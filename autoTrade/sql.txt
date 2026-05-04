@@ -1,0 +1,299 @@
+select 
+name,instrument_token,expiry,lot_size,instrument_type,strike,tradingsymbol 
+from 
+    kite_instruments 
+where 
+    segment in('MCX-OPT') 
+    and  expiry like'%-03-2026%' and name in('CRUDEOIL','CRUDEOILM','GOLDM','NATURALGAS','NATGASMINI','SILVER','SILVERM')
+    order by name;
+    
+    select 
+name,instrument_token,expiry,lot_size,instrument_type,strike,tradingsymbol 
+from 
+    kite_instruments 
+where 
+    segment in('MCX-FUT') 
+    and  expiry like'%-03-2026%' and name in('CRUDEOIL','CRUDEOILM','GOLDM','NATURALGAS','NATGASMINI','SILVER','SILVERM')
+    order by name;
+
+
+select 
+name,instrument_token,expiry,lot_size,instrument_type,strike,tradingsymbol 
+from 
+    kite_instruments 
+where 
+    segment in('MCX-OPT') 
+    and  expiry like'%-05-2026%' and name in('CRUDEOIL','CRUDEOILM')
+    order by name;
+    
+
+
+select  
+    name,instrument_token,expiry,lot_size,instrument_type,strike,tradingsymbol 
+from 
+    kite_instruments 
+where 
+    segment in('BFO-FUT','NFO-FUT') 
+    and expiry  like'%-07-2025%' 
+    and exchange in('NFO','BFO');
+
+
+select 
+name,instrument_token,expiry,lot_size,instrument_type,strike,tradingsymbol 
+from 
+    kite_instruments 
+where 
+    segment in('NFO-OPT','BFO-OPT') 
+    and  expiry like'%-07-2025%' 
+    order by name;
+
+
+
+TRUNCATE TABLE kite_instruments;
+
+LOAD DATA  LOCAL INFILE 'C:/ProgramData/MySQL/MySQL Server 8.0/Uploads/instruments.csv' INTO TABLE kite_instruments
+FIELDS TERMINATED BY ','
+ENCLOSED BY '"'
+LINES TERMINATED BY '\r\n'
+IGNORE 1 LINES
+(id,
+instrument_token, 
+exchange_token, 
+tradingsymbol, 
+name,
+last_price,
+expiry,
+strike,
+tick_size,
+lot_size,
+instrument_type,
+segment,
+exchange
+);
+
+UPDATE kite_instruments SET name = 'NIFTY MID SELECT' WHERE name='NIFTY MIDCAP SELECT (MIDCPNIFTY)';
+UPDATE kite_instruments SET name = 'HINDALCO  INDUSTRIES' WHERE name='HINDALCO  INDUSTRIES ';
+
+UPDATE kite_instruments SET name = 'TVS MOTOR COMPANY' WHERE name='TVS MOTOR COMPANY ';
+
+
+SELECT symbol FROM trade_db_windows.nse_stock_strike_intervals group by symbol;
+
+select symbol,group_concat(value ORDER BY value separator ',,') as myList  from (
+select symbol,min(CONVERT(step_value,double)) as 'value' from nse_stock_strike_intervals where month_type='M1' group by symbol 
+union
+select symbol,max(CONVERT(step_value,double)) as 'value' from nse_stock_strike_intervals where month_type='M1' group by symbol
+) 
+a group by symbol order by symbol;
+
+
+
+select tradingsymbol,instrument_token from kite_instruments where segment='NSE' and   tradingsymbol in(
+'360ONE',
+'ABB',
+'ABCAPITAL',
+'ADANIENSOL',
+'ADANIENT',
+'ADANIGREEN',
+'ADANIPORTS',
+'ALKEM',
+'AMBER',
+'AMBUJACEM',
+'ANGELONE',
+'APLAPOLLO',
+'APOLLOHOSP',
+'ASHOKLEY',
+'ASIANPAINT',
+'ASTRAL',
+'AUBANK',
+'AUROPHARMA',
+'AXISBANK',
+'BAJAJ-AUTO',
+'BAJAJFINSV',
+'BAJAJHLDNG',
+'BAJFINANCE',
+'BANDHANBNK',
+'BANKBARODA',
+'BANKINDIA',
+'BDL',
+'BEL',
+'BHARATFORG',
+'BHARTIARTL',
+'BHEL',
+'BIOCON',
+'BLUESTARCO',
+'BOSCHLTD',
+'BPCL',
+'BRITANNIA',
+'BSE',
+'CAMS',
+'CANBK',
+'CDSL',
+'CGPOWER',
+'CHOLAFIN',
+'CIPLA',
+'COALINDIA',
+'COFORGE',
+'COLPAL',
+'CONCOR',
+'CROMPTON',
+'CUMMINSIND',
+'DABUR',
+'DALBHARAT',
+'DELHIVERY',
+'DIVISLAB',
+'DIXON',
+'DLF',
+'DMART',
+'DRREDDY',
+'EICHERMOT',
+'ETERNAL',
+'EXIDEIND',
+'FEDERALBNK',
+'FORTIS',
+'GAIL',
+'GLENMARK',
+'GMRAIRPORT',
+'GODREJCP',
+'GODREJPROP',
+'GRASIM',
+'HAL',
+'HAVELLS',
+'HCLTECH',
+'HDFCAMC',
+'HDFCBANK',
+'HDFCLIFE',
+'HEROMOTOCO',
+'HINDALCO',
+'HINDPETRO',
+'HINDUNILVR',
+'HINDZINC',
+'HUDCO',
+'ICICIBANK',
+'ICICIGI',
+'ICICIPRULI',
+'IDEA',
+'IDFCFIRSTB',
+'IEX',
+'INDHOTEL',
+'INDIANB',
+'INDIGO',
+'INDUSINDBK',
+'INDUSTOWER',
+'INFY',
+'INOXWIND',
+'IOC',
+'IREDA',
+'IRFC',
+'ITC',
+'JINDALSTEL',
+'JIOFIN',
+'JSWENERGY',
+'JSWSTEEL',
+'JUBLFOOD',
+'KALYANKJIL',
+'KAYNES',
+'KEI',
+'KFINTECH',
+'KOTAKBANK',
+'KPITTECH',
+'LAURUSLABS',
+'LICHSGFIN',
+'LICI',
+'LODHA',
+'LT',
+'LTF',
+'LTM',
+'LUPIN',
+'M&M',
+'MANAPPURAM',
+'MANKIND',
+'MARICO',
+'MARUTI',
+'MAXHEALTH',
+'MAZDOCK',
+'MCX',
+'MFSL',
+'MOTHERSON',
+'MPHASIS',
+'MUTHOOTFIN',
+'NATIONALUM',
+'NAUKRI',
+'NBCC',
+'NESTLEIND',
+'NHPC',
+'NMDC',
+'NTPC',
+'NUVAMA',
+'NYKAA',
+'OBEROIRLTY',
+'OFSS',
+'OIL',
+'ONGC',
+'PAGEIND',
+'PATANJALI',
+'PAYTM',
+'PERSISTENT',
+'PETRONET',
+'PFC',
+'PGEL',
+'PHOENIXLTD',
+'PIDILITIND',
+'PIIND',
+'PNB',
+'PNBHOUSING',
+'POLICYBZR',
+'POLYCAB',
+'POWERGRID',
+'POWERINDIA',
+'PPLPHARMA',
+'PREMIERENE',
+'PRESTIGE',
+'RBLBANK',
+'RECLTD',
+'RELIANCE',
+'RVNL',
+'SAIL',
+'SAMMAANCAP',
+'SBICARD',
+'SBILIFE',
+'SBIN',
+'SHREECEM',
+'SHRIRAMFIN',
+'SIEMENS',
+'SOLARINDS',
+'SONACOMS',
+'SRF',
+'SUNPHARMA',
+'SUPREMEIND',
+'SUZLON',
+'SWIGGY',
+'SYNGENE',
+'TATACONSUM',
+'TATAELXSI',
+'TATAPOWER',
+'TATASTEEL',
+'TATATECH',
+'TCS',
+'TECHM',
+'TIINDIA',
+'TITAN',
+'TMPV',
+'TORNTPHARM',
+'TORNTPOWER',
+'TRENT',
+'TVSMOTOR',
+'ULTRACEMCO',
+'UNIONBANK',
+'UNITDSPR',
+'UNOMINDA',
+'UPL',
+'VBL',
+'VEDL',
+'VOLTAS',
+'WAAREEENER',
+'WIPRO',
+'YESBANK',
+'ZYDUSLIFE',
+) order by tradingsymbol;
+
