@@ -408,7 +408,8 @@ async function commonShowInidividuslStockPopupWindow(symbol) {
     html += '<div class="col-md-4" style="border:1px solid #c3c3c3;">'
     html += '<div class="row" >'
     html += '<div class="col-md-12" style="position:relative;background-color:#ffbcb0;">'
-    html += '<span id="' + tempName + '-pcr-probability" style="position: absolute;left: .2rem;top: .2rem;" data-name="' + symbol + '">PCR</span>'
+    html += '<span id="' + tempName + '-pcr-probability" style="position: absolute;right: .2rem;top: .2rem;" data-name="' + symbol + '">PCR</span>'
+    html += '<span title="OI Score" id="' + tempName + '-oi-score" style="position: absolute;left: 2rem;top: .1rem;" data-name="' + symbol + '">SCORE</span>'
 
     html += '<h4 style="text-align:center;padding:.5rem;padding-bottom:unset;font-size:large">OI/OBV</h4>'
     html += '</div>'

@@ -48,6 +48,25 @@ where
     order by name;
 
 
+select 
+name,instrument_token,expiry,lot_size,instrument_type,strike,tradingsymbol 
+from 
+    kite_instruments 
+where 
+    segment in('CDS-FUT') and name='USDINR'
+    and  expiry like'%-05-2026%' 
+    order by name;
+
+    select 
+name,instrument_token,expiry,lot_size,instrument_type,strike,tradingsymbol 
+from 
+    kite_instruments 
+where 
+    segment in('CDS-OPT') and name='USDINR' and expiry='29-05-2026'
+    and  expiry like'%-05-2026%' 
+    order by name;
+
+
 
 TRUNCATE TABLE kite_instruments;
 

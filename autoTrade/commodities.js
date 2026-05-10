@@ -16,12 +16,14 @@ async function showTopChartMCX(name) {
         let prevData = await getHistoricalDataUsingPromise(futures['instrument_token'], PREVIOUS_DAY_DATE, PREVIOUS_DAY_DATE, 'day');
 
         let strikeDiff = mcxFutreStrikeDiff[name];
+        console.log("Fetched strike diff for " + name + " is " + strikeDiff)
         if (!strikeDiff) {
             strikeDiff = "100,100"
         }
         strikeDiff = strikeDiff.split(",");
-        let strikeOne = parseInt(strikeDiff[0])
-        let strikeTwo = parseInt(strikeDiff[1])
+        let strikeOne = parseFloat(strikeDiff[0])
+        let strikeTwo = parseFloat(strikeDiff[1])
+        console.log("Strike Diff for " + name + " is " + strikeOne + " and " + strikeTwo)
 
         let open = data.data.candles[0][4]
         let prevClose = prevData.data.candles[0][4]
@@ -56,6 +58,10 @@ async function showTopChartMCX(name) {
 
         if (name == "NATURALGAS" || name == "NATGASMINI") {
             vix = VIX
+        }
+
+         if (name == "USDINR") {
+            vix = "4.85"
         }
 
         ovxChg = parseFloat(vix) / Math.sqrt(365 - 104 - 15)

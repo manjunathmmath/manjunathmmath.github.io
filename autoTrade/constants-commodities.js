@@ -5,6 +5,7 @@ let mcxFutreStrikeDiff = {
 	'NATGASMINI': '5,5',
 	'NATURALGAS': '5,5',
 	'SILVER': '500,500',
+	'USDINR': '0.25,0.25',
 }
 
 let commoditiesFutureInstrumentsList = [
@@ -25,5 +26,15 @@ let commoditiesFutureInstrumentsList = [
 		"instrument_type" : "FUT",
 		"strike" : "0",
 		"tradingsymbol" : "CRUDEOILM26MAYFUT"
+	}
+	,
+	{
+		"name" : "USDINR",
+		"instrument_token" : "825603",
+		"expiry" : "26-05-2026",
+		"lot_size" : "1",
+		"instrument_type" : "FUT",
+		"strike" : "0",
+		"tradingsymbol" : "USDINR26MAYFUT"
 	}
 ]
