@@ -413,8 +413,9 @@ async function commonShowInidividuslStockPopupWindow(symbol) {
 
     html += '<h4 style="text-align:center;padding:.5rem;padding-bottom:unset;font-size:large">OI/OBV</h4>'
     html += '</div>'
-    html += '<div class="col-md-12" style="height:10rem;position:relative;">'
+    html += '<div class="col-md-12" style="height:13rem;position:relative;overflow-y:auto;">'
     html += '<div id="' + tempName + '-oi-obv" ></div>'
+    html += '<div id="' + tempName + '-component-oi-list-table"></div>'
     html += '</div>'
     html += '</div>'
     html += '</div>'
