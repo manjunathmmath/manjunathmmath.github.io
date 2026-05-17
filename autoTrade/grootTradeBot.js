@@ -666,8 +666,8 @@ function setScore() {
             type: 'gauge',
         },
         gauge: {
-            min: -20, // Set minimum to a negative number
-            max: 20,  // Set maximum
+            min: -30, // Set minimum to a negative number
+            max: 30,  // Set maximum
             label: {
                 format: function (value, ratio) {
                     return value; // Display the actual value

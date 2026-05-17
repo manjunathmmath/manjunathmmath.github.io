@@ -67,6 +67,10 @@ const VERSION = "v1.0";
 const BASE_URL = "https://kite.zerodha.com";
 const PREVIOUS_DAY_DATE = g_config.get('previous_day_date');
 const CURRENT_DAY = g_config.get('current_day_date');
+
+const CURRENT_DATE_FROM_DATE = CURRENT_DAY+" 09:15:00";
+const CURRENT_DATE_TO_DATE = CURRENT_DAY+" 11:05:00";
+
 let date = new Date().toJSON().slice(0, 10);
 const MARGIN = g_config.get('margin');
 let weightIndex = []
