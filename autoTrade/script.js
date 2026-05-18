@@ -456,3 +456,38 @@ async function commonShowInidividuslStockPopupWindow(symbol) {
     let res = await showFutureDetails(symbol);
     setFutureDetails(symbol, res);
 }
+
+
+window.addEventListener('load', function () {
+    getSetAccessToken()
+}, false);
+
+
+
+async function getSetAccessToken(){
+    await callSleepForAWhile(2000)
+    if (window.location.href.includes('request_token')) {
+        var q = qs.parse(window.location.href);
+        if (q.status == 'success') {
+            jQ.post('https://api.kite.trade/session/token',
+                { 'api_key': g_config.get('api_key'), 'request_token': q.request_token, 'checksum': sha256(g_config.get('api_key') + q.request_token + g_config.get('api_secret')) },
+                function (data, status) {
+                    callSackBarInfo(`AT status ${status}`);
+                    alert(data.data.access_token)
+                    g_config.set('api_access_token', data.data.access_token);
+                    redirectToDashboard()
+                })
+                .fail(function (xhr, status, error) {
+                    var resp = JSON.parse(xhr.responseText);
+                    callSackBarInfo(`AT Status ${status} :: ${resp.message}`);
+                });
+        } else {
+            callSackBarInfo('Unable to get Request Token');
+        }
+    }
+}
+
+async function redirectToDashboard() {
+     await callSleepForAWhile(2000)
+    window.location.href = "https://kite.zerodha.com/dashboard";
+}

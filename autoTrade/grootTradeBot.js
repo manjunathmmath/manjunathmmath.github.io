@@ -45,7 +45,7 @@ async function showGrootTradeBot() {
 
     let statusHtml = ''
     statusHtml += '<div class="row" position:relative;" >'
-    statusHtml += '<div class="col-md-9">'
+    statusHtml += '<div class="col-md-8">'
     statusHtml += '<div class="row" id="status-bar-container">'
     statusHtml += '</div>'
     statusHtml += '</div>'
@@ -55,6 +55,11 @@ async function showGrootTradeBot() {
     statusHtml += '<div class="col-md-1" style="text-align:right;">'
     statusHtml += '<a id="show-stock-viewer">Stocks</a>'
     statusHtml += '</div>'
+
+    statusHtml += '<div class="col-md-1" style="text-align:right;">'
+    statusHtml += '<a id="show-market-quote-analyzer">Quotes Analyzer</a>'
+    statusHtml += '</div>'
+
     statusHtml += '<div class="col-md-1" style="text-align:right;">'
     statusHtml += '<span id="refresh-timer-one">00:00</span>'
     statusHtml += '</div>'
@@ -130,6 +135,11 @@ jQ(document).on("click", "#data-load", function () {
         position: 'tc'
     });
 });
+
+
+GM_registerMenuCommand("Create AT ", function () {
+    window.open("https://kite.zerodha.com/connect/login?v=3&api_key=" + g_config.get('api_key'), "_self");
+}, "r");
 
 jQ(document).on('click', '#nine-fifteen-scan', function (e) {
     scanNineFifteenCandle()
@@ -666,8 +676,8 @@ function setScore() {
             type: 'gauge',
         },
         gauge: {
-            min: -30, // Set minimum to a negative number
-            max: 30,  // Set maximum
+            min: -40, // Set minimum to a negative number
+            max: 40,  // Set maximum
             label: {
                 format: function (value, ratio) {
                     return value; // Display the actual value
@@ -1569,9 +1579,9 @@ function updateScoresOfOI(name, item) {
     if (item['CHG_OI_PE'] > item['CHG_OI_CE']) {
         SCORE++
     } else if (item['CE_OBV'][item['CE_OBV'].length - 1]['obv'] > item['PE_OBV'][item['PE_OBV'].length - 1]['obv']) {
-        //SCORE++
+        SCORE++
     } else if (item['PE_OBV'][item['PE_OBV'].length - 1]['obv'] < 0) {
-        //SCORE++
+        SCORE++
     }
 
     if (item['OI_PE'] > item['OI_CE']) {
@@ -1585,9 +1595,9 @@ function updateScoresOfOI(name, item) {
     if (item['CHG_OI_CE'] > item['CHG_OI_PE']) {
         SCORE--
     } else if (item['PE_OBV'][item['PE_OBV'].length - 1]['obv'] > item['CE_OBV'][item['CE_OBV'].length - 1]['obv']) {
-        //SCORE--
+        SCORE--
     } else if (item['CE_OBV'][item['CE_OBV'].length - 1]['obv'] > 0) {
-        //SCORE--
+        SCORE--
     }
 
     if (name == "NIFTY 50") {
@@ -1600,6 +1610,7 @@ function updateScoresOfOI(name, item) {
         HDFCBANK_OI_OBV_SCORE += SCORE
     }
 
+    console.log("Score for " + name + " is " + SCORE + "STRIKE: " + item['STRIKE'])
     return SCORE;
 
 }
