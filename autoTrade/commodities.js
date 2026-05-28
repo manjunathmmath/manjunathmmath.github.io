@@ -232,16 +232,16 @@ async function showTrendingOIMCX(instrument) {
 
     if (instrument == "NIFTY 50") {
         instrument = "NIFTY"
-        strikToShow = 3
+        strikToShow = 4
     } else if (instrument == "NIFTY BANK") {
         instrument = "BANKNIFTY"
-        strikToShow = 3
+        strikToShow = 4
     } else if (instrument == "NIFTY FIN SERVICE") {
         instrument = "FINNIFTY"
-        strikToShow = 3
+        strikToShow = 4
     } else if (instrument == "NIFTY MID SELECT") {
         instrument = "MIDCPNIFTY"
-        strikToShow = 3
+        strikToShow = 4
     }
 
     let atmStrike = 0;
