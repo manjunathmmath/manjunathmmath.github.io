@@ -220,11 +220,11 @@ async function showOITrendingDetails(strikeData, selectedStrike) {
                     HISTORICAL_DATA_INTERVAL_OVERRIDE = '5minute'
                 }
 
-                let prevDataCE = await getHistoricalDataUsingPromise(CE.instrument_token, PREVIOUS_DAY_DATE, PREVIOUS_DAY_DATE, 'day');
-                let currDataCE = await getHistoricalDataUsingPromise(CE.instrument_token, PREVIOUS_DAY_DATE, CURRENT_DAY, HISTORICAL_DATA_INTERVAL_OVERRIDE);
+                let prevDataCE = await getHistoricalDataUsingPromise(CE.instrument_token, PREVIOUS_DAY, PREVIOUS_DAY, 'day');
+                let currDataCE = await getHistoricalDataUsingPromise(CE.instrument_token, PREVIOUS_DAY, CURRENT_DAY, HISTORICAL_DATA_INTERVAL_OVERRIDE);
 
-                let prevDataPE = await getHistoricalDataUsingPromise(PE.instrument_token, PREVIOUS_DAY_DATE, PREVIOUS_DAY_DATE, 'day');
-                let currDataPE = await getHistoricalDataUsingPromise(PE.instrument_token, PREVIOUS_DAY_DATE, CURRENT_DAY, HISTORICAL_DATA_INTERVAL_OVERRIDE);
+                let prevDataPE = await getHistoricalDataUsingPromise(PE.instrument_token, PREVIOUS_DAY, PREVIOUS_DAY, 'day');
+                let currDataPE = await getHistoricalDataUsingPromise(PE.instrument_token, PREVIOUS_DAY, CURRENT_DAY, HISTORICAL_DATA_INTERVAL_OVERRIDE);
 
 
 
