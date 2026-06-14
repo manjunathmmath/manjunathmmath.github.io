@@ -197,6 +197,18 @@
 }
 .gtb-t915-combo-h i { color: var(--gtb-accent); }
 .gtb-t915-combo th, .gtb-t915-combo td { padding: 5px 10px; }
+
+/* Highlight rows matching today's 9:15 combo */
+.gtb-t915-table tr.gtb-t915-today td {
+  background: var(--gtb-accent-dim) !important;
+  box-shadow: inset 2px 0 0 var(--gtb-accent);
+}
+.gtb-t915-table tr.gtb-t915-today td:first-child { color: var(--gtb-accent); font-weight: 800; }
+.gtb-t915-today-note {
+  font-size: 0.64rem; color: var(--gtb-accent); font-weight: 700;
+  margin: 6px 0; display: flex; align-items: center; gap: 6px;
+}
+.gtb-t915-today-note b { font-family: var(--gtb-mono); }
 .gtb-t915-et { font-size: 0.5rem; opacity: 0.7; letter-spacing: 0.04em; }
 
 /* ── 9:15 close strip ──────────────────────────────────────── */

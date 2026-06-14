@@ -436,7 +436,7 @@ function commonMarkupPlaceHolder() {
        + 'border-radius:4px;padding:2px 4px;cursor:pointer;width:76px;" title="Snapshot end time — empty = live">';
 
     // Tool launchers as icon-only buttons
-    h += '<a id="show-915-backtest" class="gtb-ctrl-link" title="9:15 Trend — 60-day day-wise (NIFTY/SENSEX/BANK)"><i class="bi bi-calendar-week"></i></a>';
+    h += '<a id="show-915-backtest" class="gtb-ctrl-link" title="9:15 Trend — 1-year day-wise backtest (NIFTY/SENSEX/BANK)"><i class="bi bi-calendar-week"></i></a>';
     h += '<a id="show-oi-viewer" class="gtb-ctrl-link" title="OI Analyzer"><i class="bi bi-eye"></i></a>';
     h += '<a id="show-stock-viewer" class="gtb-ctrl-link" title="Stock Viewer"><i class="bi bi-list-ul"></i></a>';
     h += '<a id="show-market-quote-analyzer" class="gtb-ctrl-link" title="Quotes"><i class="bi bi-graph-up"></i></a>';
@@ -3548,22 +3548,40 @@ function _gtbLegsFor(outcome) {
     return [];
 }
 
+// Fetch 5-minute candles over an arbitrary range by chunking into ≤95-day windows
+// (Kite caps the 5-minute interval at 100 days per request) and merging in order.
+async function _gtbFetch5minRange(token, fromM, toM) {
+    var all = [];
+    var CHUNK = 95;
+    var start = fromM.clone();
+    while (start.isSameOrBefore(toM)) {
+        var end = moment.min(start.clone().add(CHUNK - 1, 'days'), toM);
+        var res = await getHistoricalDataUsingPromise(token, start.format('YYYY-MM-DD'), end.format('YYYY-MM-DD'), '5minute');
+        var c = (res && res.data && res.data.candles) ? res.data.candles : [];
+        if (c.length) all = all.concat(c);
+        start = end.clone().add(1, 'days');
+    }
+    return all;
+}
+
 async function _gtbBuild915Trend(lookback) {
-    lookback = lookback || 60;
+    lookback = lookback || 250;   // ~1 year of trading days
     var instruments = ['NIFTY 50', 'SENSEX', 'NIFTY BANK', 'GIFT NIFTY'];
-    var to   = moment().format('YYYY-MM-DD');
-    // Kite caps the 5-minute interval at 100 days/request → keep the window under that.
-    // ~98 calendar days ≈ 68 trading days, enough to fill a 60-day lookback.
-    var calDays = Math.min(98, Math.ceil(lookback * 1.45) + 6);
-    var from = moment().subtract(calDays, 'days').format('YYYY-MM-DD');
+    // Computed rows are cacheable per day (past days don't change) — avoids re-fetching
+    // ~16 chunked requests on every open.
+    var ckey = 'GTB_915TREND_' + moment().format('YYYY-MM-DD') + '_' + lookback;
+    try { var cached = localStorage.getItem(ckey); if (cached) return JSON.parse(cached); } catch (e) {}
+
+    var toM   = moment();
+    // Calendar span to cover `lookback` trading days (~5 trading days per 7 calendar days).
+    var fromM = moment().subtract(Math.ceil(lookback * 1.5) + 10, 'days');
 
     var byInstr = {};
     for (var i = 0; i < instruments.length; i++) {
         var name = instruments[i];
         var token = INSTRUMENT_TOKENS[name];
         if (!token) { byInstr[name] = {}; continue; }
-        var res = await getHistoricalDataUsingPromise(token, from, to, '5minute');
-        var candles = (res && res.data && res.data.candles) ? res.data.candles : [];
+        var candles = await _gtbFetch5minRange(token, fromM, toM);
         var dayMap = {};
         candles.forEach(function (c) {
             var d = moment(c[0]).format('YYYY-MM-DD');
@@ -3601,6 +3619,7 @@ async function _gtbBuild915Trend(lookback) {
         return { date: d, n: n.cls, s: s.cls, b: b.cls, g: g ? g.cls : '—', key: key,
                  outcome: strat.outcome, level: strat.level, move: move, movePct: movePct, legs: legs };
     });
+    try { localStorage.setItem(ckey, JSON.stringify(rows)); } catch (e) {}
     return rows;
 }
 
@@ -3608,6 +3627,12 @@ function _render915Trend(rows) {
     if (!rows || !rows.length) {
         return '<div style="padding:24px;text-align:center;color:var(--gtb-muted);"><i class="bi bi-exclamation-triangle"></i> No data</div>';
     }
+    // Today's 9:15 combo (same classification the live dashboard uses) — for highlighting.
+    var _tb915 = JSON.parse(localStorage.getItem('VALID_BREAKOUT_NINE_FIFTEEN') || '{}');
+    var todayKey = _gtbNorm915((_tb915['NIFTY 50']  || {}).CLOSE_9_15)
+              + '-' + _gtbNorm915((_tb915['SENSEX']    || {}).CLOSE_9_15)
+              + '-' + _gtbNorm915((_tb915['NIFTY BANK']|| {}).CLOSE_9_15);
+    var hasToday = todayKey.indexOf('undefined') === -1;
     // Aggregate per-leg P/L stats (each Buy/Sell day = 2 legs)
     var win = 0, loss = 0, levelN = 0, trendN = 0, legCount = 0, totPnl = 0, totMfe = 0, totMae = 0, tpN = 0, slN = 0;
     rows.forEach(function (r) {
@@ -3704,13 +3729,16 @@ function _render915Trend(rows) {
     // ── Per-combo edge table ────────────────────────────────────────────────────
     html += '<div class="gtb-t915-combo-h"><i class="bi bi-trophy"></i> Per-combo edge '
          +  '<span style="font-weight:400;color:var(--gtb-muted);">(NIFTY-SENSEX-BANK · sorted by win-rate · low N = unreliable)</span></div>';
+    if (hasToday) html += '<div class="gtb-t915-today-note"><i class="bi bi-star-fill"></i> Today\'s 9:15 combo: <b>' + todayKey + '</b> — highlighted below</div>';
     html += '<table class="gtb-t915-table gtb-t915-combo"><thead><tr>'
          +  '<th>Combo</th><th>Bias</th><th>Days</th><th>Win-rate</th><th>Avg P/L</th><th>Avg Max-Fav</th></tr></thead><tbody>';
     comboRows.forEach(function (c) {
         var wc = c.winPct >= 60 ? 'var(--gtb-green)' : c.winPct <= 40 ? 'var(--gtb-red)' : 'var(--gtb-amber)';
-        var lowN = c.days < 4 ? ' style="opacity:0.5;"' : '';
-        html += '<tr' + lowN + '>'
-            + '<td class="gtb-t915-date" style="font-family:var(--gtb-mono);">' + c.key + '</td>'
+        var isToday = hasToday && c.key === todayKey;
+        var trCls = isToday ? ' class="gtb-t915-today"' : '';
+        var lowN = (!isToday && c.days < 4) ? ' style="opacity:0.5;"' : '';
+        html += '<tr' + trCls + lowN + '>'
+            + '<td class="gtb-t915-date" style="font-family:var(--gtb-mono);">' + (isToday ? '★ ' : '') + c.key + '</td>'
             + '<td>' + _out(c.outcome) + '</td>'
             + '<td class="gtb-t915-date">' + c.days + '</td>'
             + '<td style="color:' + wc + ';font-weight:800;font-family:var(--gtb-mono);">' + c.winPct + '%</td>'
@@ -3721,7 +3749,10 @@ function _render915Trend(rows) {
     });
     html += '</tbody></table>';
 
-    html += '<div class="gtb-t915-combo-h"><i class="bi bi-calendar3"></i> Day-by-day</div>';
+    var _matchN = hasToday ? rows.filter(function (r) { return r.key === todayKey; }).length : 0;
+    html += '<div class="gtb-t915-combo-h"><i class="bi bi-calendar3"></i> Day-by-day'
+         +  (hasToday ? '<span style="font-weight:400;color:var(--gtb-muted);"> — ★ ' + _matchN + ' day(s) matched today\'s combo (' + todayKey + ')</span>' : '')
+         +  '</div>';
     html += '<table class="gtb-t915-table"><thead><tr>'
          +  '<th>Date</th><th>GIFT</th><th>NIFTY</th><th>SENSEX</th><th>BANK</th><th>Strategy</th><th>Entry Level</th><th>Nifty →12pm</th><th>Result (P/L)</th><th>Max Fav</th><th>Max Adv</th><th>1:1 TP/SL</th><th>Entry @</th><th>Peak @</th>'
          +  '</tr></thead><tbody>';
@@ -3734,8 +3765,9 @@ function _render915Trend(rows) {
         var tpslHtml= (r.legs && r.legs.length) ? r.legs.map(_legTpsl).join(' ') : empty;
         var entHtml = (r.legs && r.legs.length) ? r.legs.map(function (lg) { return _legTime(lg, 'entryTime'); }).join(' ') : empty;
         var pkHtml  = (r.legs && r.legs.length) ? r.legs.map(function (lg) { return _legTime(lg, 'peakTime'); }).join(' ') : empty;
-        html += '<tr>'
-            + '<td class="gtb-t915-date">' + moment(r.date).format('DD MMM') + '</td>'
+        var rowMatch = hasToday && r.key === todayKey;   // same 9:15 combo as today
+        html += '<tr' + (rowMatch ? ' class="gtb-t915-today"' : '') + '>'
+            + '<td class="gtb-t915-date">' + (rowMatch ? '★ ' : '') + moment(r.date).format('DD MMM') + '</td>'
             + '<td>' + _cls(r.g) + '</td><td>' + _cls(r.n) + '</td><td>' + _cls(r.s) + '</td><td>' + _cls(r.b) + '</td>'
             + '<td>' + _out(r.outcome) + '</td>'
             + '<td class="gtb-t915-lvl">' + r.level + '</td>'
@@ -3755,11 +3787,11 @@ function _render915Trend(rows) {
 
 jQ(document).on('click', '#show-915-backtest', async function (e) {
     e.preventDefault();
-    showMaximizeOverlay('<i class="bi bi-calendar-week"></i> 9:15 Opening-Trend + Entry-Level P/L Backtest — 60-Day, till 12:00 (GIFT · NIFTY · SENSEX · BANK)',
+    showMaximizeOverlay('<i class="bi bi-calendar-week"></i> 9:15 Opening-Trend + Entry-Level P/L Backtest — 1-Year, till 12:00 (GIFT · NIFTY · SENSEX · BANK)',
         '<div style="padding:30px;text-align:center;color:var(--gtb-muted);font-size:0.85rem;">'
-        + '<i class="bi bi-hourglass-split"></i> Building last 60 days of 9:15 trend…</div>');
+        + '<i class="bi bi-hourglass-split"></i> Building ~1 year of 9:15 trend (chunked 5-min fetch, may take ~20–30s)…</div>');
     try {
-        var rows = await _gtbBuild915Trend(60);
+        var rows = await _gtbBuild915Trend(250);
         jQ('#groot-maximize-body').html(_render915Trend(rows));
     } catch (err) {
         jQ('#groot-maximize-body').html('<div style="padding:24px;color:var(--gtb-red);">Error: ' + (err && err.message) + '</div>');
