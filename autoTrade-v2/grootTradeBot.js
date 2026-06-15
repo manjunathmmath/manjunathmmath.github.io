@@ -3767,7 +3767,8 @@ function _render915Trend(rows) {
         var pkHtml  = (r.legs && r.legs.length) ? r.legs.map(function (lg) { return _legTime(lg, 'peakTime'); }).join(' ') : empty;
         var rowMatch = hasToday && r.key === todayKey;   // same 9:15 combo as today
         html += '<tr' + (rowMatch ? ' class="gtb-t915-today"' : '') + '>'
-            + '<td class="gtb-t915-date">' + (rowMatch ? '★ ' : '') + moment(r.date).format('DD MMM') + '</td>'
+            + '<td class="gtb-t915-date">' + (rowMatch ? '★ ' : '') + moment(r.date).format('DD MMM')
+            + ' <button class="gtb-day-chart-btn" data-date="' + r.date + '" title="View NIFTY chart for this day"><i class="bi bi-bar-chart-line"></i></button></td>'
             + '<td>' + _cls(r.g) + '</td><td>' + _cls(r.n) + '</td><td>' + _cls(r.s) + '</td><td>' + _cls(r.b) + '</td>'
             + '<td>' + _out(r.outcome) + '</td>'
             + '<td class="gtb-t915-lvl">' + r.level + '</td>'
@@ -3795,6 +3796,57 @@ jQ(document).on('click', '#show-915-backtest', async function (e) {
         jQ('#groot-maximize-body').html(_render915Trend(rows));
     } catch (err) {
         jQ('#groot-maximize-body').html('<div style="padding:24px;color:var(--gtb-red);">Error: ' + (err && err.message) + '</div>');
+    }
+});
+
+// ── Day chart popup (from the 9:15 day-by-day table) ──────────────────────────
+function _gtbDayChartPopup() {
+    var el = document.getElementById('gtb-daychart-overlay');
+    if (!el) {
+        el = document.createElement('div');
+        el.id = 'gtb-daychart-overlay';
+        el.innerHTML = '<div id="gtb-daychart-panel">'
+            + '<div id="gtb-daychart-hd"><span class="gtb-daychart-title"></span>'
+            + '<i class="bi bi-x-lg gtb-daychart-close"></i></div>'
+            + '<div id="gtb-daychart-body"></div></div>';
+        document.body.appendChild(el);
+    }
+    jQ(el).toggleClass('gtb-light', jQ('#main-trade-bot-container').hasClass('gtb-light'));
+    return jQ(el);
+}
+jQ(document).on('click', '.gtb-daychart-close, #gtb-daychart-overlay', function (e) {
+    if (e.target.id === 'gtb-daychart-overlay' || jQ(e.target).closest('.gtb-daychart-close').length) {
+        jQ('#gtb-daychart-overlay').removeClass('active');
+        jQ('#gtb-daychart-body').html('');
+    }
+});
+jQ(document).on('click', '#gtb-daychart-panel', function (e) { e.stopPropagation(); });
+
+jQ(document).on('click', '.gtb-day-chart-btn', async function (e) {
+    e.preventDefault(); e.stopPropagation();
+    var date = jQ(this).data('date');
+    var ov = _gtbDayChartPopup();
+    ov.find('.gtb-daychart-title').html('<i class="bi bi-candlestick"></i> NIFTY 50 — ' + moment(date).format('ddd, DD MMM YYYY'));
+    ov.find('#gtb-daychart-body').html('<div style="padding:30px;text-align:center;color:var(--gtb-muted);"><i class="bi bi-hourglass-split"></i> Loading…</div>');
+    ov.addClass('active');
+    try {
+        var token = INSTRUMENT_TOKENS['NIFTY 50'];
+        var res = await getHistoricalDataUsingPromise(token, date, date, '5minute');
+        var candles = (res && res.data && res.data.candles) ? res.data.candles : [];
+        if (!candles.length) { ov.find('#gtb-daychart-body').html('<div style="padding:24px;color:var(--gtb-red);">No candle data for this day.</div>'); return; }
+        var open = parseFloat(candles[0][1]);
+        var sd = getStrikeDetails({ price: open }, 'NIFTY 50');
+        var refLines = [
+            { key: 'OPEN', value: open,             text: 'OPEN' },
+            { key: 'AST',  value: sd.ustrikeTwo,    text: 'AST'  },
+            { key: 'ASO',  value: sd.ustrikeOne,    text: 'ASO'  },
+            { key: 'BSO',  value: sd.bstrikeOne,    text: 'BSO'  },
+            { key: 'BST',  value: sd.bstrikeTwo,    text: 'BST'  },
+        ];
+        ov.find('#gtb-daychart-body').html('<div id="gtb-daychart-canvas" style="width:100%;height:440px;"></div>');
+        _renderLWChart('gtb-daychart-canvas', candles, refLines, 440);
+    } catch (err) {
+        ov.find('#gtb-daychart-body').html('<div style="padding:24px;color:var(--gtb-red);">Error: ' + (err && err.message) + '</div>');
     }
 });
 

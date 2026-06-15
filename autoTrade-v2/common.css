@@ -209,6 +209,35 @@
   margin: 6px 0; display: flex; align-items: center; gap: 6px;
 }
 .gtb-t915-today-note b { font-family: var(--gtb-mono); }
+
+/* Day-chart button + popup */
+.gtb-day-chart-btn {
+  background: var(--gtb-surface2); border: 1px solid var(--gtb-border2);
+  color: var(--gtb-muted); cursor: pointer; font-size: 0.55rem;
+  padding: 0 4px; margin-left: 4px; line-height: 1.6;
+}
+.gtb-day-chart-btn:hover { color: var(--gtb-accent); border-color: var(--gtb-accent); }
+#gtb-daychart-overlay {
+  display: none; position: fixed; inset: 0; z-index: 100001;
+  background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
+  align-items: center; justify-content: center; padding: 24px;
+}
+#gtb-daychart-overlay.active { display: flex; }
+#gtb-daychart-panel {
+  background: var(--gtb-surface); border: 1px solid var(--gtb-border);
+  width: 92vw; max-width: 1100px;
+  box-shadow: 0 24px 80px rgba(0,0,0,0.7);
+}
+#gtb-daychart-hd {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 9px 14px; background: var(--gtb-surface2);
+  border-bottom: 1px solid var(--gtb-border);
+  font-size: 0.78rem; font-weight: 800; color: var(--gtb-text);
+}
+#gtb-daychart-hd i.bi-candlestick { color: var(--gtb-accent); margin-right: 6px; }
+.gtb-daychart-close { cursor: pointer; color: var(--gtb-muted); font-size: 0.8rem; }
+.gtb-daychart-close:hover { color: var(--gtb-red); }
+#gtb-daychart-body { padding: 12px 14px; }
 .gtb-t915-et { font-size: 0.5rem; opacity: 0.7; letter-spacing: 0.04em; }
 
 /* ── 9:15 close strip ──────────────────────────────────────── */
