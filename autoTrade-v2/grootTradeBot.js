@@ -437,6 +437,7 @@ function commonMarkupPlaceHolder() {
 
     // Tool launchers as icon-only buttons
     h += '<a id="show-915-backtest" class="gtb-ctrl-link" title="9:15 Trend — 1-year day-wise backtest (NIFTY/SENSEX/BANK)"><i class="bi bi-calendar-week"></i></a>';
+    h += '<a id="show-all-oi" class="gtb-ctrl-link" title="OI Scan — all instruments incl. weighted constituents"><i class="bi bi-layers-fill"></i></a>';
     h += '<a id="show-oi-viewer" class="gtb-ctrl-link" title="OI Analyzer"><i class="bi bi-eye"></i></a>';
     h += '<a id="show-stock-viewer" class="gtb-ctrl-link" title="Stock Viewer"><i class="bi bi-list-ul"></i></a>';
     h += '<a id="show-market-quote-analyzer" class="gtb-ctrl-link" title="Quotes"><i class="bi bi-graph-up"></i></a>';
@@ -3569,12 +3570,21 @@ async function _gtbBuild915Trend(lookback) {
     var instruments = ['NIFTY 50', 'SENSEX', 'NIFTY BANK', 'GIFT NIFTY'];
     // Computed rows are cacheable per day (past days don't change) — avoids re-fetching
     // ~16 chunked requests on every open.
-    var ckey = 'GTB_915TREND_' + moment().format('YYYY-MM-DD') + '_' + lookback;
+    var ckey = 'GTB_915TREND_' + moment().format('YYYY-MM-DD') + '_' + lookback + '_v2';  // v2 = + VIX
     try { var cached = localStorage.getItem(ckey); if (cached) return JSON.parse(cached); } catch (e) {}
 
     var toM   = moment();
     // Calendar span to cover `lookback` trading days (~5 trading days per 7 calendar days).
     var fromM = moment().subtract(Math.ceil(lookback * 1.5) + 10, 'days');
+
+    // India VIX (token 264969) daily — for VIX-regime classification of each day
+    var vixMap = {};
+    try {
+        var vixTok = (typeof INSTRUMENT_TOKENS !== 'undefined' && INSTRUMENT_TOKENS['INDIA VIX']) || 264969;
+        var vres = await getHistoricalDataUsingPromise(vixTok, fromM.format('YYYY-MM-DD'), toM.format('YYYY-MM-DD'), 'day');
+        var vc = (vres && vres.data && vres.data.candles) ? vres.data.candles : [];
+        vc.forEach(function (c) { vixMap[moment(c[0]).format('YYYY-MM-DD')] = parseFloat(c[1]); }); // day open VIX
+    } catch (e) {}
 
     var byInstr = {};
     for (var i = 0; i < instruments.length; i++) {
@@ -3617,16 +3627,21 @@ async function _gtbBuild915Trend(lookback) {
         var movePct = n.open ? ((c12 - n.open) / n.open * 100) : 0;
         var legs = _gtbLegsFor(strat.outcome).map(function (dir) { return _gtbSimLeg(dir, n.cands, n.open); }).filter(Boolean);
         return { date: d, n: n.cls, s: s.cls, b: b.cls, g: g ? g.cls : '—', key: key,
-                 outcome: strat.outcome, level: strat.level, move: move, movePct: movePct, legs: legs };
+                 outcome: strat.outcome, level: strat.level, move: move, movePct: movePct, legs: legs,
+                 vix: (vixMap[d] != null && !isNaN(vixMap[d])) ? vixMap[d] : null };
     });
     try { localStorage.setItem(ckey, JSON.stringify(rows)); } catch (e) {}
     return rows;
 }
 
+var _GTB_915_ROWS = [];   // last-built day rows, for the combo-charts popup
+var _GTB_OIC_LIST = [];   // last OI-compare instrument list, for the detailed/compact toggle
+
 function _render915Trend(rows) {
     if (!rows || !rows.length) {
         return '<div style="padding:24px;text-align:center;color:var(--gtb-muted);"><i class="bi bi-exclamation-triangle"></i> No data</div>';
     }
+    _GTB_915_ROWS = rows;
     // Today's 9:15 combo (same classification the live dashboard uses) — for highlighting.
     var _tb915 = JSON.parse(localStorage.getItem('VALID_BREAKOUT_NINE_FIFTEEN') || '{}');
     var todayKey = _gtbNorm915((_tb915['NIFTY 50']  || {}).CLOSE_9_15)
@@ -3650,18 +3665,29 @@ function _render915Trend(rows) {
     var tpslN  = tpN + slN;
     var tpPct  = tpslN ? Math.round(tpN / tpslN * 100) : 0;   // target-before-stop hit rate (1:1)
 
+    // VIX-regime threshold = median day-open VIX across the sample (adaptive split)
+    var _vv = rows.map(function (r) { return r.vix; }).filter(function (v) { return v != null && !isNaN(v); }).sort(function (a, b) { return a - b; });
+    var vixThresh = _vv.length ? _vv[Math.floor(_vv.length / 2)] : null;
+
     // ── Per-combo performance (which 9:15 combos actually have an edge) ──────────
     var combo = {};
     rows.forEach(function (r) {
-        if (!combo[r.key]) combo[r.key] = { key: r.key, outcome: r.outcome, days: 0, legs: 0, win: 0, pnl: 0, mfe: 0 };
+        if (!combo[r.key]) combo[r.key] = { key: r.key, outcome: r.outcome, level: r.level, days: 0, legs: 0, win: 0, pnl: 0, mfe: 0, loWin: 0, loLegs: 0, hiWin: 0, hiLegs: 0 };
         var c = combo[r.key]; c.days++;
-        (r.legs || []).forEach(function (lg) { c.legs++; if (lg.win) c.win++; c.pnl += lg.pnl; c.mfe += (lg.mfe || 0); });
+        var regime = (vixThresh != null && r.vix != null) ? (r.vix <= vixThresh ? 'lo' : 'hi') : null;
+        (r.legs || []).forEach(function (lg) {
+            c.legs++; if (lg.win) c.win++; c.pnl += lg.pnl; c.mfe += (lg.mfe || 0);
+            if (regime === 'lo') { c.loLegs++; if (lg.win) c.loWin++; }
+            else if (regime === 'hi') { c.hiLegs++; if (lg.win) c.hiWin++; }
+        });
     });
     var comboRows = Object.keys(combo).map(function (k) {
         var c = combo[k];
         c.winPct = c.legs ? Math.round(c.win / c.legs * 100) : 0;
         c.avgPnl = c.legs ? (c.pnl / c.legs) : 0;
         c.avgMfe = c.legs ? (c.mfe / c.legs) : 0;
+        c.loPct  = c.loLegs ? Math.round(c.loWin / c.loLegs * 100) : null;
+        c.hiPct  = c.hiLegs ? Math.round(c.hiWin / c.hiLegs * 100) : null;
         return c;
     }).sort(function (a, b) { return b.winPct - a.winPct || b.days - a.days; });
 
@@ -3727,21 +3753,33 @@ function _render915Trend(rows) {
          +  '</div>';
 
     // ── Per-combo edge table ────────────────────────────────────────────────────
+    var vixTxt = vixThresh != null ? vixThresh.toFixed(2) : '—';
     html += '<div class="gtb-t915-combo-h"><i class="bi bi-trophy"></i> Per-combo edge '
-         +  '<span style="font-weight:400;color:var(--gtb-muted);">(NIFTY-SENSEX-BANK · sorted by win-rate · low N = unreliable)</span></div>';
+         +  '<span style="font-weight:400;color:var(--gtb-muted);">(NIFTY-SENSEX-BANK · sorted by win-rate · low N = unreliable · VIX split at median ' + vixTxt + ')</span></div>';
     if (hasToday) html += '<div class="gtb-t915-today-note"><i class="bi bi-star-fill"></i> Today\'s 9:15 combo: <b>' + todayKey + '</b> — highlighted below</div>';
     html += '<table class="gtb-t915-table gtb-t915-combo"><thead><tr>'
-         +  '<th>Combo</th><th>Bias</th><th>Days</th><th>Win-rate</th><th>Avg P/L</th><th>Avg Max-Fav</th></tr></thead><tbody>';
+         +  '<th>Combo</th><th>Bias</th><th>Entry Level</th><th>Days</th><th>Win-rate</th>'
+         +  '<th title="Win-rate on days with VIX ≤ ' + vixTxt + '">Low-VIX</th>'
+         +  '<th title="Win-rate on days with VIX > ' + vixTxt + '">High-VIX</th>'
+         +  '<th>Avg P/L</th><th>Avg Max-Fav</th></tr></thead><tbody>';
+    function _vixCell(pct, n) {
+        if (pct === null) return '<td class="gtb-t915-date" style="color:var(--gtb-muted);">—</td>';
+        var col = pct >= 60 ? 'var(--gtb-green)' : pct <= 40 ? 'var(--gtb-red)' : 'var(--gtb-amber)';
+        return '<td style="font-family:var(--gtb-mono);color:' + col + ';font-weight:700;">' + pct + '% <span style="color:var(--gtb-muted);font-weight:400;">(' + n + ')</span></td>';
+    }
     comboRows.forEach(function (c) {
         var wc = c.winPct >= 60 ? 'var(--gtb-green)' : c.winPct <= 40 ? 'var(--gtb-red)' : 'var(--gtb-amber)';
         var isToday = hasToday && c.key === todayKey;
-        var trCls = isToday ? ' class="gtb-t915-today"' : '';
+        var cls = 'gtb-combo-row' + (isToday ? ' gtb-t915-today' : '');
         var lowN = (!isToday && c.days < 4) ? ' style="opacity:0.5;"' : '';
-        html += '<tr' + trCls + lowN + '>'
-            + '<td class="gtb-t915-date" style="font-family:var(--gtb-mono);">' + (isToday ? '★ ' : '') + c.key + '</td>'
+        html += '<tr class="' + cls + '" data-key="' + c.key + '" title="Click to view the NIFTY chart for every day with this combo"' + lowN + '>'
+            + '<td class="gtb-t915-date" style="font-family:var(--gtb-mono);">' + (isToday ? '★ ' : '') + c.key + ' <i class="bi bi-grid-3x3-gap" style="opacity:0.6;"></i></td>'
             + '<td>' + _out(c.outcome) + '</td>'
+            + '<td class="gtb-t915-lvl">' + (c.level || '—') + '</td>'
             + '<td class="gtb-t915-date">' + c.days + '</td>'
             + '<td style="color:' + wc + ';font-weight:800;font-family:var(--gtb-mono);">' + c.winPct + '%</td>'
+            + _vixCell(c.loPct, c.loLegs)
+            + _vixCell(c.hiPct, c.hiLegs)
             + '<td style="color:' + (c.avgPnl >= 0 ? 'var(--gtb-green)' : 'var(--gtb-red)') + ';font-family:var(--gtb-mono);">'
             + (c.avgPnl >= 0 ? '+' : '') + c.avgPnl.toFixed(1) + '</td>'
             + '<td style="color:var(--gtb-green);font-family:var(--gtb-mono);">+' + c.avgMfe.toFixed(1) + '</td>'
@@ -3848,6 +3886,211 @@ jQ(document).on('click', '.gtb-day-chart-btn', async function (e) {
     } catch (err) {
         ov.find('#gtb-daychart-body').html('<div style="padding:24px;color:var(--gtb-red);">Error: ' + (err && err.message) + '</div>');
     }
+});
+
+// ── Combo charts popup — every day's NIFTY chart for a given 9:15 combo ────────
+function _gtbComboChartPopup() {
+    var el = document.getElementById('gtb-combochart-overlay');
+    if (!el) {
+        el = document.createElement('div');
+        el.id = 'gtb-combochart-overlay';
+        el.innerHTML = '<div id="gtb-combochart-panel">'
+            + '<div id="gtb-combochart-hd"><span class="gtb-combochart-title"></span>'
+            + '<i class="bi bi-x-lg gtb-combochart-close"></i></div>'
+            + '<div id="gtb-combochart-body"></div></div>';
+        document.body.appendChild(el);
+    }
+    jQ(el).toggleClass('gtb-light', jQ('#main-trade-bot-container').hasClass('gtb-light'));
+    return jQ(el);
+}
+jQ(document).on('click', '.gtb-combochart-close, #gtb-combochart-overlay', function (e) {
+    if (e.target.id === 'gtb-combochart-overlay' || jQ(e.target).closest('.gtb-combochart-close').length) {
+        jQ('#gtb-combochart-overlay').removeClass('active');
+        jQ('#gtb-combochart-body').html('');
+    }
+});
+jQ(document).on('click', '#gtb-combochart-panel', function (e) { e.stopPropagation(); });
+
+jQ(document).on('click', '.gtb-combo-row', async function (e) {
+    e.stopPropagation();
+    var key = jQ(this).data('key');
+    var matches = _GTB_915_ROWS.filter(function (r) { return r.key === key; });
+    if (!matches.length) return;
+    var CAP = 12;                                   // most-recent N charts to limit fetches
+    var show = matches.slice(0, CAP);
+    var ov = _gtbComboChartPopup();
+    ov.find('.gtb-combochart-title').html('<i class="bi bi-grid-3x3-gap"></i> Combo ' + key + ' — ' + matches.length + ' day(s)'
+        + (matches.length > CAP ? ' (showing recent ' + CAP + ')' : ''));
+    ov.addClass('active');
+
+    var grid = '<div class="gtb-combochart-grid">';
+    show.forEach(function (r, i) {
+        var mc = r.move === 'UP' ? 'var(--gtb-green)' : 'var(--gtb-red)';
+        var res = (r.legs || []).map(function (lg) {
+            var t = lg.dir === 'long' ? 'L' : 'S';
+            return '<span style="color:' + (lg.win ? 'var(--gtb-green)' : 'var(--gtb-red)') + ';">' + t + ' ' + (lg.pnl >= 0 ? '+' : '') + lg.pnl.toFixed(0) + '</span>';
+        }).join(' · ');
+        grid += '<div class="gtb-combochart-cell">'
+            + '<div class="gtb-combochart-lbl"><b>' + moment(r.date).format('DD MMM YY') + '</b>'
+            + ' <span style="color:' + mc + ';font-family:var(--gtb-mono);">' + (r.move === 'UP' ? '▲' : '▼') + ' ' + (r.movePct >= 0 ? '+' : '') + r.movePct.toFixed(2) + '%</span>'
+            + (res ? ' &nbsp;' + res : '') + '</div>'
+            + '<div id="gtb-cchart-' + i + '" class="gtb-combochart-canvas"></div></div>';
+    });
+    grid += '</div>';
+    ov.find('#gtb-combochart-body').html(grid);
+
+    // Fetch + render each day's chart sequentially (avoids hammering the API)
+    for (var j = 0; j < show.length; j++) {
+        try {
+            var r = show[j];
+            var res2 = await getHistoricalDataUsingPromise(INSTRUMENT_TOKENS['NIFTY 50'], r.date, r.date, '5minute');
+            var candles = (res2 && res2.data && res2.data.candles) ? res2.data.candles : [];
+            if (!candles.length) { jQ('#gtb-cchart-' + j).html('<div style="padding:14px;color:var(--gtb-muted);font-size:0.6rem;">no data</div>'); continue; }
+            var open = parseFloat(candles[0][1]);
+            var sd = getStrikeDetails({ price: open }, 'NIFTY 50');
+            var refLines = [
+                { key: 'OPEN', value: open },
+                { key: 'AST', value: sd.ustrikeTwo }, { key: 'ASO', value: sd.ustrikeOne },
+                { key: 'BSO', value: sd.bstrikeOne }, { key: 'BST', value: sd.bstrikeTwo },
+            ];
+            _renderLWChart('gtb-cchart-' + j, candles, refLines, 190);
+        } catch (err) { /* skip this day */ }
+    }
+});
+
+// ── OI Scan — all instruments (incl. weighted constituents) ───────────────────
+// Reuses the OI data already cached in INSTRUMENT_SCORE_MAP[name].oiData (no fetch).
+function _gtbAllOIInstruments() {
+    var mainOrder = ['NIFTY 50', 'NIFTY BANK', 'RELIANCE', 'HDFCBANK', 'ICICIBANK', 'CRUDEOILM', 'USDINR'];
+    var seen = {}, list = [];
+    function _has(n) { var od = INSTRUMENT_SCORE_MAP[n] && INSTRUMENT_SCORE_MAP[n].oiData; return od && od.tableData && od.tableData.length; }
+    mainOrder.forEach(function (n) { if (_has(n)) { list.push({ name: n, group: 'Index / Stock' }); seen[n] = 1; } });
+    // Weighted constituents (Nifty 50 + Bank Nifty), de-duped, sorted by name
+    var w = Object.keys(NIFTY_50_WEIGHTED_STOCKS || {}).concat(Object.keys(NIFTY_BANK_WEIGHTED_STOCKS || {}));
+    w.sort().forEach(function (n) { if (!seen[n] && _has(n)) { list.push({ name: n, group: 'Weighted constituent' }); seen[n] = 1; } });
+    return list;
+}
+
+// Builds the compact OI list table HTML directly from oiData (works for any instrument).
+function _gtbOITableHtml(oiData, pc) {
+    var h = '<table class="aoi-tbl"><thead><tr>'
+        + '<th>Strike</th><th>ΔCE OI</th><th>CE OBV</th><th>ΔPE OI</th><th>PE OBV</th><th>CE Signal</th><th>PE Signal</th><th>Score</th>'
+        + '</tr></thead><tbody>';
+    jQ.each(oiData.tableData, function (i, item) {
+        var r = scoreOIStrikeForSignal(item, !!item['ATM_STRIKE'], pc);
+        var c = item['CE_OBV'], p = item['PE_OBV'];
+        var ceObv = parseFloat(c[c.length - 1].obv), peObv = parseFloat(p[p.length - 1].obv);
+        var ceCh = parseFloat(item['CHG_OI_CE']), peCh = parseFloat(item['CHG_OI_PE']);
+        var sc = r.score > 0 ? 'var(--gtb-green)' : r.score < 0 ? 'var(--gtb-red)' : 'var(--gtb-muted)';
+        h += '<tr' + (item['ATM_STRIKE'] ? ' class="atm"' : '') + '>'
+            + '<td><b>' + item['STRIKE'] + (item['ATM_STRIKE'] ? ' ★' : '') + '</b></td>'
+            + '<td style="color:' + (ceCh > 0 ? 'var(--gtb-red)' : ceCh < 0 ? 'var(--gtb-green)' : 'inherit') + '">' + item['CHG_OI_CE'] + '</td>'
+            + '<td style="color:' + (ceObv > 0 ? 'var(--gtb-red)' : ceObv < 0 ? 'var(--gtb-green)' : 'inherit') + '">' + ceObv.toFixed(1) + '</td>'
+            + '<td style="color:' + (peCh > 0 ? 'var(--gtb-green)' : peCh < 0 ? 'var(--gtb-red)' : 'inherit') + '">' + item['CHG_OI_PE'] + '</td>'
+            + '<td style="color:' + (peObv > 0 ? 'var(--gtb-green)' : peObv < 0 ? 'var(--gtb-red)' : 'inherit') + '">' + peObv.toFixed(1) + '</td>'
+            + '<td>' + r.ceLabel + '</td><td>' + r.peLabel + '</td>'
+            + '<td style="color:' + sc + ';font-weight:700;">' + (r.score > 0 ? '+' : '') + r.score.toFixed(2) + '</td>'
+            + '</tr>';
+    });
+    h += '</tbody></table>';
+    return h;
+}
+
+// One strike cell in the comparison matrix: CE/PE ΔOI, OBV, CE/PE signal, score.
+function _gtbOICell(item, pc, isATM) {
+    if (!item) return '<td class="oic-cell empty">—</td>';
+    var r = scoreOIStrikeForSignal(item, !!item['ATM_STRIKE'], pc);
+    var c = item['CE_OBV'], p = item['PE_OBV'];
+    var ceObv = parseFloat(c[c.length - 1].obv), peObv = parseFloat(p[p.length - 1].obv);
+    var ceCh = parseFloat(item['CHG_OI_CE']), peCh = parseFloat(item['CHG_OI_PE']);
+    var sc = r.score > 0 ? 'var(--gtb-green)' : r.score < 0 ? 'var(--gtb-red)' : 'var(--gtb-muted)';
+    var ceLC = (r.ceLabel.indexOf('WRITE') >= 0 || r.ceLabel.indexOf('UNWIND') >= 0) ? 'var(--gtb-red)' : (r.ceLabel.indexOf('BUY') >= 0 || r.ceLabel.indexOf('COV') >= 0) ? 'var(--gtb-green)' : 'var(--gtb-muted)';
+    var peLC = (r.peLabel.indexOf('WRITE') >= 0 || r.peLabel.indexOf('UNWIND') >= 0) ? 'var(--gtb-green)' : (r.peLabel.indexOf('BUY') >= 0 || r.peLabel.indexOf('COV') >= 0) ? 'var(--gtb-red)' : 'var(--gtb-muted)';
+    return '<td class="oic-cell' + (isATM ? ' atm' : '') + '">'
+        + '<div class="oic-strike">' + item['STRIKE'] + (isATM ? ' ★' : '') + '</div>'
+        + '<div class="oic-kv"><span>CEΔ</span> <b style="color:' + (ceCh > 0 ? 'var(--gtb-red)' : ceCh < 0 ? 'var(--gtb-green)' : 'inherit') + '">' + item['CHG_OI_CE'] + '</b>'
+        + ' &nbsp;<span>PEΔ</span> <b style="color:' + (peCh > 0 ? 'var(--gtb-green)' : peCh < 0 ? 'var(--gtb-red)' : 'inherit') + '">' + item['CHG_OI_PE'] + '</b></div>'
+        + '<div class="oic-kv"><span>OBV</span> C<b style="color:' + (ceObv > 0 ? 'var(--gtb-red)' : ceObv < 0 ? 'var(--gtb-green)' : 'inherit') + '">' + ceObv.toFixed(0) + '</b>'
+        + ' P<b style="color:' + (peObv > 0 ? 'var(--gtb-green)' : peObv < 0 ? 'var(--gtb-red)' : 'inherit') + '">' + peObv.toFixed(0) + '</b></div>'
+        + '<div class="oic-sig"><span style="color:' + ceLC + '">' + r.ceLabel + '</span> / <span style="color:' + peLC + '">' + r.peLabel + '</span></div>'
+        + '<div class="oic-score" style="color:' + sc + '">' + (r.score > 0 ? '+' : '') + r.score.toFixed(2) + '</div>'
+        + '</td>';
+}
+
+// Compact cell — score-only heatmap (strike + score, background tinted by score).
+function _gtbOICellCompact(item, pc, isATM) {
+    if (!item) return '<td class="oic-cell-c empty">—</td>';
+    var r = scoreOIStrikeForSignal(item, !!item['ATM_STRIKE'], pc);
+    var s = r.score, mag = Math.min(1, Math.abs(s) / 4.5);
+    var bg = s > 0 ? 'rgba(0,229,160,' + (0.12 + mag * 0.5).toFixed(2) + ')'
+           : s < 0 ? 'rgba(255,77,106,' + (0.12 + mag * 0.5).toFixed(2) + ')' : 'transparent';
+    var col = s > 0 ? 'var(--gtb-green)' : s < 0 ? 'var(--gtb-red)' : 'var(--gtb-muted)';
+    return '<td class="oic-cell-c' + (isATM ? ' atm' : '') + '" style="background:' + bg + ';" '
+        + 'title="' + item['STRIKE'] + ' · CE ' + r.ceLabel + ' / PE ' + r.peLabel + ' · ΔCE ' + item['CHG_OI_CE'] + ' ΔPE ' + item['CHG_OI_PE'] + '">'
+        + '<div class="oic-c-strike">' + item['STRIKE'] + (isATM ? '★' : '') + '</div>'
+        + '<div class="oic-c-score" style="color:' + col + '">' + (s > 0 ? '+' : '') + s.toFixed(1) + '</div></td>';
+}
+
+// Horizontal comparison matrix — one row per instrument, strike columns centred on ATM.
+function _gtbOICompareTableHtml(list, mode) {
+    var cellFn = (mode === 'compact') ? _gtbOICellCompact : _gtbOICell;
+    var OFFS = [-2, -1, 0, 1, 2];
+    var h = '<table class="oic-matrix"><thead><tr>'
+        + '<th class="oic-sticky">Instrument</th><th>OI</th><th>PCR</th>'
+        + OFFS.map(function (o) { return '<th>' + (o === 0 ? 'ATM' : 'ATM' + (o > 0 ? '+' + o : o)) + '</th>'; }).join('')
+        + '</tr></thead><tbody>';
+    var lastGroup = '';
+    list.forEach(function (it) {
+        if (it.group !== lastGroup) { h += '<tr class="oic-grouprow"><td colspan="' + (3 + OFFS.length) + '">' + it.group + '</td></tr>'; lastGroup = it.group; }
+        var name = it.name, sm = INSTRUMENT_SCORE_MAP[name] || {}, oiData = sm.oiData;
+        var td = oiData.tableData, atmIdx = -1;
+        for (var i = 0; i < td.length; i++) { if (td[i]['ATM_STRIKE']) { atmIdx = i; break; } }
+        if (atmIdx < 0) atmIdx = Math.floor(td.length / 2);
+        var pc = 0; try { pc = parseFloat(generateTrend(name).change) || 0; } catch (e) {}
+        var oiScore = (sm.oi_obv != null) ? sm.oi_obv : 0;
+        var scColor = oiScore > 0 ? 'var(--gtb-green)' : oiScore < 0 ? 'var(--gtb-red)' : 'var(--gtb-muted)';
+        h += '<tr><td class="oic-sticky"><b>' + name + '</b></td>'
+            + '<td style="color:' + scColor + ';font-weight:700;font-family:var(--gtb-mono);">' + (oiScore > 0 ? '+' : '') + (typeof oiScore === 'number' ? oiScore.toFixed(1) : oiScore) + '</td>'
+            + '<td style="font-family:var(--gtb-mono);">' + (oiData.pcr != null ? oiData.pcr : '—') + '</td>';
+        OFFS.forEach(function (off) {
+            var idx = atmIdx + off;
+            h += cellFn((idx >= 0 && idx < td.length) ? td[idx] : null, pc, off === 0);
+        });
+        h += '</tr>';
+    });
+    h += '</tbody></table>';
+    return h;
+}
+
+jQ(document).on('click', '#show-all-oi', function (e) {
+    e.preventDefault();
+    var list = _gtbAllOIInstruments();
+    if (!list.length) {
+        showMaximizeOverlay('<i class="bi bi-layers-fill"></i> OI Compare — All Instruments',
+            '<div style="padding:30px;text-align:center;color:var(--gtb-muted);">No OI data scanned yet. Run a refresh (with OI scan) first.</div>');
+        return;
+    }
+    _GTB_OIC_LIST = list;
+    var mode = localStorage.getItem('GTB_OIC_MODE') || 'detailed';
+    var html = '<div class="aoi-wrap">'
+        + '<div class="oic-toolbar">'
+        + '<span class="aoi-note" style="margin:0;"><i class="bi bi-info-circle"></i> ' + list.length
+        + ' instruments · rows = instruments, columns = strikes around ATM (★).</span>'
+        + '<div class="oic-modes">'
+        + '<button class="oic-mode-btn' + (mode !== 'compact' ? ' active' : '') + '" data-mode="detailed"><i class="bi bi-table"></i> Detailed</button>'
+        + '<button class="oic-mode-btn' + (mode === 'compact' ? ' active' : '') + '" data-mode="compact"><i class="bi bi-grid-3x3"></i> Compact</button>'
+        + '</div></div>'
+        + '<div id="oic-table-wrap" style="overflow:auto;">' + _gtbOICompareTableHtml(list, mode) + '</div></div>';
+    showMaximizeOverlay('<i class="bi bi-layers-fill"></i> OI Compare Matrix — All Instruments (' + list.length + ')', html);
+});
+
+// Detailed / Compact toggle
+jQ(document).on('click', '.oic-mode-btn', function () {
+    var m = jQ(this).data('mode');
+    localStorage.setItem('GTB_OIC_MODE', m);
+    jQ('.oic-mode-btn').removeClass('active');
+    jQ(this).addClass('active');
+    jQ('#oic-table-wrap').html(_gtbOICompareTableHtml(_GTB_OIC_LIST, m));
 });
 
 // ── Strike-level probability backtest ─────────────────────────────────────────
