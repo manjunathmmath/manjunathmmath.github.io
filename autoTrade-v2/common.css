@@ -372,6 +372,26 @@
 .oic-cell-c.atm { box-shadow: inset 0 0 0 2px var(--gtb-gold); }
 .oic-c-strike { font-size: 0.54rem; color: var(--gtb-muted); }
 .oic-c-score { font-size: 0.72rem; font-weight: 800; }
+
+/* ── Commodities popup ─────────────────────────────────────────── */
+.cmd-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 800px) { .cmd-grid { grid-template-columns: 1fr; } }
+.cmd-cell { border: 1px solid var(--gtb-border2); background: var(--gtb-bg); }
+.cmd-t {
+  font-size: 0.72rem; font-weight: 800; color: var(--gtb-text);
+  margin: 14px 0 6px; display: flex; align-items: center; gap: 6px;
+}
+.cmd-t i { color: var(--gtb-accent); }
+.cmd-cell .cmd-t { margin: 0; padding: 6px 8px; background: var(--gtb-surface); border-bottom: 1px solid var(--gtb-border2); }
+.cmd-st { font-size: 0.56rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--gtb-muted); margin: 4px 0 2px; }
+.cmd-oi-charts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 800px) { .cmd-oi-charts { grid-template-columns: 1fr; } }
+.cmd-fut { border: 1px solid var(--gtb-border2); background: var(--gtb-bg); padding: 8px 10px; }
+.cmd-fut img { max-width: 26px !important; max-height: 26px !important; vertical-align: middle; }
+.cmd-fut-prem { margin-bottom: 6px; }
+.cmd-fut-meta { margin-top: 6px; color: var(--gtb-muted); font-size: 0.66rem; }
+.cmd-crude-oi-table table, #cmd-crude-oi-table table { width: 100%; }
+.cmd-load { padding: 14px; color: var(--gtb-muted); font-size: 0.7rem; display: flex; align-items: center; gap: 6px; }
 .gtb-t915-et { font-size: 0.5rem; opacity: 0.7; letter-spacing: 0.04em; }
 
 /* ── 9:15 close strip ──────────────────────────────────────── */

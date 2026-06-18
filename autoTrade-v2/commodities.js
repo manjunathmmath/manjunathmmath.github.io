@@ -32,7 +32,7 @@
 // Fetches intraday 5-min candles (MCX_CURRENT_DAY) + prev day close for strike levels.
 // Draws ASO/AST/BSO/BST + VIXL/VIXU reference lines using _renderLWChart.
 // Updates LTP display and ATR/stop-loss badges via _buildATRBadges.
-async function showTopChartMCX(name, chartHeight) {
+async function showTopChartMCX(name, chartHeight, bindtoDivId) {
     try {
 
         let futures;
@@ -160,7 +160,7 @@ async function showTopChartMCX(name, chartHeight) {
 
         // Use LightweightCharts candlestick (defined in grootTradeBot.js)
         if (typeof _renderLWChart === 'function') {
-            _renderLWChart(tempName + '-chart', data.data.candles, refLines, chartHeight || 150);
+            _renderLWChart((bindtoDivId ? bindtoDivId.replace('#', '') : (tempName + '-chart')), data.data.candles, refLines, chartHeight || 150);
         }
 
         let ltp = data.data.candles[data.data.candles.length - 1][4];

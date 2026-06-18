@@ -438,6 +438,7 @@ function commonMarkupPlaceHolder() {
     // Tool launchers as icon-only buttons
     h += '<a id="show-915-backtest" class="gtb-ctrl-link" title="9:15 Trend — 1-year day-wise backtest (NIFTY/SENSEX/BANK)"><i class="bi bi-calendar-week"></i></a>';
     h += '<a id="show-all-oi" class="gtb-ctrl-link" title="OI Scan — all instruments incl. weighted constituents"><i class="bi bi-layers-fill"></i></a>';
+    h += '<a id="show-commodities" class="gtb-ctrl-link" title="Commodities — GIFT NIFTY &amp; Crude (chart, OI, futures)"><i class="bi bi-droplet-fill"></i></a>';
     h += '<a id="show-oi-viewer" class="gtb-ctrl-link" title="OI Analyzer"><i class="bi bi-eye"></i></a>';
     h += '<a id="show-stock-viewer" class="gtb-ctrl-link" title="Stock Viewer"><i class="bi bi-list-ul"></i></a>';
     h += '<a id="show-market-quote-analyzer" class="gtb-ctrl-link" title="Quotes"><i class="bi bi-graph-up"></i></a>';
@@ -3644,10 +3645,15 @@ function _render915Trend(rows) {
     _GTB_915_ROWS = rows;
     // Today's 9:15 combo (same classification the live dashboard uses) — for highlighting.
     var _tb915 = JSON.parse(localStorage.getItem('VALID_BREAKOUT_NINE_FIFTEEN') || '{}');
-    var todayKey = _gtbNorm915((_tb915['NIFTY 50']  || {}).CLOSE_9_15)
-              + '-' + _gtbNorm915((_tb915['SENSEX']    || {}).CLOSE_9_15)
-              + '-' + _gtbNorm915((_tb915['NIFTY BANK']|| {}).CLOSE_9_15);
+    var _t915n = (_tb915['NIFTY 50']   || {}).CLOSE_9_15;
+    var _t915s = (_tb915['SENSEX']     || {}).CLOSE_9_15;
+    var _t915b = (_tb915['NIFTY BANK'] || {}).CLOSE_9_15;
+    // Normalized key (AST→ASO, BST→BSO) for the strategy-bucket combo table
+    var todayKey = _gtbNorm915(_t915n) + '-' + _gtbNorm915(_t915s) + '-' + _gtbNorm915(_t915b);
     var hasToday = todayKey.indexOf('undefined') === -1;
+    // Raw key (exact AST/ASO/BSO/BST/B-W) for day-by-day exact-match highlighting
+    var todayKeyRaw = _t915n + '-' + _t915s + '-' + _t915b;
+    var hasTodayRaw = !!(_t915n && _t915s && _t915b);
     // Aggregate per-leg P/L stats (each Buy/Sell day = 2 legs)
     var win = 0, loss = 0, levelN = 0, trendN = 0, legCount = 0, totPnl = 0, totMfe = 0, totMae = 0, tpN = 0, slN = 0;
     rows.forEach(function (r) {
@@ -3732,6 +3738,9 @@ function _render915Trend(rows) {
     }
 
     var html = '<div class="gtb-t915-wrap">';
+    html += '<div style="display:flex;justify-content:flex-end;margin-bottom:6px;">'
+         +  '<button id="gtb-915-clear" class="oic-mode-btn" title="Clear the cached backtest data and rebuild from fresh candles"><i class="bi bi-arrow-clockwise"></i> Clear cache &amp; rebuild</button>'
+         +  '</div>';
     html += '<div class="gtb-t915-sub">Daily 9:15 combo for <b>NIFTY · SENSEX · BANK</b> (with <b>GIFT NIFTY</b> reference) over the last <b>'
          +  rows.length + '</b> trading days. The <b>Result</b> enters NIFTY per bias — '
          +  '<b style="color:var(--gtb-green)">long @ BSO</b> (Buy), <b style="color:var(--gtb-red)">short @ ASO</b> (Sell), '
@@ -3787,9 +3796,9 @@ function _render915Trend(rows) {
     });
     html += '</tbody></table>';
 
-    var _matchN = hasToday ? rows.filter(function (r) { return r.key === todayKey; }).length : 0;
+    var _matchN = hasTodayRaw ? rows.filter(function (r) { return (r.n + '-' + r.s + '-' + r.b) === todayKeyRaw; }).length : 0;
     html += '<div class="gtb-t915-combo-h"><i class="bi bi-calendar3"></i> Day-by-day'
-         +  (hasToday ? '<span style="font-weight:400;color:var(--gtb-muted);"> — ★ ' + _matchN + ' day(s) matched today\'s combo (' + todayKey + ')</span>' : '')
+         +  (hasTodayRaw ? '<span style="font-weight:400;color:var(--gtb-muted);"> — ★ ' + _matchN + ' day(s) exactly matched today\'s 9:15 (' + todayKeyRaw + ')</span>' : '')
          +  '</div>';
     html += '<table class="gtb-t915-table"><thead><tr>'
          +  '<th>Date</th><th>GIFT</th><th>NIFTY</th><th>SENSEX</th><th>BANK</th><th>Strategy</th><th>Entry Level</th><th>Nifty →12pm</th><th>Result (P/L)</th><th>Max Fav</th><th>Max Adv</th><th>1:1 TP/SL</th><th>Entry @</th><th>Peak @</th>'
@@ -3803,7 +3812,7 @@ function _render915Trend(rows) {
         var tpslHtml= (r.legs && r.legs.length) ? r.legs.map(_legTpsl).join(' ') : empty;
         var entHtml = (r.legs && r.legs.length) ? r.legs.map(function (lg) { return _legTime(lg, 'entryTime'); }).join(' ') : empty;
         var pkHtml  = (r.legs && r.legs.length) ? r.legs.map(function (lg) { return _legTime(lg, 'peakTime'); }).join(' ') : empty;
-        var rowMatch = hasToday && r.key === todayKey;   // same 9:15 combo as today
+        var rowMatch = hasTodayRaw && (r.n + '-' + r.s + '-' + r.b) === todayKeyRaw;   // exact raw combo match
         html += '<tr' + (rowMatch ? ' class="gtb-t915-today"' : '') + '>'
             + '<td class="gtb-t915-date">' + (rowMatch ? '★ ' : '') + moment(r.date).format('DD MMM')
             + ' <button class="gtb-day-chart-btn" data-date="' + r.date + '" title="View NIFTY chart for this day"><i class="bi bi-bar-chart-line"></i></button></td>'
@@ -3824,8 +3833,7 @@ function _render915Trend(rows) {
     return html;
 }
 
-jQ(document).on('click', '#show-915-backtest', async function (e) {
-    e.preventDefault();
+async function _gtbShow915Backtest() {
     showMaximizeOverlay('<i class="bi bi-calendar-week"></i> 9:15 Opening-Trend + Entry-Level P/L Backtest — 1-Year, till 12:00 (GIFT · NIFTY · SENSEX · BANK)',
         '<div style="padding:30px;text-align:center;color:var(--gtb-muted);font-size:0.85rem;">'
         + '<i class="bi bi-hourglass-split"></i> Building ~1 year of 9:15 trend (chunked 5-min fetch, may take ~20–30s)…</div>');
@@ -3835,6 +3843,21 @@ jQ(document).on('click', '#show-915-backtest', async function (e) {
     } catch (err) {
         jQ('#groot-maximize-body').html('<div style="padding:24px;color:var(--gtb-red);">Error: ' + (err && err.message) + '</div>');
     }
+}
+jQ(document).on('click', '#show-915-backtest', function (e) { e.preventDefault(); _gtbShow915Backtest(); });
+
+// Clear cached backtest data (per-day rows + strike-prob) and rebuild fresh.
+jQ(document).on('click', '#gtb-915-clear', function (e) {
+    e.preventDefault(); e.stopPropagation();
+    try {
+        var keys = [];
+        for (var i = 0; i < localStorage.length; i++) {
+            var k = localStorage.key(i);
+            if (k && (k.indexOf('GTB_915TREND_') === 0 || k.indexOf('GTB_STRIKEPROB_') === 0)) keys.push(k);
+        }
+        keys.forEach(function (k) { localStorage.removeItem(k); });
+    } catch (er) {}
+    _gtbShow915Backtest();   // rebuild from fresh candles
 });
 
 // ── Day chart popup (from the 9:15 day-by-day table) ──────────────────────────
@@ -4091,6 +4114,78 @@ jQ(document).on('click', '.oic-mode-btn', function () {
     jQ('.oic-mode-btn').removeClass('active');
     jQ(this).addClass('active');
     jQ('#oic-table-wrap').html(_gtbOICompareTableHtml(_GTB_OIC_LIST, m));
+});
+
+// ── Commodities popup — GIFT NIFTY + Crude (chart, OI, futures) ────────────────
+// Renders OI/OBV bar charts into the given containers from cached oiData.
+function _cmdRenderOI(oiData, oiSel, obvSel) {
+    var x = ['x'], ceCh = ['CH CE OI'], peCh = ['CH PE OI'], ceObv = ['CE OBV'], peObv = ['PE OBV'], atm = -1;
+    jQ.each(oiData.tableData, function (i, item) {
+        x.push(item['STRIKE']); ceCh.push(item['CHG_OI_CE']); peCh.push(item['CHG_OI_PE']);
+        var c = item['CE_OBV'], p = item['PE_OBV'];
+        ceObv.push(parseFloat(c[c.length - 1].obv).toFixed(1));
+        peObv.push(parseFloat(p[p.length - 1].obv).toFixed(1));
+        if (item['ATM_STRIKE']) atm = i;
+    });
+    var strikes = x.slice(1);
+    _renderBarChart(oiSel,  { labels: strikes, atm: atm, height: 170, series: [
+        { label: 'CH CE OI', color: OI_COLORS.CE_OI, values: ceCh.slice(1) },
+        { label: 'CH PE OI', color: OI_COLORS.PE_OI, values: peCh.slice(1) } ] });
+    _renderBarChart(obvSel, { labels: strikes, atm: atm, height: 170, series: [
+        { label: 'CE OBV', color: OI_COLORS.CE_OBV, values: ceObv.slice(1) },
+        { label: 'PE OBV', color: OI_COLORS.PE_OBV, values: peObv.slice(1) } ] });
+}
+
+jQ(document).on('click', '#show-commodities', function (e) {
+    e.preventDefault();
+    var body = ''
+        + '<div class="cmd-grid">'
+        + '<div class="cmd-cell"><div class="cmd-t"><i class="bi bi-globe-asia-australia"></i> GIFT NIFTY</div><div id="cmd-gift-chart" style="height:300px;"></div></div>'
+        + '<div class="cmd-cell"><div class="cmd-t"><i class="bi bi-droplet-fill"></i> CRUDEOILM</div><div id="cmd-crude-chart" style="height:300px;"></div></div>'
+        + '</div>'
+        + '<div class="cmd-t"><i class="bi bi-bar-chart-fill"></i> CRUDEOILM — OI / OBV</div>'
+        + '<div class="cmd-oi-charts"><div><div class="cmd-st">OI Change (CE/PE)</div><div id="cmd-crude-oi"></div></div>'
+        + '<div><div class="cmd-st">OBV (CE/PE)</div><div id="cmd-crude-obv"></div></div></div>'
+        + '<div id="cmd-crude-oi-table" style="overflow-x:auto;margin-top:6px;"><div class="cmd-load"><i class="bi bi-hourglass-split"></i> Loading OI…</div></div>'
+        + '<div class="cmd-t"><i class="bi bi-rocket-takeoff"></i> CRUDEOILM — Futures Trend</div>'
+        + '<div id="cmd-crude-fut" class="cmd-fut"><div class="cmd-load"><i class="bi bi-hourglass-split"></i> Loading futures…</div></div>';
+    showMaximizeOverlay('<i class="bi bi-droplet-fill"></i> Commodities — GIFT NIFTY &amp; Crude', body);
+
+    setTimeout(async function () {
+        // Charts
+        try { await showTopChart('GIFT NIFTY', '#cmd-gift-chart', 300); } catch (e1) {}
+        try { await showTopChartMCX('CRUDEOILM', 300, '#cmd-crude-chart'); } catch (e2) {}
+
+        // ── Load CRUDEOILM futures fresh ──────────────────────────────────────
+        var fres = null;
+        try {
+            fres = await showFutureDetailsMCX('CRUDEOILM');
+            setFutureDetails('CRUDEOILM', fres);
+            if (!INSTRUMENT_SCORE_MAP['CRUDEOILM']) INSTRUMENT_SCORE_MAP['CRUDEOILM'] = {};
+            INSTRUMENT_SCORE_MAP['CRUDEOILM'].futures_trend = getFuturesTrendScore(fres['REMARK']);
+        } catch (e3) {}
+        var prem  = jQ('#CRUDEOILM-futures-premium').html() || '';
+        var fut   = jQ('#CRUDEOILM-futures').html() || '';
+        var trend = jQ('#CRUDEOILM-futures-trend').html() || '';
+        var vwap  = jQ('#CRUDEOILM-futures-vwap').html() || '';
+        jQ('#cmd-crude-fut').html((prem || fut || trend || vwap)
+            ? ('<div class="cmd-fut-prem">' + prem + '</div>' + fut + '<div class="cmd-fut-meta">' + trend + ' ' + vwap + '</div>')
+            : '<div class="cmd-load" style="color:var(--gtb-red);">Futures unavailable.</div>');
+
+        // ── Load CRUDEOILM OI fresh ───────────────────────────────────────────
+        try {
+            if (fres) await showPrictionProbabiltyMCX('CRUDEOILM', fres);
+            showOIOBVBarChart('CRUDEOILM');   // populates INSTRUMENT_SCORE_MAP['CRUDEOILM'].oiData
+        } catch (e4) {}
+        var oiData = INSTRUMENT_SCORE_MAP['CRUDEOILM'] && INSTRUMENT_SCORE_MAP['CRUDEOILM'].oiData;
+        if (oiData && oiData.tableData && oiData.tableData.length) {
+            var pc = 0; try { pc = parseFloat(generateTrend('CRUDEOILM').change) || 0; } catch (e5) {}
+            try { _cmdRenderOI(oiData, '#cmd-crude-oi', '#cmd-crude-obv'); } catch (e6) {}
+            jQ('#cmd-crude-oi-table').html(_gtbOITableHtml(oiData, pc));
+        } else {
+            jQ('#cmd-crude-oi-table').html('<div class="cmd-load" style="color:var(--gtb-red);">CRUDEOILM OI unavailable.</div>');
+        }
+    }, 80);
 });
 
 // ── Strike-level probability backtest ─────────────────────────────────────────
