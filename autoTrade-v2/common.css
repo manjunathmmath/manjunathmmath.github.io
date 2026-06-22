@@ -116,6 +116,10 @@
   transition: color .15s, border-color .15s;
 }
 .gtb-prob-btn:hover { color: var(--gtb-accent); border-color: var(--gtb-accent); }
+.gtb-fut-refresh-btn:hover { color: var(--gtb-accent) !important; border-color: var(--gtb-accent) !important; }
+.gtb-fut-refresh-btn:disabled { opacity: 0.4; cursor: default; }
+@keyframes gtb-spin { to { transform: rotate(360deg); } }
+.gtb-fut-refresh-btn .spin { display: inline-block; animation: gtb-spin 0.7s linear infinite; }
 
 .gtb-prob-wrap { font-size: 0.72rem; color: var(--gtb-text); }
 .gtb-prob-sub { color: var(--gtb-muted); margin-bottom: 12px; line-height: 1.5; font-size: 0.7rem; }
@@ -1704,6 +1708,28 @@ td.details-control {
 }
 .popup-custom-style-groot-trade-bot .popupwindow_content:after { height: 0 !important; }
 
+/* ── Individual View popup (groot-trade-bot-stock) — theme-aware ── */
+.popup-custom-style-groot-trade-bot-stock.popupwindow {
+  background: var(--gtb-bg) !important;
+  border: 1px solid var(--gtb-border) !important;
+  box-shadow: 0 24px 80px rgba(0,0,0,0.5) !important;
+  overflow: hidden !important;
+}
+.popup-custom-style-groot-trade-bot-stock .popupwindow_titlebar {
+  background: var(--gtb-surface2) !important;
+  border-bottom: 1px solid var(--gtb-border) !important;
+  color: var(--gtb-text) !important;
+}
+.popup-custom-style-groot-trade-bot-stock .popupwindow_titlebar_text { color: var(--gtb-text) !important; }
+.popup-custom-style-groot-trade-bot-stock .popupwindow_titlebar_button { color: var(--gtb-muted) !important; background: transparent !important; border: none !important; }
+.popup-custom-style-groot-trade-bot-stock .popupwindow_content {
+  padding: 0 !important;
+  background: var(--gtb-bg) !important;
+  border-top: none !important;
+  overflow: hidden !important;
+}
+.popup-custom-style-groot-trade-bot-stock .popupwindow_statusbar { background: var(--gtb-surface2) !important; border-top: 1px solid var(--gtb-border) !important; }
+
 /* ── Window control buttons (minimize / restore / close) ────── */
 .gtb-win-controls {
   display: flex; align-items: center; gap: 4px;
@@ -2592,6 +2618,37 @@ td.details-control {
   --gtb-col-wt:      170px;
   --gtb-col-detail:  160px;
 }
+
+/* ── Individual View popup — same layout as main panel, scaled to 1400px wide ── */
+/* Column totals: 140+330+56+200+180+210+140+144 = 1400px                         */
+.sv-indiv-view {
+  --gtb-col-instr:   140px;
+  --gtb-col-chart:   330px;
+  --gtb-col-915:      56px;
+  --gtb-col-fut:     200px;
+  --gtb-col-oi:      180px;
+  --gtb-col-oiobv:   210px;
+  --gtb-col-wt:      140px;
+  --gtb-col-detail:  144px;
+  --gtb-row-h:       390px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--gtb-bg);
+  overflow: hidden;
+}
+.sv-indiv-view #sv-rows-head { position: static; }
+.sv-indiv-view .gtb-row { flex: 1 1 0; height: 100%; }
+/* Futures column — premium chip at top, then signals and remark stacked */
+.sv-indiv-view .gtb-row-fut {
+  flex-direction: column;
+  align-items: flex-start;
+  align-content: flex-start;
+  gap: 3px;
+  padding: 6px 8px;
+}
+.sv-indiv-view .gtb-row-fut .gtb-cell-fut-signals,
+.sv-indiv-view .gtb-row-fut .gtb-cell-fut-remark { width: 100%; flex: unset; }
 #gtb-rows-head,
 .gtb-row {
   display: grid;

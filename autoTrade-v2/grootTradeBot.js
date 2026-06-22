@@ -473,7 +473,14 @@ async function maximizeChart(name) {
 
     function _buildBody() {
         let b = '';
-        b += '<div id="max-' + tempName + '-chart" style="width:100%;min-width:0;height:520px;border-radius:8px;overflow:hidden;display:block;"></div>';
+        // Levels strip — populated by showTopChart once candles are loaded
+        b += '<div id="max-' + tempName + '-chart-levels"'
+            + ' style="display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;'
+            + 'padding:6px 10px;background:var(--gtb-surface2,#161b22);'
+            + 'border:1px solid var(--gtb-border2,#30363d);border-radius:6px;margin-bottom:8px;min-height:28px;">'
+            + '<span style="font-size:0.52rem;color:var(--gtb-muted,#7d8590);">Loading levels…</span>'
+            + '</div>';
+        b += '<div id="max-' + tempName + '-chart" style="width:100%;min-width:0;height:500px;border-radius:8px;overflow:hidden;display:block;"></div>';
         b += '<div id="max-' + tempName + '-atr-sl" style="margin-top:8px;"></div>';
         return b;
     }
@@ -1088,7 +1095,10 @@ function commonMarkupPlaceHolder() {
         // ── Futures ────────────────────────────────────────────────────────
         h += '<div class="gtb-row-col gtb-row-fut">';
         if (hasFut) {
-            h +=   '<span id="' + tid + '-futures-premium" class="gtb-cell-premium-chip"></span>';
+            h +=   '<div style="display:flex;align-items:center;gap:4px;flex-shrink:0;">';
+            h +=     '<span id="' + tid + '-futures-premium" class="gtb-cell-premium-chip"></span>';
+            h +=     '<button class="gtb-fut-refresh-btn" data-name="' + name + '" title="Refresh futures" style="margin-left:auto;padding:1px 4px;font-size:0.55rem;line-height:1;background:transparent;border:1px solid var(--gtb-border2,#30363d);border-radius:3px;color:var(--gtb-muted,#7d8590);cursor:pointer;"><i class="bi bi-arrow-clockwise"></i></button>';
+            h +=   '</div>';
             h +=   '<div id="' + tid + '-futures" class="gtb-cell-fut-signals"></div>';
             h +=   '<div id="' + tid + '-futures-trend" class="gtb-cell-fut-remark"></div>';
         } else {
@@ -3250,7 +3260,7 @@ jQ(document).on("click", function(e) {
 function _gtbApplyTheme(theme) {
     // The maximize overlay is appended to <body>, outside #main-trade-bot-container,
     // so it needs the theme class applied directly to inherit the light palette.
-    var container = jQ('#main-trade-bot-container').add('#groot-maximize-overlay');
+    var container = jQ('#main-trade-bot-container, #groot-maximize-overlay, .popup-custom-style-groot-trade-bot-stock');
     if (theme === 'light') container.addClass('gtb-light');
     else                    container.removeClass('gtb-light');
     localStorage.setItem('GTB_THEME', theme);
@@ -3265,7 +3275,8 @@ function _gtbApplyTheme(theme) {
 
 // Theme-aware LightweightCharts colours
 function _gtbChartColors() {
-    var light = jQ('#main-trade-bot-container').hasClass('gtb-light');
+    var light = jQ('#main-trade-bot-container').hasClass('gtb-light')
+             || (localStorage.getItem('GTB_THEME') || 'dark') === 'light';
     return light
         ? { bg: '#ffffff', grid: '#e7edf4', bdr: '#c5d0de', text: '#5a6678' }
         : { bg: '#060a12', grid: '#122038', bdr: '#1b2d47', text: '#5c7499' };
@@ -3336,10 +3347,13 @@ jQ(document).on('input', '#gtb-oi-bar-slider', function() {
     var pct = parseInt(jQ(this).val());
     localStorage.setItem('GTB_OI_BAR_W', pct);
     jQ('#gtb-oi-bar-val').text(pct + '%');
-    // Re-render all OI/OBV bar charts using cached data (no API call)
+    // Re-render all OI/OBV bar charts using per-instrument cached data (no API call, no stock[] read)
     var _oiNames = ['NIFTY 50','NIFTY BANK','RELIANCE','HDFCBANK','ICICIBANK','CRUDEOILM','USDINR'];
     _oiNames.forEach(function(n) {
-        try { showOIOBVBarChart(n); } catch(e) {}
+        try {
+            var _cached = INSTRUMENT_SCORE_MAP[n] && INSTRUMENT_SCORE_MAP[n].oiData;
+            if (_cached) showOIOBVBarChart(n, '', _cached);
+        } catch(e) {}
     });
 });
 
@@ -4717,14 +4731,14 @@ jQ(document).on('click', '#show-commodities', function (e) {
         + '<div id="cmd-crude-oi-table" style="overflow-x:auto;margin-top:6px;"><div class="cmd-load"><i class="bi bi-hourglass-split"></i> Loading OI…</div></div>'
         + '<div class="cmd-t"><i class="bi bi-graph-up"></i> CRUDEOILM — Futures Trend</div>'
         + '<div id="cmd-crude-fut" class="cmd-fut"><div class="cmd-load"><i class="bi bi-hourglass-split"></i> Loading futures…</div></div>';
-    showMaximizeOverlay('<i class="bi bi-droplet-fill"></i> Commodities — GIFT NIFTY &amp; Crude', body);
 
-    setTimeout(async function () {
+    async function _cmdLoadAll() {
         // Charts
         try { await showTopChart('GIFT NIFTY', '#cmd-gift-chart', 300); } catch (e1) {}
         try { await showTopChartMCX('CRUDEOILM', 300, '#cmd-crude-chart'); } catch (e2) {}
 
-        // ── Load CRUDEOILM futures fresh ──────────────────────────────────────
+        // Futures
+        jQ('#cmd-crude-fut').html('<div class="cmd-load"><i class="bi bi-hourglass-split"></i> Loading futures…</div>');
         var fres = null;
         try {
             fres = await showFutureDetailsMCX('CRUDEOILM');
@@ -4740,10 +4754,11 @@ jQ(document).on('click', '#show-commodities', function (e) {
             ? ('<div class="cmd-fut-prem">' + prem + '</div>' + fut + '<div class="cmd-fut-meta">' + trend + ' ' + vwap + '</div>')
             : '<div class="cmd-load" style="color:var(--gtb-red);">Futures unavailable.</div>');
 
-        // ── Load CRUDEOILM OI fresh ───────────────────────────────────────────
+        // OI
+        jQ('#cmd-crude-oi-table').html('<div class="cmd-load"><i class="bi bi-hourglass-split"></i> Loading OI…</div>');
         try {
             if (fres) await showPrictionProbabiltyMCX('CRUDEOILM', fres);
-            showOIOBVBarChart('CRUDEOILM');   // populates INSTRUMENT_SCORE_MAP['CRUDEOILM'].oiData
+            showOIOBVBarChart('CRUDEOILM');
         } catch (e4) {}
         var oiData = INSTRUMENT_SCORE_MAP['CRUDEOILM'] && INSTRUMENT_SCORE_MAP['CRUDEOILM'].oiData;
         if (oiData && oiData.tableData && oiData.tableData.length) {
@@ -4753,7 +4768,10 @@ jQ(document).on('click', '#show-commodities', function (e) {
         } else {
             jQ('#cmd-crude-oi-table').html('<div class="cmd-load" style="color:var(--gtb-red);">CRUDEOILM OI unavailable.</div>');
         }
-    }, 80);
+    }
+
+    showMaximizeOverlay('<i class="bi bi-droplet-fill"></i> Commodities — GIFT NIFTY &amp; Crude', body, _cmdLoadAll);
+    setTimeout(_cmdLoadAll, 80);
 });
 
 // ── Strike-level probability backtest ─────────────────────────────────────────
@@ -5248,6 +5266,21 @@ jQ(document).on("click", ".refresh-oi-obv", function () {
     commonRefershOIOBV(name, that)
 })
 
+jQ(document).on('click', '.gtb-fut-refresh-btn', async function () {
+    let name = jQ(this).data('name');
+    let $btn = jQ(this);
+    $btn.prop('disabled', true);
+    $btn.find('i').addClass('spin');
+    try {
+        let res = _gtbIsMcxFuture(name)
+            ? await showFutureDetailsMCX(name)
+            : await showFutureDetails(name);
+        if (res) setFutureDetails(name, res);
+    } catch(e) { console.log('fut refresh', e); }
+    $btn.find('i').removeClass('spin');
+    $btn.prop('disabled', false);
+});
+
 async function commonRefershOIOBV(name, that) {
     try {
         that.attr("disabled", true);
@@ -5524,7 +5557,7 @@ function _renderLWChart(containerId, candles, refLines, chartHeight, opts) {
     return chart;
 }
 
-function _buildATRBadges(ltp, name, candles) {
+function _buildATRBadges(ltp, name, candles, suffix) {
     let tempName = name.replaceAll(' ', '-').replaceAll('&', '-');
     try {
         let instrScore = computeInstrumentScore(name);
@@ -5615,7 +5648,7 @@ function _buildATRBadges(ltp, name, candles) {
             slHtml += '<span class="gtb-sl-badge t1"><span class="sb-label">T1</span><span class="sb-val">' + slShort.target1 + '</span></span>';
         }
         slHtml += '</div>';
-        let slDivId = '#' + tempName + '-atr-sl';
+        let slDivId = '#' + tempName + '-atr-sl' + (suffix || '');
         if (jQ(slDivId).length) jQ(slDivId).html(slHtml);
     } catch(e) {}
 }
@@ -5651,27 +5684,42 @@ async function showTopChart(name, bindtoDivId, chartHeight) {
         ];
 
         let containerId = (bindtoDivId || ('#' + tempName + '-chart')).replace('#', '');
+
+        // Derive ID suffix for side-effect DOM writes so they land in the right
+        // elements regardless of which panel is calling (main, stock viewer, maximize).
+        // e.g. 'NIFTY-50-chart'              → _sfx = ''
+        //      'NIFTY-50-chart-stock-viewer'  → _sfx = '-stock-viewer'
+        //      'max-NIFTY-50-chart'           → _sfx = '' (update main panel elements)
+        var _sfx = containerId.startsWith('max-') ? '' : containerId.replace(tempName + '-chart', '');
+
         let _chartCandles = _gtbTrimCandles(data.data.candles);
         // No explicit height → let _renderLWChart fill the row cell via clientHeight
         _renderLWChart(containerId, _chartCandles, refLines, chartHeight, { hideLegend: true });
 
-        // Populate levels strip in the row title bar (if it exists)
-        var _levelsRow = document.getElementById(tempName + '-chart-levels');
-        if (_levelsRow) {
-            var _lMeta = { OPEN:{s:'O',c:'#ffbe0b'}, VIXU:{s:'V↑',c:'#38bdf8'}, VIXL:{s:'V↓',c:'#38bdf8'},
-                           AST:{s:'A+',c:'#3fb950'}, ASO:{s:'A',c:'#3fb950'}, BSO:{s:'B',c:'#f85149'}, BST:{s:'B-',c:'#f85149'} };
-            var _fmt = function(v) { v=parseFloat(v); return v>=1000?v.toLocaleString('en-IN',{maximumFractionDigits:1}):v.toFixed(1); };
-            _levelsRow.innerHTML = refLines.map(function(rl) {
-                var m = _lMeta[rl.key] || {s:rl.key,c:'#7d8590'};
-                return '<span style="display:inline-flex;align-items:center;gap:1px;white-space:nowrap;">'
-                    + '<span style="font-size:0.44rem;font-weight:700;color:'+m.c+';letter-spacing:0.02em;">'+m.s+'</span>'
-                    + '<span style="font-size:0.44rem;color:var(--gtb-muted,#7d8590);">'+_fmt(rl.value)+'</span></span>';
-            }).join('<span style="color:#30363d;font-size:0.4rem;"> · </span>');
+        // Populate levels strip
+        var _lMeta = { OPEN:{s:'O',c:'#ffbe0b'}, VIXU:{s:'V↑',c:'#38bdf8'}, VIXL:{s:'V↓',c:'#38bdf8'},
+                       AST:{s:'A+',c:'#3fb950'}, ASO:{s:'A',c:'#3fb950'}, BSO:{s:'B',c:'#f85149'}, BST:{s:'B-',c:'#f85149'} };
+        var _fmt = function(v) { v=parseFloat(v); return v>=1000?v.toLocaleString('en-IN',{maximumFractionDigits:1}):v.toFixed(1); };
+        var _levelsHtml = refLines.map(function(rl) {
+            var m = _lMeta[rl.key] || {s:rl.key,c:'#7d8590'};
+            return '<span style="display:inline-flex;align-items:center;gap:2px;white-space:nowrap;">'
+                + '<span style="font-size:0.58rem;font-weight:700;color:'+m.c+';letter-spacing:0.02em;">'+m.s+'</span>'
+                + '<span style="font-size:0.58rem;color:var(--gtb-muted,#7d8590);">'+_fmt(rl.value)+'</span></span>';
+        }).join('<span style="color:#30363d;font-size:0.5rem;padding:0 2px;">·</span>');
+
+        // Row header strip — suffix-aware (main panel: no suffix, stock viewer: -stock-viewer)
+        var _levelsRow = document.getElementById(tempName + '-chart-levels' + _sfx);
+        if (_levelsRow) _levelsRow.innerHTML = _levelsHtml;
+
+        // Maximize overlay strip (only when called from maximizeChart)
+        if (containerId.startsWith('max-')) {
+            var _maxLevels = document.getElementById(containerId + '-levels');
+            if (_maxLevels) _maxLevels.innerHTML = _levelsHtml;
         }
 
         let ltp = _chartCandles[_chartCandles.length - 1][4];
-        jQ('#' + tempName + '-ltp').html(parseFloat(ltp).toLocaleString('en-IN'));
-        _buildATRBadges(ltp, name, _chartCandles);
+        jQ('#' + tempName + '-ltp' + _sfx).html(parseFloat(ltp).toLocaleString('en-IN'));
+        _buildATRBadges(ltp, name, _chartCandles, _sfx);
 
         // 9:15 breakout badge
         try {
@@ -5681,7 +5729,7 @@ async function showTopChart(name, bindtoDivId, chartHeight) {
                 let isBull = (close915 === 'ASO' || close915 === 'AST');
                 let isBear = (close915 === 'BSO' || close915 === 'BST');
                 let cls = isBull ? 'gtb-915-bull' : isBear ? 'gtb-915-bear' : 'gtb-915-neutral';
-                jQ('#' + tempName + '-915-badge').html('<span class="' + cls + '">' + close915 + '</span>');
+                jQ('#' + tempName + '-915-badge' + _sfx).html('<span class="' + cls + '">' + close915 + '</span>');
             }
         } catch(e) {}
     } catch (error) {
@@ -6327,7 +6375,7 @@ function _svRenderOIMatrix(name, tempName, oiData, suffix) {
     INSTRUMENT_SCORE_MAP[name].oi_obv = oiScore;
 }
 
-function showOIOBVBarChart(name, suffix) {
+function showOIOBVBarChart(name, suffix, _oiDataOverride) {
     suffix = suffix || '';
     let tempName = name.replaceAll(" ", "-")
     tempName = tempName.replaceAll("&", "-")
@@ -6348,8 +6396,10 @@ function showOIOBVBarChart(name, suffix) {
     let oiCEOBV = ["CE OBV"]
     let oiPEOBV = ["PE OBV"]
 
-    let data = stock[0]['DATA']['tableData']
-    let oiData = stock[0]['DATA']
+    // When called from the bar-width slider, _oiDataOverride carries the per-instrument
+    // cached data so we never read the shared stock[0] global (which only holds the last fetch).
+    let oiData = _oiDataOverride || stock[0]['DATA']
+    let data = oiData['tableData']
 
     // Cache per-instrument so maximize can re-render without re-fetching
     if (!INSTRUMENT_SCORE_MAP[name]) INSTRUMENT_SCORE_MAP[name] = {};
@@ -6434,33 +6484,35 @@ function showOIOBVBarChart(name, suffix) {
     function _svgMiniBar(containerId, seriesList, atmIdx) {
         let el = document.getElementById(containerId.replace(/^#/, ''));
         if (!el) return;
-        let W = el.clientWidth || 260, H = 56;
+        // Fixed logical coordinate space — SVG scales via width="100%" so bars always
+        // fill the container regardless of when clientWidth is read or column width.
+        let W = 300, H = 56;
         let n = seriesList[0].values.length;
         if (!n) { el.innerHTML = '<span style="color:#7d8590;font-size:0.5rem;padding:2px;">no data</span>'; return; }
-        // max abs across all series
         let maxV = 0;
         seriesList.forEach(function(s) { s.values.forEach(function(v) { let a = Math.abs(+v||0); if (a>maxV) maxV=a; }); });
         if (!maxV) maxV = 1;
         let barWPct = parseInt(localStorage.getItem('GTB_OI_BAR_W') || '60') / 100;
-        let barW = Math.max(2, Math.floor((W / n) / seriesList.length * barWPct));
-        let groupW = barW * seriesList.length + 1;
-        let svg = '<svg width="' + W + '" height="' + H + '" xmlns="http://www.w3.org/2000/svg" style="display:block;overflow:visible;">';
-        let midY = Math.round(H / 2);
-        // zero line
-        svg += '<line x1="0" y1="' + midY + '" x2="' + W + '" y2="' + midY + '" stroke="#30363d" stroke-width="1"/>';
+        let ns = seriesList.length;
+        let slotW = W / n;
+        let gap = 0.5;                                          // gap between bars in a group
+        let barW = Math.max(1, (slotW * barWPct - gap * (ns - 1)) / ns);
+        let groupW = barW * ns + gap * (ns - 1);               // total group width
+        let svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" height="' + H + '" xmlns="http://www.w3.org/2000/svg" style="display:block;" preserveAspectRatio="none">';
+        let midY = H / 2;
+        svg += '<line x1="0" y1="' + midY + '" x2="' + W + '" y2="' + midY + '" stroke="#30363d" stroke-width="0.5"/>';
         for (let i = 0; i < n; i++) {
-            let gx = Math.round(i * (W / n));
-            // ATM highlight
-            if (i === atmIdx) svg += '<rect x="' + gx + '" y="0" width="' + Math.round(W/n) + '" height="' + H + '" fill="#fbbf2418" rx="1"/>';
+            let slotCx = i * slotW + slotW / 2;                // center of this slot
+            let groupX = slotCx - groupW / 2;                  // center bars in slot
+            if (i === atmIdx) svg += '<rect x="' + (i * slotW) + '" y="0" width="' + slotW + '" height="' + H + '" fill="#fbbf2418" rx="1"/>';
             seriesList.forEach(function(s, si) {
                 let v = +s.values[i] || 0;
-                let bh = Math.round((Math.abs(v) / maxV) * (midY - 2));
+                let bh = Math.max(1, Math.abs(v) / maxV * (midY - 2));
                 let by = v >= 0 ? midY - bh : midY;
-                let bx = gx + si * (barW + 1);
-                svg += '<rect x="' + bx + '" y="' + by + '" width="' + barW + '" height="' + Math.max(1,bh) + '" fill="' + s.color + '" opacity="0.85" rx="1"/>';
+                let bx = groupX + si * (barW + gap);
+                svg += '<rect x="' + bx + '" y="' + by + '" width="' + barW + '" height="' + bh + '" fill="' + s.color + '" opacity="0.85" rx="0.5"/>';
             });
-            // ATM tick below
-            if (i === atmIdx) svg += '<text x="' + (gx + Math.round(W/n)/2) + '" y="' + (H-1) + '" text-anchor="middle" font-size="5" fill="#fbbf24">▲</text>';
+            if (i === atmIdx) svg += '<text x="' + slotCx + '" y="' + (H - 1) + '" text-anchor="middle" font-size="5" fill="#fbbf24">▲</text>';
         }
         svg += '</svg>';
         el.innerHTML = svg;
@@ -6479,14 +6531,12 @@ function showOIOBVBarChart(name, suffix) {
     (function() {
         let axEl = document.getElementById(tempName + '-oiobv-xaxis');
         if (!axEl || !strikes.length) return;
-        let W = axEl.clientWidth || 260;
-        let n = strikes.length;
-        let slotW = W / n;
-        let svg = '<svg width="' + W + '" height="14" xmlns="http://www.w3.org/2000/svg" style="display:block;">';
+        // Same logical W=300 as _svgMiniBar so strike labels align with bars above
+        let W = 300, n = strikes.length, slotW = W / n;
+        let svg = '<svg viewBox="0 0 ' + W + ' 14" width="100%" height="14" xmlns="http://www.w3.org/2000/svg" style="display:block;" preserveAspectRatio="none">';
         for (let i = 0; i < n; i++) {
-            let cx = Math.round(i * slotW + slotW / 2);
+            let cx = i * slotW + slotW / 2;
             let lbl = String(strikes[i]);
-            // Abbreviate: drop last 3 zeros if present (e.g. 24500 → 24.5k or just last digits)
             let short = lbl.length > 5 ? lbl.slice(-4) : lbl;
             let isAtm = (i === atmIndex);
             svg += '<text x="' + cx + '" y="10" text-anchor="middle" font-size="' + (isAtm ? '6' : '5.5') + '" '
