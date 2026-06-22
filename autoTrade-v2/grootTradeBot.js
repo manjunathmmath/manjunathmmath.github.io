@@ -332,6 +332,31 @@ jQ(document).on('click', '.maximize-component-btn', function() {
     maximizeComponent(name, type);
 });
 
+jQ(document).on('click', '.gtb-left-max-btn', function(e) {
+    e.stopPropagation(); // don't trigger collapse-toggle
+    var panel = jQ(this).data('panel');
+    var titles = {
+        score:       '<i class="bi bi-speedometer2"></i> Score',
+        signal:      '<i class="bi bi-lightning-charge"></i> Signal',
+        rangesb:     '<i class="bi bi-bar-chart-line-fill"></i> Range Scoreboard',
+        pillars:     '<i class="bi bi-bar-chart-steps"></i> Pillars',
+        toptrades:   '<i class="bi bi-stars"></i> Top Trades',
+        scoredetail: '<i class="bi bi-table"></i> Score Detail',
+        scorehistory:'<i class="bi bi-clock-history"></i> Score History',
+    };
+    var bodyMap = {
+        score:       function() { return jQ('#gtb-score-gauge').html(); },
+        signal:      function() { return jQ('#market-final-signal').parent().html(); },
+        rangesb:     function() { return jQ('#gtb-range-sb').html(); },
+        pillars:     function() { return jQ('#gtb-pillars-body').html(); },
+        toptrades:   function() { return jQ('#gtb-top-trades-list').html(); },
+        scoredetail: function() { return jQ('#trend-scoreboard-table').html(); },
+        scorehistory:function() { return jQ('#gtb-score-history-table').html(); },
+    };
+    var body = bodyMap[panel] ? bodyMap[panel]() : '';
+    showMaximizeOverlay(titles[panel] || panel, '<div style="padding:12px;overflow:auto;height:100%;">' + body + '</div>');
+});
+
 var _gtbMaxRefreshFn = null;   // callback set by each maximize caller
 
 function showMaximizeOverlay(title, bodyHtml, refreshFn) {
@@ -887,7 +912,7 @@ function commonMarkupPlaceHolder() {
     // Score gauge
     h += '<div class="gtb-card gtb-widget" id="gtb-score-gauge">';
     h += '<div class="gtb-card-header"><span class="gtb-card-title"><i class="bi bi-speedometer2"></i> SCORE' + _ii('score') + '</span>';
-    h += '<button class="sv-icon-btn show-notes" title="Trading notes"><i class="bi bi-journal-text"></i></button></div>';
+    h += '<span class="hdr-actions"><button class="sv-icon-btn gtb-left-max-btn" data-panel="score" title="Maximize"><i class="bi bi-fullscreen"></i></button><button class="sv-icon-btn show-notes" title="Trading notes"><i class="bi bi-journal-text"></i></button></span></div>';
     h += '<div class="gtb-card-body gtb-widget-body" style="height:120px;">';
     h += '<div id="trend-scoreboard" style="height:110px;"></div>';
     h += '<div id="score-board-number" style="text-align:center;margin-top:-4px;"></div>';
@@ -899,7 +924,7 @@ function commonMarkupPlaceHolder() {
 
     // Signal + outcome
     h += '<div class="gtb-card gtb-widget">';
-    h += '<div class="gtb-card-header"><span class="gtb-card-title"><i class="bi bi-lightning-charge"></i> SIGNAL' + _ii('signal') + '</span></div>';
+    h += '<div class="gtb-card-header"><span class="gtb-card-title"><i class="bi bi-lightning-charge"></i> SIGNAL' + _ii('signal') + '</span><span class="hdr-actions"><button class="sv-icon-btn gtb-left-max-btn" data-panel="signal" title="Maximize"><i class="bi bi-fullscreen"></i></button></span></div>';
     h += '<div class="gtb-card-body gtb-widget-body" style="height:120px;overflow-y:auto;">';
     h += '<div id="market-final-signal"></div>';
     h += '<div id="trend-scoreboard-outcome" style="margin-top:4px;"></div>';
@@ -907,7 +932,7 @@ function commonMarkupPlaceHolder() {
 
     // Range Scoreboard
     h += '<div class="gtb-card gtb-widget">';
-    h += '<div class="gtb-card-header"><span class="gtb-card-title"><i class="bi bi-bar-chart-line-fill"></i> RANGE SCOREBOARD' + _ii('rangesb') + '</span></div>';
+    h += '<div class="gtb-card-header"><span class="gtb-card-title"><i class="bi bi-bar-chart-line-fill"></i> RANGE SCOREBOARD' + _ii('rangesb') + '</span><span class="hdr-actions"><button class="sv-icon-btn gtb-left-max-btn" data-panel="rangesb" title="Maximize"><i class="bi bi-fullscreen"></i></button></span></div>';
     h += '<div class="gtb-card-body gtb-widget-body" id="gtb-range-sb" style="padding:6px 8px;"></div>';
     h += '</div>';
 
@@ -931,7 +956,7 @@ function commonMarkupPlaceHolder() {
     h += '<div class="gtb-card gtb-widget">';
     h += '<div class="gtb-card-header gtb-collapse-toggle" data-target="gtb-pillars-body">';
     h += '<span class="gtb-card-title"><i class="bi bi-bar-chart-steps"></i> PILLARS' + _ii('pillars') + '</span>';
-    h += '<span class="hdr-actions"><i class="bi bi-chevron-down gtb-caret"></i></span></div>';
+    h += '<span class="hdr-actions"><button class="sv-icon-btn gtb-left-max-btn" data-panel="pillars" title="Maximize"><i class="bi bi-fullscreen"></i></button><i class="bi bi-chevron-down gtb-caret"></i></span></div>';
     h += '<div id="gtb-pillars-body" class="gtb-collapse-body gtb-widget-body" style="height:200px;overflow-y:auto;">';
     h += '<div style="color:#64748b;font-size:0.6rem;text-align:center;padding:8px;">Refreshing…</div>';
     h += '</div></div>';
@@ -940,7 +965,7 @@ function commonMarkupPlaceHolder() {
     h += '<div class="gtb-card gtb-widget">';
     h += '<div class="gtb-card-header gtb-collapse-toggle" data-target="gtb-top-trades-list">';
     h += '<span class="gtb-card-title"><i class="bi bi-stars"></i> TOP TRADES' + _ii('toptrades') + '</span>';
-    h += '<span class="hdr-actions"><button class="sv-icon-btn refresh-scoreboard" title="Refresh"><i class="bi bi-arrow-clockwise"></i></button><i class="bi bi-chevron-down gtb-caret"></i></span></div>';
+    h += '<span class="hdr-actions"><button class="sv-icon-btn gtb-left-max-btn" data-panel="toptrades" title="Maximize"><i class="bi bi-fullscreen"></i></button><button class="sv-icon-btn refresh-scoreboard" title="Refresh"><i class="bi bi-arrow-clockwise"></i></button><i class="bi bi-chevron-down gtb-caret"></i></span></div>';
     h += '<div id="gtb-top-trades-list" class="gtb-collapse-body gtb-widget-body" style="height:160px;">';
     h += '<div class="gtb-empty-msg"><i class="bi bi-hourglass-split"></i> Refreshing…</div>';
     h += '</div></div>';
@@ -949,7 +974,7 @@ function commonMarkupPlaceHolder() {
     h += '<div class="gtb-card gtb-widget">';
     h += '<div class="gtb-card-header gtb-collapse-toggle" data-target="gtb-score-detail">';
     h += '<span class="gtb-card-title"><i class="bi bi-table"></i> SCORE DETAIL' + _ii('scoredetail') + '</span>';
-    h += '<span class="hdr-actions"><i class="bi bi-chevron-down gtb-caret"></i></span></div>';
+    h += '<span class="hdr-actions"><button class="sv-icon-btn gtb-left-max-btn" data-panel="scoredetail" title="Maximize"><i class="bi bi-fullscreen"></i></button><i class="bi bi-chevron-down gtb-caret"></i></span></div>';
     h += '<div id="gtb-score-detail" class="gtb-collapse-body gtb-widget-body" style="height:240px;overflow:auto;">';
     h += '<div id="trend-scoreboard-table" style="overflow:auto;"></div>';
     h += '</div></div>';
@@ -958,7 +983,7 @@ function commonMarkupPlaceHolder() {
     h += '<div class="gtb-card gtb-widget">';
     h += '<div class="gtb-card-header gtb-collapse-toggle" data-target="gtb-score-history">';
     h += '<span class="gtb-card-title"><i class="bi bi-clock-history"></i> SCORE HISTORY' + _ii('scorehistory') + '</span>';
-    h += '<span class="hdr-actions"><i class="bi bi-chevron-down gtb-caret"></i></span></div>';
+    h += '<span class="hdr-actions"><button class="sv-icon-btn gtb-left-max-btn" data-panel="scorehistory" title="Maximize"><i class="bi bi-fullscreen"></i></button><i class="bi bi-chevron-down gtb-caret"></i></span></div>';
     h += '<div id="gtb-score-history" class="gtb-collapse-body gtb-widget-body" style="height:220px;overflow:auto;">';
     h += '<div id="gtb-score-history-table" style="font-size:0.62rem;color:#7d8590;padding:6px;">Waiting for refresh…</div>';
     h += '</div></div>';
