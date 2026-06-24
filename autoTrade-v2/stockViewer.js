@@ -400,7 +400,7 @@ function _svRowHtml(name, scriptData, breakOut915) {
     // col 8 — detail: SL row (persistent) + confidence panel (overwritten by _svRenderScoreConfidence)
     h += '<div class="gtb-row-detail" id="' + tid + '-detail' + s + '">';
     if (hasFut) {
-        h += '<div class="gtb-det-row"><span class="gtb-det-lbl">SL</span><div id="' + tid + '-atr-sl' + s + '" class="gtb-cell-sl-wrap" style="margin-left:0"></div></div>';
+        h += '<div class="gtb-det-row"><div id="' + tid + '-atr-sl' + s + '" class="gtb-cell-sl-wrap" style="margin-left:0"></div></div>';
         h += '<div id="' + tid + '-confidence' + s + '"></div>';
     } else {
         h += '<span class="gtb-row-na" style="margin:auto">—</span>';

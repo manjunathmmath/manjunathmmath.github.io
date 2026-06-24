@@ -601,19 +601,33 @@ jQ(document).on("click", "#show-groot-trade-bot", function (e) {
 });
 
 
+function _gtbApplyFullscreen(on) {
+    var divId = 'popup-custom-style-groot-trade-bot';
+    var $pop = jQ('.' + divId);
+    if (on) {
+        $pop.css({ position: 'fixed', top: '0', left: '0', width: '100vw', height: '100vh',
+                   'max-width': 'none', 'max-height': 'none', 'z-index': '99999',
+                   margin: '0', transform: 'none' });
+    } else {
+        $pop.css({ position: '', top: '80px', left: '5vw', width: '90vw', height: '80vh',
+                   'max-width': '', 'max-height': '', 'z-index': '', margin: '', transform: '' });
+    }
+    $pop.find('.popupwindow_content').css({ top: '0', bottom: '0', left: '0', right: '0' });
+    $pop.data('gtb-fullscreen', on);
+}
+
 async function showGrootTradeBot() {
     let html = '<div id="main-trade-bot-container"></div>';
-
     showPopUpWindow('groot-trade-bot', html, 'Groot', 950, 550);
     let divId = 'popup-custom-style-groot-trade-bot';
-    jQ('.' + divId).find('.popupwindow_titlebar_button_maximize').trigger('click');
 
-    // Hide the popup title bar and status bar — the new #gtb-topbar replaces both
+    // Hide the popup library's own titlebar and statusbar — #gtb-topbar replaces them
     jQ('.' + divId).find('.popupwindow_titlebar').hide();
     jQ('.' + divId).find('.popupwindow_statusbar').hide();
 
-    // Make the content fill 100% with no top gap
-    jQ('.' + divId).find('.popupwindow_content').css({ top: '0', bottom: '0' });
+    // Force fullscreen via CSS (more reliable than triggering the library's maximize)
+    _gtbApplyFullscreen(true);
+    jQ('body').css('overflow', 'hidden');
 
     showCompoenentPlaceHolders();
 }
@@ -668,6 +682,7 @@ jQ(document).on("click", "#data-load", function () {
         + '</div>';
     jQ("." + divId).find(".popupwindow_titlebar_text").html(dsTitle);
     hideNativePopupButtons(divId);
+    jQ('.' + divId).toggleClass('gtb-light', (localStorage.getItem('GTB_THEME') || 'dark') === 'light');
 });
 
 
@@ -883,12 +898,8 @@ function commonMarkupPlaceHolder() {
     h += '</div>'; // end settings menu
     h += '</div>'; // end settings wrap
 
-    // Window controls — inside topbar-controls so they're always visible at right edge
-    h += '<div class="gtb-win-controls">';
-    h += '<button class="gtb-win-btn gtb-win-minimize" title="Minimize"><i class="bi bi-dash"></i></button>';
-    h += '<button class="gtb-win-btn gtb-win-restore" title="Restore / Maximize"><i class="bi bi-fullscreen"></i></button>';
-    h += '<button class="gtb-win-btn gtb-win-close" title="Close"><i class="bi bi-x-lg"></i></button>';
-    h += '</div>';
+    // Window controls — same popupWinControls style as all other popups
+    h += popupWinControls('popup-custom-style-groot-trade-bot');
 
     h += '</div>'; // end gtb-topbar-controls
 
@@ -1192,7 +1203,7 @@ function commonMarkupPlaceHolder() {
         // ── Details: SL / PCR / OI score (col 8) ─────────────────────────
         h += '<div class="gtb-row-detail" id="' + tid + '-detail">';
         if (hasFut) {
-            h += '<div class="gtb-det-row"><span class="gtb-det-lbl">SL</span><div id="' + tid + '-atr-sl" class="gtb-cell-sl-wrap" style="margin-left:0"></div></div>';
+            h += '<div class="gtb-det-row"><div id="' + tid + '-atr-sl" class="gtb-cell-sl-wrap" style="margin-left:0"></div></div>';
             h += '<div class="gtb-det-row"><span class="gtb-det-lbl">PCR</span><span class="gtb-pcr-chip gtb-det-val" id="' + tid + '-pcr-probability"></span></div>';
             h += '<div class="gtb-det-row"><span class="gtb-det-lbl">OI sc</span><span class="gtb-oi-score-chip gtb-det-val" id="' + tid + '-oi-score"></span></div>';
         } else {
@@ -1325,8 +1336,8 @@ function commonMarkupPlaceHolder() {
 
     // ── Refresh status bar ────────────────────────────────────────────────────
     h += '<div id="gtb-refresh-statusbar" style="'
-       + 'font-size:0.6rem;color:#7d8590;padding:3px 10px;border-top:1px solid #ffffff10;'
-       + 'background:#0d1117;display:flex;align-items:center;gap:4px;">'
+       + 'font-size:0.6rem;color:var(--gtb-muted);padding:3px 10px;border-top:1px solid var(--gtb-border);'
+       + 'background:var(--gtb-surface2);display:flex;align-items:center;gap:4px;flex-shrink:0;">'
        + '<i class="bi bi-hourglass-split" style="margin-right:3px;"></i>Waiting for refresh…'
        + '</div>';
 
@@ -3283,9 +3294,9 @@ jQ(document).on("click", function(e) {
 
 // ── Theme toggle (dark / light) ──────────────────────────────────────────────
 function _gtbApplyTheme(theme) {
-    // The maximize overlay is appended to <body>, outside #main-trade-bot-container,
-    // so it needs the theme class applied directly to inherit the light palette.
-    var container = jQ('#main-trade-bot-container, #groot-maximize-overlay, .popup-custom-style-groot-trade-bot-stock');
+    // Apply theme to all popups, overlays and containers that use --gtb-* vars
+    // but live outside #main-trade-bot-container (so they don't inherit it automatically).
+    var container = jQ('#main-trade-bot-container, #groot-maximize-overlay, [class*="popup-custom-style-"]');
     if (theme === 'light') container.addClass('gtb-light');
     else                    container.removeClass('gtb-light');
     localStorage.setItem('GTB_THEME', theme);
@@ -3412,6 +3423,9 @@ function hideNativePopupButtons(popupClass) {
 
 jQ(document).on("click", ".popup-win-close", function () {
     let cls = jQ(this).closest('[data-popup]').data('popup');
+    if (cls === 'popup-custom-style-groot-trade-bot') {
+        jQ('body').css('overflow', '');
+    }
     jQ('.' + cls).find('.popupwindow_titlebar_button_close').trigger('click');
 });
 
@@ -3419,9 +3433,28 @@ jQ(document).on("click", ".popup-win-restore", function () {
     let btn   = jQ(this);
     let cls   = btn.closest('[data-popup]').data('popup');
     let popEl = jQ('.' + cls);
+
+    // Groot main popup: toggle CSS fullscreen ↔ windowed
+    if (cls === 'popup-custom-style-groot-trade-bot') {
+        let isFs = popEl.data('gtb-fullscreen') !== false;
+        _gtbApplyFullscreen(!isFs);
+        jQ('#gtb-main').show();
+        btn.closest('[data-popup]').find('.popup-win-minimize')
+            .removeClass('is-active').find('i').removeClass('bi-chevron-up').addClass('bi-dash');
+        popEl.css({ 'min-height': '', overflow: '' });
+        if (!isFs) {
+            btn.find('i').removeClass('bi-fullscreen').addClass('bi-fullscreen-exit');
+            btn.attr('title', 'Restore to window').addClass('is-active');
+        } else {
+            btn.find('i').removeClass('bi-fullscreen-exit').addClass('bi-fullscreen');
+            btn.attr('title', 'Fullscreen').removeClass('is-active');
+        }
+        return;
+    }
+
+    // All other popups: use library maximize
     let isMax = popEl.data('maximized') || false;
     popEl.find('.popupwindow_titlebar_button_maximize').trigger('click');
-    // Toggle and persist maximized state so the next click goes the other way
     popEl.data('maximized', !isMax);
     if (isMax) {
         btn.find('i').removeClass('bi-fullscreen-exit').addClass('bi-fullscreen');
@@ -3430,12 +3463,8 @@ jQ(document).on("click", ".popup-win-restore", function () {
         btn.find('i').removeClass('bi-fullscreen').addClass('bi-fullscreen-exit');
         btn.attr('title', 'Restore').addClass('is-active');
     }
-    // Re-show content if it was collapsed by minimize
-    let collapseTarget = popEl.find('.popup-win-content-area');
-    if (collapseTarget.length) collapseTarget.show();
     btn.closest('[data-popup]').find('.popup-win-minimize')
         .removeClass('is-active').find('i').removeClass('bi-chevron-up').addClass('bi-dash');
-    // Restore any height constraints imposed by minimize
     popEl.find('.popupwindow_content').show();
     popEl.css({ height: '', 'min-height': '', overflow: '' });
 });
@@ -3444,6 +3473,29 @@ jQ(document).on("click", ".popup-win-minimize", function () {
     let btn   = jQ(this);
     let cls   = btn.closest('[data-popup]').data('popup');
     let popEl = jQ('.' + cls);
+
+    // Groot main popup: collapse to topbar strip
+    if (cls === 'popup-custom-style-groot-trade-bot') {
+        let main = jQ('#gtb-main');
+        if (main.is(':visible')) {
+            main.hide();
+            btn.find('i').removeClass('bi-dash').addClass('bi-chevron-up');
+            btn.attr('title', 'Restore').addClass('is-active');
+            popEl.css({ height: '46px', 'min-height': '0', overflow: 'hidden' });
+        } else {
+            main.show();
+            btn.find('i').removeClass('bi-chevron-up').addClass('bi-dash');
+            btn.attr('title', 'Minimize').removeClass('is-active');
+            if (popEl.data('gtb-fullscreen') !== false) {
+                _gtbApplyFullscreen(true);
+            } else {
+                popEl.css({ height: '80vh', 'min-height': '', overflow: '' });
+            }
+        }
+        return;
+    }
+
+    // All other popups: hide/show popupwindow_content
     let content = popEl.find('.popupwindow_content');
     if (content.is(':visible')) {
         content.hide();
@@ -3459,52 +3511,29 @@ jQ(document).on("click", ".popup-win-minimize", function () {
 });
 
 // ── Window control buttons ───────────────────────────────────────────────────
-// Minimize: collapse the panel body, leaving only the topbar visible.
-// This avoids the library's minimize which flows the popup to the bottom of
-// the page and gets hidden behind the OS taskbar on Windows.
+// Minimize — collapse to topbar-only strip (46px); restore on second click.
 jQ(document).on("click", ".gtb-win-minimize", function () {
-    let container = jQ('#main-trade-bot-container');
-    let main      = container.find('#gtb-main');
-    let btn       = jQ(this);
-    let popupEl = jQ('.popup-custom-style-groot-trade-bot');
+    var main  = jQ('#gtb-main');
+    var btn   = jQ(this);
+    var popEl = jQ('.popup-custom-style-groot-trade-bot');
     if (main.is(':visible')) {
         main.hide();
         btn.find('i').removeClass('bi-dash').addClass('bi-chevron-up');
         btn.attr('title', 'Restore').addClass('is-active');
-        popupEl.css({ height: '44px', 'min-height': '44px', overflow: 'hidden' });
+        popEl.css({ height: '46px', 'min-height': '0', overflow: 'hidden' });
     } else {
         main.show();
         btn.find('i').removeClass('bi-chevron-up').addClass('bi-dash');
-        btn.attr('title', 'Minimise').removeClass('is-active');
-        popupEl.css({ height: '', 'min-height': '', overflow: '' });
+        btn.attr('title', 'Minimize').removeClass('is-active');
+        // Re-apply current fullscreen or windowed size
+        if (popEl.data('gtb-fullscreen') !== false) {
+            _gtbApplyFullscreen(true);
+        } else {
+            popEl.css({ height: '80vh', 'min-height': '', overflow: '' });
+        }
     }
 });
 
-// Maximize: trigger the library's maximize; update icon to reflect state.
-jQ(document).on("click", ".gtb-win-restore", function () {
-    let popupEl = jQ('.popup-custom-style-groot-trade-bot');
-    let btn     = jQ(this);
-    let isMaximized = popupEl.data('maximized') || false;
-    popupEl.find('.popupwindow_titlebar_button_maximize').trigger('click');
-    // Persist toggle state so next click goes the other way
-    popupEl.data('maximized', !isMaximized);
-    if (isMaximized) {
-        btn.find('i').removeClass('bi-fullscreen-exit').addClass('bi-fullscreen');
-        btn.attr('title', 'Maximise').removeClass('is-active');
-    } else {
-        btn.find('i').removeClass('bi-fullscreen').addClass('bi-fullscreen-exit');
-        btn.attr('title', 'Restore').addClass('is-active');
-    }
-    // If panel was collapsed (minimized), restore it
-    jQ('#gtb-main').show();
-    jQ('.gtb-win-minimize').removeClass('is-active').find('i').removeClass('bi-chevron-up').addClass('bi-dash');
-    popupEl.css({ height: '', 'min-height': '', overflow: '' });
-});
-
-// Close: trigger the library close button.
-jQ(document).on("click", ".gtb-win-close", function () {
-    jQ('.popup-custom-style-groot-trade-bot').find('.popupwindow_titlebar_button_close').trigger('click');
-});
 
 jQ(document).on("click", ".gtb-collapse-toggle", function (e) {
     // Don't collapse when clicking badges/buttons inside the header
@@ -4735,10 +4764,11 @@ function _cmdRenderOI(oiData, oiSel, obvSel) {
         if (item['ATM_STRIKE']) atm = i;
     });
     var strikes = x.slice(1);
-    _renderBarChart(oiSel,  { labels: strikes, atm: atm, height: 170, series: [
+    var _cmdH = (oiSel === '#cmd-crude-oi') ? 170 : 170;
+    _renderBarChart(oiSel,  { labels: strikes, atm: atm, height: _cmdH, series: [
         { label: 'CH CE OI', color: OI_COLORS.CE_OI, values: ceCh.slice(1) },
         { label: 'CH PE OI', color: OI_COLORS.PE_OI, values: peCh.slice(1) } ] });
-    _renderBarChart(obvSel, { labels: strikes, atm: atm, height: 170, series: [
+    _renderBarChart(obvSel, { labels: strikes, atm: atm, height: _cmdH, series: [
         { label: 'CE OBV', color: OI_COLORS.CE_OBV, values: ceObv.slice(1) },
         { label: 'PE OBV', color: OI_COLORS.PE_OBV, values: peObv.slice(1) } ] });
 }
@@ -4747,20 +4777,22 @@ jQ(document).on('click', '#show-commodities', function (e) {
     e.preventDefault();
     var body = ''
         + '<div class="cmd-grid">'
-        + '<div class="cmd-cell"><div class="cmd-t"><i class="bi bi-globe-asia-australia"></i> GIFT NIFTY</div><div id="cmd-gift-chart" style="height:300px;"></div></div>'
-        + '<div class="cmd-cell"><div class="cmd-t"><i class="bi bi-droplet-fill"></i> CRUDEOILM</div><div id="cmd-crude-chart" style="height:300px;"></div></div>'
+        + '<div class="cmd-cell"><div class="cmd-t"><i class="bi bi-globe-asia-australia"></i> GIFT NIFTY</div><div id="cmd-gift-levels" class="gtb-chart-levels" style="min-height:24px;"></div><div id="cmd-gift-chart" style="height:180px;"></div></div>'
+        + '<div class="cmd-cell"><div class="cmd-t"><i class="bi bi-droplet-fill"></i> CRUDEOILM</div><div id="cmd-crude-levels" class="gtb-chart-levels" style="min-height:24px;"></div><div id="cmd-crude-chart" style="height:180px;"></div></div>'
         + '</div>'
-        + '<div class="cmd-t"><i class="bi bi-bar-chart-fill"></i> CRUDEOILM — OI / OBV</div>'
-        + '<div class="cmd-oi-charts"><div><div class="cmd-st">OI Change (CE/PE)</div><div id="cmd-crude-oi"></div></div>'
-        + '<div><div class="cmd-st">OBV (CE/PE)</div><div id="cmd-crude-obv"></div></div></div>'
-        + '<div id="cmd-crude-oi-table" style="overflow-x:auto;margin-top:6px;"><div class="cmd-load"><i class="bi bi-hourglass-split"></i> Loading OI…</div></div>'
-        + '<div class="cmd-t"><i class="bi bi-graph-up"></i> CRUDEOILM — Futures Trend</div>'
-        + '<div id="cmd-crude-fut" class="cmd-fut"><div class="cmd-load"><i class="bi bi-hourglass-split"></i> Loading futures…</div></div>';
+        + '<div class="cmd-t"><i class="bi bi-bar-chart-fill"></i> CRUDEOILM — OI / OBV / Futures</div>'
+        + '<div class="cmd-3col">'
+        +   '<div class="cmd-3col-cell cmd-3col-chart"><div class="cmd-st">OI Change (CE/PE)</div><div id="cmd-crude-oi"></div></div>'
+        +   '<div class="cmd-3col-cell cmd-3col-chart"><div class="cmd-st">OBV (CE/PE)</div><div id="cmd-crude-obv"></div></div>'
+        +   '<div class="cmd-3col-cell cmd-3col-scroll"><div class="cmd-st">Futures Trend</div><div id="cmd-crude-fut" class="cmd-fut"><div class="cmd-load"><i class="bi bi-hourglass-split"></i> Loading futures…</div></div></div>'
+        + '</div>'
+        + '<div class="cmd-st" style="margin-top:10px;">Strike Table</div>'
+        + '<div id="cmd-crude-oi-table" style="overflow-x:auto;"><div class="cmd-load"><i class="bi bi-hourglass-split"></i> Loading OI…</div></div>';
 
     async function _cmdLoadAll() {
         // Charts
-        try { await showTopChart('GIFT NIFTY', '#cmd-gift-chart', 300); } catch (e1) {}
-        try { await showTopChartMCX('CRUDEOILM', 300, '#cmd-crude-chart'); } catch (e2) {}
+        try { await showTopChart('GIFT NIFTY', '#cmd-gift-chart', 180); } catch (e1) {}
+        try { await showTopChartMCX('CRUDEOILM', 180, '#cmd-crude-chart'); } catch (e2) {}
 
         // Futures
         jQ('#cmd-crude-fut').html('<div class="cmd-load"><i class="bi bi-hourglass-split"></i> Loading futures…</div>');
@@ -4780,7 +4812,6 @@ jQ(document).on('click', '#show-commodities', function (e) {
             : '<div class="cmd-load" style="color:var(--gtb-red);">Futures unavailable.</div>');
 
         // OI
-        jQ('#cmd-crude-oi-table').html('<div class="cmd-load"><i class="bi bi-hourglass-split"></i> Loading OI…</div>');
         try {
             if (fres) await showPrictionProbabiltyMCX('CRUDEOILM', fres);
             showOIOBVBarChart('CRUDEOILM');
@@ -5740,6 +5771,15 @@ async function showTopChart(name, bindtoDivId, chartHeight) {
         if (containerId.startsWith('max-')) {
             var _maxLevels = document.getElementById(containerId + '-levels');
             if (_maxLevels) _maxLevels.innerHTML = _levelsHtml;
+        }
+
+        // Custom container (e.g. commodities popup '#cmd-gift-chart') — derive sibling levels div
+        if (_sfx && _sfx !== '' && !containerId.startsWith('max-')) {
+            var _siblingLevels = document.getElementById(containerId.replace('#', '').replace('-chart', '-levels'));
+            if (_siblingLevels) _siblingLevels.innerHTML = _levelsHtml;
+            // Also keep the main panel div in sync
+            var _mainLevels = document.getElementById(tempName + '-chart-levels');
+            if (_mainLevels) _mainLevels.innerHTML = _levelsHtml;
         }
 
         let ltp = _chartCandles[_chartCandles.length - 1][4];

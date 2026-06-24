@@ -175,6 +175,32 @@ async function showTopChartMCX(name, chartHeight, bindtoDivId) {
         if (typeof _buildATRBadges === 'function') {
             _buildATRBadges(ltp, name, data.data.candles);
         }
+
+        // Levels strip — same layout as showTopChart
+        var _ltpN = parseFloat(ltp);
+        var _sm   = strikeMap;
+        function _lbl(key, val, isBull) {
+            var v = parseFloat(val);
+            var hit = isBull ? (_ltpN >= v) : (_ltpN <= v);
+            var col = hit ? (isBull ? 'var(--gtb-green,#3fb950)' : 'var(--gtb-red,#f85149)') : 'var(--gtb-muted,#7d8590)';
+            return '<span style="font-size:0.5rem;white-space:nowrap;color:' + col + '"><b>' + key + '</b> ' + v.toFixed(2) + '</span>';
+        }
+        var _levelsHtml = ''
+            + _lbl('O',   open,           true)
+            + _lbl('V↑',  _sm.vixDDUpper, true)
+            + _lbl('V↓',  _sm.vixDDLower, false)
+            + _lbl('A+',  _sm.ustrikeTwo,  true)
+            + _lbl('A',   _sm.ustrikeOne,  true)
+            + _lbl('B',   _sm.bstrikeOne,  false)
+            + _lbl('B-',  _sm.bstrikeTwo,  false);
+        // Write to the main panel row levels div
+        var _levelsRow = document.getElementById(tempName + '-chart-levels');
+        if (_levelsRow) _levelsRow.innerHTML = _levelsHtml;
+        // Also write to any popup levels div that follows the chart container
+        if (bindtoDivId) {
+            var _popupLevels = document.getElementById(bindtoDivId.replace('#', '').replace('-chart', '-levels'));
+            if (_popupLevels) _popupLevels.innerHTML = _levelsHtml;
+        }
     } catch (error) {
         console.error('Error in showTopChartMCX for ' + name, error);
     }

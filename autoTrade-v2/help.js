@@ -19,6 +19,7 @@ function showHelpPopup() {
         + '</div>';
     jQ('.' + divId).find('.popupwindow_titlebar_text').html(title);
     hideNativePopupButtons(divId);
+    jQ('.' + divId).toggleClass('gtb-light', (localStorage.getItem('GTB_THEME') || 'dark') === 'light');
 
     // Activate first tab
     jQ('#help-tab-overview').addClass('hlp-tab-active');
