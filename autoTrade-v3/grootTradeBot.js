@@ -3269,7 +3269,8 @@ function _gtbRiskPanel(name) {
     var lotSize = 0;
     try {
         if (typeof FUTURE_INTRUMENT_LIST !== 'undefined') {
-            var _fi = FUTURE_INTRUMENT_LIST.find(function(x){ return x.name === name; });
+            var _futName = name === 'NIFTY 50' ? 'NIFTY' : name === 'NIFTY BANK' ? 'BANKNIFTY' : name;
+            var _fi = FUTURE_INTRUMENT_LIST.find(function(x){ return x.name === _futName; });
             if (_fi) lotSize = parseInt(_fi.lot_size) || 0;
         }
     } catch(e) {}
