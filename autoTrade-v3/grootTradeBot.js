@@ -936,15 +936,12 @@ function commonMarkupPlaceHolder() {
     h += '<span class="gtb-signal-pill wait" id="gtb-signal-pill"><i class="bi bi-hourglass-split"></i> LOADING</span>';
     h += '</div>';
 
-    // ── Topbar controls (decluttered) ─────────────────────────────────────────
+    // ── Topbar controls (timer + refresh only) ────────────────────────────────
     var _savedHistTime = localStorage.getItem('GTB_HIST_TIME') || '';
     h += '<div class="gtb-topbar-controls">';
-
-    // Primary: timer + refresh button (always visible)
     h += '<span id="refresh-loader" class="loader hide"></span>';
     h += '<span id="refresh-timer-one" class="gtb-timer-badge">00:00</span>';
     h += '<a id="start-auto-refresh" class="gtb-ctrl-link" title="Refresh now"><i class="bi bi-arrow-clockwise"></i> Refresh</a>';
-    // Progress pill — shows current step during refresh, hidden at rest
     h += '<span id="gtb-progress-pill" style="visibility:hidden;display:inline-flex;align-items:center;gap:5px;'
        + 'font-size:0.6rem;color:#c9d1d9;background:#1f2937;border:1px solid #3b82f633;'
        + 'border-radius:10px;padding:2px 8px;width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:0;">'
@@ -952,35 +949,13 @@ function commonMarkupPlaceHolder() {
        + 'animation:gtb-pulse 1s ease-in-out infinite;" id="gtb-progress-dot"></span>'
        + '<span id="gtb-progress-text"></span>'
        + '</span>';
-
-    // Time picker (compact, always visible — core feature)
     h += '<input type="time" id="gtb-hist-time" value="' + _savedHistTime + '" min="09:15" max="15:30" '
        + 'style="font-size:0.6rem;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;'
        + 'border-radius:4px;padding:2px 4px;cursor:pointer;width:76px;" title="Snapshot end time — empty = live">';
-
-    // Tool launchers as icon-only buttons
-    h += '<a id="show-915-backtest" class="gtb-ctrl-link" title="9:15 Trend — 1-year day-wise backtest (NIFTY/SENSEX/BANK)"><i class="bi bi-calendar-week"></i></a>';
-    h += '<a id="show-all-oi" class="gtb-ctrl-link" title="OI Scan — all instruments incl. weighted constituents"><i class="bi bi-layers-fill"></i></a>';
-    h += '<a id="show-fut-accuracy" class="gtb-ctrl-link" title="Futures remark accuracy (5-min reconstruction)"><i class="bi bi-bullseye"></i></a>';
-    h += '<a id="show-futures-signal" class="gtb-ctrl-link" title="Instrument Detail View — price action, OI, futures, score for any instrument"><i class="bi bi-layers-fill"></i></a>';
-    h += '<a id="show-commodities" class="gtb-ctrl-link" title="Commodities — GIFT NIFTY &amp; Crude (chart, OI, futures)"><i class="bi bi-droplet-fill"></i></a>';
-    h += '<a id="show-oi-viewer" class="gtb-ctrl-link" title="OI Analyzer"><i class="bi bi-eye"></i></a>';
-    h += '<a id="show-stock-viewer" class="gtb-ctrl-link" title="Stock Viewer"><i class="bi bi-list-ul"></i></a>';
-    h += '<a id="show-market-quote-analyzer" class="gtb-ctrl-link" title="Quotes"><i class="bi bi-graph-up"></i></a>';
-    h += '<a id="show-maxpain-gex" class="gtb-ctrl-link" title="Max Pain &amp; GEX — all instruments"><i class="bi bi-bar-chart-steps"></i></a>';
-    h += '<a id="show-help" class="gtb-ctrl-link" title="Help"><i class="bi bi-question-circle-fill"></i></a>';
-
-    // ➕ Add instrument dynamically
-    h += '<a class="gtb-ctrl-link" id="gtb-add-instr-btn" title="Add instrument to overview"><i class="bi bi-plus-circle-fill"></i></a>';
-
-    // ⚙ Settings — opens as a draggable popup window
-    h += '<a class="gtb-ctrl-link" id="gtb-settings-toggle" title="Settings"><i class="bi bi-gear-fill"></i></a>';
-
-    // Window controls at the right end of the topbar
-    h += '<span class="gtb-win-controls" data-popup="popup-custom-style-groot-trade-bot" style="margin-left:6px;flex-shrink:0;display:flex;gap:4px;">'
-       + '<button class="gtb-win-btn popup-win-minimize" title="Minimize" style="width:26px;height:26px;background:#2a3040;color:#c9d1d9;border:1px solid #444c5a;border-radius:5px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:0.75rem;"><i class="bi bi-dash"></i></button>'
-       + '<button class="gtb-win-btn popup-win-restore"  title="Maximize" style="width:26px;height:26px;background:#2a3040;color:#c9d1d9;border:1px solid #444c5a;border-radius:5px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:0.75rem;"><i class="bi bi-fullscreen"></i></button>'
-       + '<button class="gtb-win-btn popup-win-close"    title="Close"    style="width:26px;height:26px;background:#2a3040;color:#c9d1d9;border:1px solid #444c5a;border-radius:5px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:0.75rem;"><i class="bi bi-x-lg"></i></button>'
+    h += '<span class="gtb-win-controls" data-popup="popup-custom-style-groot-trade-bot" style="flex-shrink:0;padding-left:6px;border-left:1px solid var(--gtb-border);margin-left:4px;">'
+       + '<button class="gtb-win-btn popup-win-minimize" title="Minimize"><i class="bi bi-dash"></i></button>'
+       + '<button class="gtb-win-btn popup-win-restore"  title="Maximize/Restore"><i class="bi bi-fullscreen"></i></button>'
+       + '<button class="gtb-win-btn popup-win-close"    title="Close"><i class="bi bi-x-lg"></i></button>'
        + '</span>';
     h += '</div>'; // end gtb-topbar-controls
     h += '</div>'; // end topbar
@@ -1083,9 +1058,29 @@ function commonMarkupPlaceHolder() {
     // ════════════════════════════════════════════════════════════════
     h += '<div id="gtb-right">';
     h += '<div id="gtb-tab-strip">'
+        // ── Tabs ─────────────────────────────────────────────────────────────
         + '<button class="gtb-tab active" data-tab="main"><i class="bi bi-grid"></i> Overview</button>'
+        + '<button class="gtb-tab" data-tab="signals"><i class="bi bi-layers-fill"></i> Signals</button>'
         + '<button class="gtb-tab" data-tab="analysis"><i class="bi bi-bar-chart-line-fill"></i> Analysis</button>'
         + '<button class="gtb-tab" data-tab="opps"><i class="bi bi-lightning-charge-fill"></i> Opportunities</button>'
+        // ── Spacer ───────────────────────────────────────────────────────────
+        + '<span class="gtb-tab-sep"></span>'
+        // ── Tool buttons (all 15 — topbar icons + float-menu extras) ─────────
+        + '<a id="show-chartgrid"            class="gtb-ctrl-link" title="Chart Grid"><i class="bi bi-grid-3x3-gap-fill"></i></a>'
+        + '<a id="show-915-backtest"         class="gtb-ctrl-link" title="9:15 Trend backtest"><i class="bi bi-calendar-week"></i></a>'
+        + '<a id="show-all-oi"               class="gtb-ctrl-link" title="OI Scan — all instruments"><i class="bi bi-layers-fill"></i></a>'
+        + '<a id="show-fut-accuracy"         class="gtb-ctrl-link" title="Futures remark accuracy"><i class="bi bi-bullseye"></i></a>'
+        + '<a id="show-futures-signal"       class="gtb-ctrl-link" title="Instrument Detail View"><i class="bi bi-flag-fill"></i></a>'
+        + '<a id="show-commodities"          class="gtb-ctrl-link" title="Commodities — GIFT NIFTY &amp; Crude"><i class="bi bi-droplet-fill"></i></a>'
+        + '<a id="show-oi-viewer"            class="gtb-ctrl-link" title="OI Analyzer"><i class="bi bi-eye"></i></a>'
+        + '<a id="show-stock-viewer"         class="gtb-ctrl-link" title="Stock Viewer"><i class="bi bi-list-ul"></i></a>'
+        + '<a id="show-market-quote-analyzer" class="gtb-ctrl-link" title="Quotes"><i class="bi bi-graph-up"></i></a>'
+        + '<a id="show-maxpain-gex"          class="gtb-ctrl-link" title="Max Pain &amp; GEX"><i class="bi bi-bar-chart-steps"></i></a>'
+        + '<a id="show-trade-checklist"      class="gtb-ctrl-link" title="Pre-Trade Checklist"><i class="bi bi-clipboard-check"></i></a>'
+        + '<a id="show-help"                 class="gtb-ctrl-link" title="Help"><i class="bi bi-question-circle-fill"></i></a>'
+        + '<a id="gtb-add-instr-btn"         class="gtb-ctrl-link" title="Add instrument"><i class="bi bi-plus-circle-fill"></i></a>'
+        + '<a id="gtb-settings-toggle"       class="gtb-ctrl-link" title="Settings"><i class="bi bi-gear-fill"></i></a>'
+        + '<a id="data-load"                 class="gtb-ctrl-link" title="Data Settings"><i class="bi bi-sliders"></i></a>'
         + '</div>';
     h += '<div id="gtb-pane-main" class="gtb-tab-pane">';
 
@@ -1434,6 +1429,7 @@ function commonMarkupPlaceHolder() {
     h += '</div>'; // end #gtb-pane-main
 
     // Additional tab panes — populated lazily on first switch
+    h += '<div id="gtb-pane-signals"  class="gtb-tab-pane" style="display:none;overflow-y:auto;padding:0;"></div>';
     h += '<div id="gtb-pane-analysis" class="gtb-tab-pane" style="display:none;overflow-y:auto;padding:4px;"></div>';
     h += '<div id="gtb-pane-opps"     class="gtb-tab-pane" style="display:none;overflow-y:auto;padding:4px;"></div>';
 
@@ -1569,6 +1565,7 @@ function _gtbActivateTab(tabId) {
 }
 
 var _GTB_PANE_GRIDS = {
+    signals:  function() { return _gtbSignalsPaneHtml(); },
     // Analysis tab: full bloomberg dashboard rendered by _btRenderInPane
     analysis: function() { return ''; },
     // Opps tab: full opportunities dashboard rendered by _btoShow_inpane
@@ -1576,9 +1573,142 @@ var _GTB_PANE_GRIDS = {
 };
 
 var _GTB_PANE_RENDERS = {
+    signals:  [function(){try{_gtbRenderSignalsPane();}catch(e){}}],
     analysis: [function(){try{_btRenderInPane('#gtb-pane-analysis');}catch(e){}}],
     opps:     [function(){try{_btoShow_inpane('#gtb-pane-opps');}catch(e){}}]
 };
+
+// ── Signals tab: 3-column layout ─────────────────────────────────────────────
+// Col 1: Index/Stock OI compact  |  Col 2: Weighted constituents OI compact  |  Col 3: Futures accuracy
+function _gtbSignalsPaneHtml() {
+    return '<div id="gtb-sig-pane">'
+        + '<div id="gtb-sig-cols">'
+        // Col 1 — Index / Stock
+        + '<div class="gtb-sig-col">'
+        +   '<div class="gtb-sig-hdr"><i class="bi bi-layers-fill"></i> INDEX / STOCK OI</div>'
+        +   '<div id="gtb-sig-oi-index" style="overflow:auto;"><div class="gtb-sig-wait"><i class="bi bi-hourglass-split"></i> Loading…</div></div>'
+        + '</div>'
+        // Col 2 — Weighted constituents
+        + '<div class="gtb-sig-col">'
+        +   '<div class="gtb-sig-hdr"><i class="bi bi-diagram-3-fill"></i> WEIGHTED CONSTITUENTS OI</div>'
+        +   '<div id="gtb-sig-oi-wtd" style="overflow:auto;"><div class="gtb-sig-wait"><i class="bi bi-hourglass-split"></i> Loading…</div></div>'
+        + '</div>'
+        // Col 3 — Futures Remark Accuracy
+        + '<div class="gtb-sig-col">'
+        +   '<div class="gtb-sig-hdr">'
+        +     '<i class="bi bi-bullseye"></i> FUTURES ACCURACY'
+        +     '<button class="gtb-sig-hdr-btn" id="gtb-sig-fut-reload" style="margin-left:auto;"><i class="bi bi-arrow-clockwise"></i> Reload</button>'
+        +   '</div>'
+        +   '<div id="gtb-sig-fut-body"><div class="gtb-sig-wait"><i class="bi bi-hourglass-split"></i> Replaying 5-min candles…</div></div>'
+        + '</div>'
+        + '</div>'
+        + '</div>';
+}
+
+function _gtbRenderSignalsPane() {
+    // ── Col 1 & 2: OI Compare compact, split by group ────────────────────────
+    try {
+        var allList = _gtbAllOIInstruments();
+        var indexList = allList.filter(function(it) { return it.group === 'Index / Stock'; });
+        var wtdList   = allList.filter(function(it) { return it.group === 'Weighted constituent'; });
+
+        function _oiColHtml(list, containerId) {
+            if (!list.length) {
+                jQ(containerId).html('<div class="gtb-sig-wait">No OI data yet. Run a refresh first.</div>');
+                return;
+            }
+            // Build compact table without group-header rows (single group per column)
+            var OFFS = [-2, -1, 0, 1, 2];
+            var h = '<table class="oic-matrix"><thead><tr>'
+                + '<th class="oic-sticky">Instrument</th><th>OI</th><th>PCR</th>'
+                + OFFS.map(function(o){ return '<th>' + (o===0?'ATM':'ATM'+(o>0?'+'+o:o)) + '</th>'; }).join('')
+                + '</tr></thead><tbody>';
+            list.forEach(function(it) {
+                var name = it.name, sm = INSTRUMENT_SCORE_MAP[name] || {}, oiData = sm.oiData;
+                if (!oiData || !oiData.tableData || !oiData.tableData.length) return;
+                var td = oiData.tableData, atmIdx = -1;
+                for (var i = 0; i < td.length; i++) { if (td[i]['ATM_STRIKE']) { atmIdx = i; break; } }
+                if (atmIdx < 0) atmIdx = Math.floor(td.length / 2);
+                var pc = 0; try { pc = parseFloat(generateTrend(name).change) || 0; } catch(e2) {}
+                var oiScore = (sm.oi_obv != null) ? sm.oi_obv : 0;
+                var scColor = oiScore > 0 ? 'var(--gtb-green)' : oiScore < 0 ? 'var(--gtb-red)' : 'var(--gtb-muted)';
+                h += '<tr><td class="oic-sticky"><b>' + name + '</b></td>'
+                    + '<td style="color:' + scColor + ';font-weight:700;font-family:var(--gtb-mono);">' + (oiScore > 0 ? '+' : '') + (typeof oiScore === 'number' ? oiScore.toFixed(1) : oiScore) + '</td>'
+                    + '<td style="font-family:var(--gtb-mono);">' + (oiData.pcr != null ? oiData.pcr : '—') + '</td>';
+                OFFS.forEach(function(off) {
+                    var idx = atmIdx + off;
+                    h += _gtbOICellCompact((idx >= 0 && idx < td.length) ? td[idx] : null, pc, off === 0);
+                });
+                h += '</tr>';
+            });
+            h += '</tbody></table>';
+            jQ(containerId).html('<div style="overflow-x:auto;">' + h + '</div>');
+        }
+
+        _oiColHtml(indexList, '#gtb-sig-oi-index');
+        _oiColHtml(wtdList,   '#gtb-sig-oi-wtd');
+    } catch(e) {}
+
+    // ── Col 3: Futures Accuracy (async) ──────────────────────────────────────
+    _gtbLoadFutAccInPane();
+
+    jQ(document).off('click.sigfutreload').on('click.sigfutreload', '#gtb-sig-fut-reload', function() {
+        jQ('#gtb-sig-fut-body').html('<div class="gtb-sig-wait"><i class="bi bi-hourglass-split"></i> Replaying 5-min candles…</div>');
+        _gtbLoadFutAccInPane();
+    });
+}
+
+async function _gtbLoadFutAccInPane() {
+    try {
+        var instruments = ['NIFTY 50', 'NIFTY BANK', 'RELIANCE', 'HDFCBANK', 'ICICIBANK'];
+        var vix = 0;
+        try { vix = parseFloat((JSON.parse(localStorage.getItem('INSTRUMENT_LTP_PRICE') || '{}')['INDIA VIX'] || {}).ltp) || 0; } catch(er) {}
+        var accMap = {}, used = [];
+        var cds = await Promise.all(instruments.map(function(nm) {
+            return _gtbFetchFutCandles(nm).catch(function() { return null; });
+        }));
+        cds.forEach(function(cd, idx) {
+            if (cd) { try { _gtbReconstructFutAccuracy(cd, vix, accMap); used.push(instruments[idx]); } catch(err) {} }
+        });
+        var rows = Object.keys(accMap).map(function(key) {
+            var a = accMap[key];
+            return { remark: key, total: a.total, hits: a.hits,
+                     win: a.total ? Math.round(a.hits / a.total * 100) : 0,
+                     avgPts: a.total ? (a.pts / a.total) : 0,
+                     dir: getFuturesTrendScore(key) };
+        }).sort(function(x, y) { return y.total - x.total; });
+
+        var body;
+        if (!rows.length) {
+            body = '<div class="gtb-sig-wait" style="color:var(--gtb-red);">No intraday futures data available to reconstruct.</div>';
+        } else {
+            body = '<div class="gtb-t915-sub" style="padding:4px 8px 2px;">Replayed every 5-min candle today across <b>'
+                 + used.join(', ') + '</b>. Higher win-rate + positive avg-pts = reliable; dimmed rows are low-sample.</div>';
+            body += '<table class="gtb-t915-table"><thead><tr>'
+                  + '<th>Remark</th><th>Bias</th><th>Samples</th><th>Win-rate</th><th>Avg pts (5-min)</th>'
+                  + '</tr></thead><tbody>';
+            rows.forEach(function(r) {
+                var bc  = r.dir > 0 ? 'up' : r.dir < 0 ? 'down' : 'flat';
+                var wc  = r.win >= 60 ? 'var(--gtb-green)' : r.win <= 40 ? 'var(--gtb-red)' : 'var(--gtb-amber)';
+                var ptc = r.avgPts >= 0 ? 'var(--gtb-green)' : 'var(--gtb-red)';
+                var dirc = r.dir > 0 ? 'var(--gtb-green)' : r.dir < 0 ? 'var(--gtb-red)' : 'var(--gtb-muted)';
+                var isReliable = r.win >= 60 && r.avgPts > 0 && r.total >= 8;
+                var rowStyle = r.total < 8 ? 'opacity:0.55;' : isReliable ? 'background:var(--gtb-green)18;outline:1px solid var(--gtb-green)44;' : '';
+                body += '<tr' + (rowStyle ? ' style="' + rowStyle + '"' : '') + '>'
+                    + '<td><span class="gtb-t915-out ' + bc + '">' + r.remark + '</span>' + (isReliable ? ' <span style="font-size:0.44rem;color:var(--gtb-green);font-weight:800;">★</span>' : '') + '</td>'
+                    + '<td style="font-family:var(--gtb-mono);color:' + dirc + ';">' + (r.dir > 0 ? '▲' : r.dir < 0 ? '▼' : '—') + '</td>'
+                    + '<td class="gtb-t915-date">' + r.total + '</td>'
+                    + '<td style="font-family:var(--gtb-mono);font-weight:800;color:' + wc + ';">' + r.win + '%</td>'
+                    + '<td style="font-family:var(--gtb-mono);color:' + ptc + ';">' + (r.avgPts >= 0 ? '+' : '') + r.avgPts.toFixed(1) + '</td>'
+                    + '</tr>';
+            });
+            body += '</tbody></table>';
+        }
+        jQ('#gtb-sig-fut-body').html('<div class="gtb-t915-wrap">' + body + '</div>');
+    } catch(e) {
+        jQ('#gtb-sig-fut-body').html('<div class="gtb-sig-wait" style="color:var(--gtb-red);">Error loading futures data.</div>');
+    }
+}
 
 function _gtbRenderPane(tabId) {
     var $p = jQ('#gtb-pane-' + tabId);
@@ -4209,8 +4339,8 @@ function setScore() {
     signalHtml += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">'
     signalHtml += '<span style="font-size:0.85rem;font-weight:900;color:' + sm.accent + ';letter-spacing:0.5px;">'
                 + '<i class="bi ' + sm.icon + '" style="margin-right:5px;"></i>' + marketSignal.signal + '</span>'
-    signalHtml += '<span style="font-size:0.65rem;font-weight:700;padding:2px 7px;border-radius:10px;background:' + outcAccent + '22;color:' + outcAccent + ';border:1px solid ' + outcAccent + '55;">'
-                + outc + '</span>'
+    signalHtml += '<span title="9:15 opening candle pattern" style="font-size:0.65rem;font-weight:700;padding:2px 7px;border-radius:10px;background:' + outcAccent + '22;color:' + outcAccent + ';border:1px solid ' + outcAccent + '55;">'
+                + '<span style="font-size:0.55rem;font-weight:600;opacity:0.7;">9:15 </span>' + outc + '</span>'
     signalHtml += '</div>'
 
     // Row 2: reason text
@@ -6121,6 +6251,19 @@ jQ(document).on('click', '.gtb-combo-row', async function (e) {
 // Fetches an instrument NSE futures intraday candles and replays the analyzer at
 // EVERY 5-min candle (calling it WITHOUT a name → no side-effects), scoring each
 // remark against the NEXT candle's move. Builds the full days accuracy in one pass.
+async function _gtbFetchFutCandlesMCX(name) {
+    var fut = null;
+    jQ.each(COMMODITIES_FUTURE_INSTRUMENT_LIST, function(i, it) { if (it.name === name) fut = it; });
+    if (!fut) return null;
+    var pres = await getHistoricalDataUsingPromise(fut.instrument_token, _gtbMcxPrevDay(), _gtbMcxPrevDay(), 'day');
+    var cres = await getHistoricalDataUsingPromise(fut.instrument_token, _gtbMcxCurrDay(), _gtbMcxCurrDayTo(), '5minute');
+    var map = function(it) { return { date: moment(it[0]).format('HH:mm'), open: it[1], high: it[2], low: it[3], close: it[4], volume: it[5], oi: it[6] }; };
+    var intr = (cres && cres.data && cres.data.candles) ? _gtbTrimCandles(cres.data.candles).map(map) : [];
+    var pcs  = (pres && pres.data && pres.data.candles) ? pres.data.candles.map(map) : [];
+    if (intr.length < 3 || !pcs.length) return null;
+    return { lotSize: fut.lot_size, prevDay: pcs[pcs.length - 1], intraday: intr };
+}
+
 async function _gtbFetchFutCandles(name) {
     var instName = name === 'NIFTY 50' ? 'NIFTY' : name === 'NIFTY BANK' ? 'BANKNIFTY' : name;
     var fut = null;
@@ -6183,8 +6326,10 @@ jQ(document).on('click', '#show-fut-accuracy', async function (e) {
         rows.forEach(function (r) {
             var bc = r.dir > 0 ? 'up' : r.dir < 0 ? 'down' : 'flat';
             var wc = r.win >= 60 ? 'var(--gtb-green)' : r.win <= 40 ? 'var(--gtb-red)' : 'var(--gtb-amber)';
-            body += '<tr' + (r.total < 8 ? ' style="opacity:0.55;"' : '') + '>'
-                + '<td><span class="gtb-t915-out ' + bc + '">' + r.remark + '</span></td>'
+            var isReliable = r.win >= 60 && r.avgPts > 0 && r.total >= 8;
+            var rowStyle = r.total < 8 ? 'opacity:0.55;' : isReliable ? 'background:var(--gtb-green)18;outline:1px solid var(--gtb-green)44;' : '';
+            body += '<tr' + (rowStyle ? ' style="' + rowStyle + '"' : '') + '>'
+                + '<td><span class="gtb-t915-out ' + bc + '">' + r.remark + '</span>' + (isReliable ? ' <span style="font-size:0.44rem;color:var(--gtb-green);font-weight:800;">★</span>' : '') + '</td>'
                 + '<td style="font-family:var(--gtb-mono);color:' + (r.dir > 0 ? 'var(--gtb-green)' : r.dir < 0 ? 'var(--gtb-red)' : 'var(--gtb-muted)') + ';">' + (r.dir > 0 ? '▲' : r.dir < 0 ? '▼' : '—') + '</td>'
                 + '<td class="gtb-t915-date">' + r.total + '</td>'
                 + '<td style="font-family:var(--gtb-mono);font-weight:800;color:' + wc + ';">' + r.win + '%</td>'
@@ -6723,6 +6868,12 @@ jQ(document).on('click', '#show-commodities', function (e) {
         +     '<div class="cmd-st" style="margin-top:4px;">OBV (CE/PE)</div>'
         +     '<div id="cmd-crude-obv" style="height:130px;"></div>'
         +     '<div id="cmd-crude-oi-table" style="overflow-x:auto;margin-top:8px;"><div class="cmd-load"><i class="bi bi-hourglass-split"></i> Loading OI…</div></div>'
+        // Futures Remark Accuracy
+        +     '<div class="cmd-st" style="margin-top:8px;display:flex;align-items:center;gap:6px;">'
+        +       '<i class="bi bi-bullseye"></i> FUTURES REMARK ACCURACY'
+        +       '<button class="gtb-sig-hdr-btn" id="cmd-crude-acc-reload" style="margin-left:auto;"><i class="bi bi-arrow-clockwise"></i> Reload</button>'
+        +     '</div>'
+        +     '<div id="cmd-crude-acc"><div class="cmd-load"><i class="bi bi-hourglass-split"></i> Replaying 5-min candles…</div></div>'
         +   '</div>'
         + '</div>'
         + '</div>';
@@ -6820,8 +6971,55 @@ jQ(document).on('click', '#show-commodities', function (e) {
         } else {
             jQ('#cmd-crude-oi-table').html('<div class="cmd-load" style="color:var(--gtb-red);">CRUDEOILM OI unavailable.</div>');
         }
+        // CRUDEOILM Futures Remark Accuracy
+        _cmdLoadCrudeAcc();
+
         _CMD.lastRefresh = moment().format('HH:mm:ss');
         _cmdUpdateStatus();
+    }
+
+    async function _cmdLoadCrudeAcc() {
+        jQ('#cmd-crude-acc').html('<div class="cmd-load"><i class="bi bi-hourglass-split"></i> Replaying 5-min candles…</div>');
+        try {
+            var vix = 0;
+            try { vix = parseFloat((JSON.parse(localStorage.getItem('INSTRUMENT_LTP_PRICE') || '{}')['INDIA VIX'] || {}).ltp) || 0; } catch(er) {}
+            var cd = await _gtbFetchFutCandlesMCX('CRUDEOILM').catch(function() { return null; });
+            if (!cd) { jQ('#cmd-crude-acc').html('<div class="cmd-load" style="color:var(--gtb-red);">No 5-min candle data for CRUDEOILM.</div>'); return; }
+            var accMap = {};
+            _gtbReconstructFutAccuracy(cd, vix, accMap);
+            var rows = Object.keys(accMap).map(function(key) {
+                var a = accMap[key];
+                return { remark: key, total: a.total, hits: a.hits,
+                         win: a.total ? Math.round(a.hits / a.total * 100) : 0,
+                         avgPts: a.total ? (a.pts / a.total) : 0,
+                         dir: getFuturesTrendScore(key) };
+            }).sort(function(x, y) { return y.total - x.total; });
+
+            if (!rows.length) { jQ('#cmd-crude-acc').html('<div class="cmd-load" style="color:var(--gtb-red);">No accuracy data reconstructed.</div>'); return; }
+
+            var body = '<table class="gtb-t915-table"><thead><tr>'
+                + '<th>Remark</th><th>Bias</th><th>Samples</th><th>Win-rate</th><th>Avg pts</th>'
+                + '</tr></thead><tbody>';
+            rows.forEach(function(r) {
+                var bc  = r.dir > 0 ? 'up' : r.dir < 0 ? 'down' : 'flat';
+                var wc  = r.win >= 60 ? 'var(--gtb-green)' : r.win <= 40 ? 'var(--gtb-red)' : 'var(--gtb-amber)';
+                var ptc = r.avgPts >= 0 ? 'var(--gtb-green)' : 'var(--gtb-red)';
+                var dirc = r.dir > 0 ? 'var(--gtb-green)' : r.dir < 0 ? 'var(--gtb-red)' : 'var(--gtb-muted)';
+                var isReliable = r.win >= 60 && r.avgPts > 0 && r.total >= 8;
+                var rowStyle = r.total < 8 ? 'opacity:0.55;' : isReliable ? 'background:var(--gtb-green)18;outline:1px solid var(--gtb-green)44;' : '';
+                body += '<tr' + (rowStyle ? ' style="' + rowStyle + '"' : '') + '>'
+                    + '<td><span class="gtb-t915-out ' + bc + '">' + r.remark + '</span>' + (isReliable ? ' <span style="font-size:0.44rem;color:var(--gtb-green);font-weight:800;">★</span>' : '') + '</td>'
+                    + '<td style="font-family:var(--gtb-mono);color:' + dirc + ';">' + (r.dir > 0 ? '▲' : r.dir < 0 ? '▼' : '—') + '</td>'
+                    + '<td class="gtb-t915-date">' + r.total + '</td>'
+                    + '<td style="font-family:var(--gtb-mono);font-weight:800;color:' + wc + ';">' + r.win + '%</td>'
+                    + '<td style="font-family:var(--gtb-mono);color:' + ptc + ';">' + (r.avgPts >= 0 ? '+' : '') + r.avgPts.toFixed(1) + '</td>'
+                    + '</tr>';
+            });
+            body += '</tbody></table>';
+            jQ('#cmd-crude-acc').html('<div class="gtb-t915-wrap">' + body + '</div>');
+        } catch(e) {
+            jQ('#cmd-crude-acc').html('<div class="cmd-load" style="color:var(--gtb-red);">Error loading accuracy data.</div>');
+        }
     }
 
     showPopUpWindow('commodities-panel', body, 'Commodities', 960, 640);
@@ -6842,6 +7040,7 @@ jQ(document).on('click', '#show-commodities', function (e) {
         try { if (_CMD.loadAll) await _CMD.loadAll(); } catch(e) {}
         $i.removeClass('spin');
     });
+    jQ(document).off('click.cmd-crude-acc-reload').on('click.cmd-crude-acc-reload', '#cmd-crude-acc-reload', function() { _cmdLoadCrudeAcc(); });
     jQ(document).off('change.cmd-iv').on('change.cmd-iv', '#cmd-interval', function() {
         _CMD.intervalMs = parseInt(jQ(this).val());
         if (_CMD.running) { _cmdStopRefresh(); _cmdStartRefresh(); }
@@ -10804,8 +11003,19 @@ function _gtbCreateFloatingBar() {
 
     var bar = document.createElement('div');
     bar.id = 'gtb-float-bar';
-    bar.innerHTML = '<span class="gtb-fb-handle" title="Drag">&#8942;</span>';
 
+    // ── Flyout panel (hidden until trigger clicked) ────────────────────────
+    var panel = document.createElement('div');
+    panel.id = 'gtb-float-panel';
+
+    // Drag handle inside panel
+    var _handle = document.createElement('span');
+    _handle.className = 'gtb-fb-handle';
+    _handle.title = 'Drag';
+    _handle.innerHTML = '&#8942;';
+    panel.appendChild(_handle);
+
+    // Tool buttons
     _tools.forEach(function(t) {
         var btn = document.createElement('button');
         btn.className = 'gtb-fb-btn';
@@ -10814,56 +11024,90 @@ function _gtbCreateFloatingBar() {
         btn.innerHTML = '<i class="bi ' + t.icon + '"></i>';
         btn.addEventListener('click', function(e) {
             e.stopPropagation();
+            bar.classList.remove('gtb-fb-open');
             var id = this.dataset.toolId;
             if (id === 'show-trade-checklist') { _gtbShowTradeChecklist(); return; }
             var $el = jQ('#' + id);
             if ($el.length) {
                 $el[0].click();
             } else {
+                // Dashboard not open — open it, click the tool, then hide the dashboard
+                // so only the tool popup is visible (not Groot alongside it).
                 showGrootTradeBot();
-                setTimeout(function() { var $x = jQ('#' + id); if ($x.length) $x[0].click(); }, 300);
+                setTimeout(function() {
+                    var $x = jQ('#' + id);
+                    if ($x.length) $x[0].click();
+                    jQ('#gtb-popup-win').hide();
+                }, 400);
             }
         });
-        bar.appendChild(btn);
+        panel.appendChild(btn);
     });
 
-    // Groot bot toggle at bottom
+    // Groot bot toggle (inside panel, above trigger)
     var gBtn = document.createElement('button');
     gBtn.className = 'gtb-fb-btn gtb-fb-groot';
     gBtn.title = 'Toggle Groot Bot';
     gBtn.innerHTML = '<i class="bi bi-toggles"></i>';
     gBtn.addEventListener('click', function(e) {
         e.stopPropagation();
+        bar.classList.remove('gtb-fb-open');
         var $win = jQ('#gtb-popup-win');
         if ($win.length) { $win.toggle(); } else { showGrootTradeBot(); }
     });
-    bar.appendChild(gBtn);
+    panel.appendChild(gBtn);
+
+    bar.appendChild(panel);
+
+    // ── Trigger button — always visible at bottom ──────────────────────────
+    var trigger = document.createElement('button');
+    trigger.id = 'gtb-float-trigger';
+    trigger.title = 'Tools';
+    trigger.innerHTML = '<i class="bi bi-grid-3x3-gap-fill"></i>';
+    trigger.addEventListener('click', function(e) {
+        e.stopPropagation();
+        bar.classList.toggle('gtb-fb-open');
+        trigger.innerHTML = bar.classList.contains('gtb-fb-open')
+            ? '<i class="bi bi-x-lg"></i>'
+            : '<i class="bi bi-grid-3x3-gap-fill"></i>';
+    });
+    bar.appendChild(trigger);
 
     document.body.appendChild(bar);
+
+    // Close panel when clicking outside the bar
+    document.addEventListener('click', function(e) {
+        if (!bar.contains(e.target) && bar.classList.contains('gtb-fb-open')) {
+            bar.classList.remove('gtb-fb-open');
+            trigger.innerHTML = '<i class="bi bi-grid-3x3-gap-fill"></i>';
+        }
+    });
 
     // Apply current theme immediately
     if ((localStorage.getItem('GTB_THEME') || 'dark') === 'light') bar.classList.add('gtb-light');
 
-    // Drag support
-    var _dragging = false, _startY = 0, _startTop = 0;
-    bar.querySelector('.gtb-fb-handle').addEventListener('mousedown', function(e) {
-        _dragging = true;
+    // Drag support — drag the whole bar via the handle
+    var _dragging = false, _dragMoved = false, _startY = 0, _startTop = 0;
+    _handle.addEventListener('mousedown', function(e) {
+        _dragging = true; _dragMoved = false;
         _startY   = e.clientY;
-        _startTop = parseInt(bar.style.top) || bar.getBoundingClientRect().top;
+        _startTop = parseInt(bar.style.bottom) || 40;
         e.preventDefault();
     });
     document.addEventListener('mousemove', function(e) {
         if (!_dragging) return;
-        var t = _startTop + (e.clientY - _startY);
-        t = Math.max(4, Math.min(window.innerHeight - bar.offsetHeight - 4, t));
-        bar.style.top = t + 'px';
-        localStorage.setItem('GTB_FLOAT_TOP', t);
+        _dragMoved = true;
+        // bar is anchored bottom-right; drag inverts Y
+        var delta = _startY - e.clientY;
+        var b = Math.max(4, Math.min(window.innerHeight - bar.offsetHeight - 4, _startTop + delta));
+        bar.style.bottom = b + 'px';
+        localStorage.setItem('GTB_FLOAT_BOTTOM', b);
     });
     document.addEventListener('mouseup', function() { _dragging = false; });
 
     // Restore saved position
-    var _saved = localStorage.getItem('GTB_FLOAT_TOP');
-    bar.style.top = (_saved ? _saved + 'px' : '40%');
+    var _saved = localStorage.getItem('GTB_FLOAT_BOTTOM');
+    bar.style.bottom = (_saved ? _saved + 'px' : '40px');
 }
 
 setTimeout(_gtbCreateFloatingBar, 1500);

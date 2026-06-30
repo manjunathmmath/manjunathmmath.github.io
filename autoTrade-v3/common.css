@@ -2972,8 +2972,9 @@ td.details-control {
 .gtb-cell-fut-remark {
   font-size: 0.5rem !important; font-weight: 700;
   font-family: var(--gtb-mono) !important;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  color: var(--gtb-muted); max-width: 90px;
+  color: var(--gtb-muted);
+  display: flex; align-items: center; flex-wrap: wrap; gap: 3px;
+  min-width: 0;
 }
 
 /* ── Premium chip (CONTANGO / BACKWARDATION) ────────────────────────── */
@@ -4935,7 +4936,10 @@ td.details-control {
     padding: 3px 6px; background: var(--gtb-surface);
     border-bottom: 1px solid var(--gtb-border2); flex-shrink: 0;
     overflow-x: auto; white-space: nowrap;
+    overflow: visible; /* allow settings dropdown to show below */
 }
+/* Spacer that pushes controls to the right */
+.gtb-tab-sep { flex: 1; min-width: 8px; }
 .gtb-tab {
     background: transparent; border: 1px solid transparent;
     border-radius: 3px; color: var(--gtb-muted);
@@ -4958,6 +4962,47 @@ td.details-control {
 }
 #gtb-right {
     display: flex; flex-direction: column; flex: 1; overflow: hidden; min-height: 0;
+}
+
+/* ── Signals tab pane — 3-column layout ──────────────────────────────── */
+#gtb-sig-pane {
+    height: 100%; display: flex; flex-direction: column; overflow: hidden;
+}
+#gtb-sig-cols {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 0;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+.gtb-sig-col {
+    display: flex; flex-direction: column;
+    border-right: 1px solid var(--gtb-border);
+    overflow: hidden; min-height: 0;
+}
+.gtb-sig-col:last-child { border-right: none; }
+.gtb-sig-hdr {
+    display: flex; align-items: center; gap: 6px;
+    padding: 4px 8px; flex-shrink: 0;
+    background: var(--gtb-surface2);
+    border-bottom: 1px solid var(--gtb-border);
+    font-size: 0.5rem; font-weight: 800; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--gtb-muted);
+}
+.gtb-sig-hdr-btn {
+    font-size: 0.46rem; font-weight: 700; color: var(--gtb-accent);
+    background: transparent; border: 1px solid var(--gtb-accent)44;
+    border-radius: 3px; padding: 1px 5px; cursor: pointer;
+    transition: background 0.12s;
+}
+.gtb-sig-hdr-btn:hover { background: var(--gtb-accent)18; }
+.gtb-sig-col > div:not(.gtb-sig-hdr) {
+    flex: 1; overflow: auto; min-height: 0;
+}
+.gtb-sig-wait {
+    padding: 16px; text-align: center;
+    font-size: 0.56rem; color: var(--gtb-muted); font-style: italic;
 }
 
 /* Tab grid for non-main panes */
@@ -5052,24 +5097,15 @@ td.details-control {
 #gtb-pane-analysis { display: flex; flex-direction: column; overflow: hidden; }
 #gtb-pane-analysis #bt-wrap { flex: 1; overflow-y: auto; }
 
-/* ── Groot window control buttons (outside main-trade-bot-container) ────── */
+/* ── Groot window control buttons — fixed to viewport top-right ─────────── */
 #gtb-winctrl {
-    position: absolute;
-    top: 9px;
-    right: 10px;
+    position: fixed;
+    top: 10px;
+    right: 12px;
     display: flex;
     gap: 4px;
-    z-index: 20;
+    z-index: 99000;
     pointer-events: all;
-}
-
-/* ── Win controls: fixed on body, above ALL groot content ───────────────── */
-#gtb-winctrl {
-    position: fixed !important;
-    display: flex !important;
-    gap: 4px !important;
-    z-index: 9500 !important;
-    pointer-events: all !important;
 }
 
 /* ── Popup library container above groot bot window ─────────────────────── */
@@ -5552,11 +5588,23 @@ td.details-control {
     background: transparent !important;
 }
 
-/* ── Floating quick-access toolbar ─────────────────────────────────── */
+/* ── Floating quick-access toolbar (flyout) ─────────────────────────── */
 #gtb-float-bar {
     position: fixed !important;
     right: 0 !important;
+    bottom: 40px !important;
     z-index: 8500 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 0 !important;
+    user-select: none !important;
+    font-family: inherit !important;
+    box-sizing: border-box !important;
+    width: 28px !important;
+}
+/* Flyout panel — slides up from trigger */
+#gtb-float-panel {
     display: flex !important;
     flex-direction: column !important;
     align-items: center !important;
@@ -5564,19 +5612,61 @@ td.details-control {
     background: #0b1220 !important;
     border: 1px solid #1e2f46 !important;
     border-right: none !important;
-    border-radius: 6px 0 0 6px !important;
-    padding: 3px 2px !important;
-    box-shadow: -2px 0 12px rgba(0,0,0,0.65) !important;
-    user-select: none !important;
-    font-family: inherit !important;
+    border-bottom: none !important;
+    border-radius: 6px 0 0 0 !important;
+    padding: 0 2px !important;
+    box-shadow: -2px -4px 14px rgba(0,0,0,0.65) !important;
     box-sizing: border-box !important;
     width: 28px !important;
+    overflow: hidden !important;
+    max-height: 0 !important;
+    transition: max-height 0.22s ease, padding 0.22s ease !important;
 }
-#gtb-float-bar.gtb-light {
+#gtb-float-bar.gtb-fb-open #gtb-float-panel {
+    max-height: 700px !important;
+    padding: 3px 2px !important;
+}
+#gtb-float-bar.gtb-light #gtb-float-panel {
     background: #f0f2f5 !important;
     border-color: #c8cdd6 !important;
-    box-shadow: -2px 0 12px rgba(0,0,0,0.18) !important;
+    box-shadow: -2px -4px 14px rgba(0,0,0,0.18) !important;
 }
+/* Trigger — always visible tab at the bottom */
+#gtb-float-trigger {
+    background: #0b1220 !important;
+    border: 1px solid #1e2f46 !important;
+    border-right: none !important;
+    border-radius: 0 0 0 6px !important;
+    color: #4e6a8a !important;
+    font-size: 12px !important;
+    width: 28px !important;
+    height: 28px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer !important;
+    padding: 0 !important;
+    box-shadow: -2px 2px 10px rgba(0,0,0,0.55) !important;
+    box-sizing: border-box !important;
+    outline: none !important;
+    transition: color 0.12s, background 0.12s !important;
+    flex-shrink: 0 !important;
+}
+#gtb-float-bar.gtb-fb-open #gtb-float-trigger {
+    border-top: 1px solid #1e2f46 !important;
+    border-radius: 0 !important;
+    color: #4cc9e0 !important;
+}
+#gtb-float-trigger:hover { color: #4cc9e0 !important; background: rgba(76,201,224,0.10) !important; }
+#gtb-float-bar.gtb-light #gtb-float-trigger {
+    background: #f0f2f5 !important;
+    border-color: #c8cdd6 !important;
+    color: #5a7399 !important;
+    box-shadow: -2px 2px 10px rgba(0,0,0,0.18) !important;
+}
+#gtb-float-bar.gtb-light #gtb-float-trigger:hover { color: #1a6fa8 !important; background: rgba(26,111,168,0.10) !important; }
+#gtb-float-bar.gtb-light.gtb-fb-open #gtb-float-trigger { color: #1a6fa8 !important; border-top-color: #c8cdd6 !important; }
+/* Handle (drag) inside panel */
 .gtb-fb-handle {
     color: #2d4160 !important;
     font-size: 10px !important;
@@ -5590,6 +5680,7 @@ td.details-control {
     box-sizing: border-box !important;
 }
 #gtb-float-bar.gtb-light .gtb-fb-handle { color: #aab0bc !important; }
+/* Tool buttons inside panel */
 .gtb-fb-btn {
     background: transparent !important;
     border: none !important;
@@ -5621,9 +5712,7 @@ td.details-control {
     color: #1a6fa8 !important;
     background: rgba(26,111,168,0.12) !important;
 }
-.gtb-fb-btn:active {
-    background: rgba(76,201,224,0.22) !important;
-}
+.gtb-fb-btn:active { background: rgba(76,201,224,0.22) !important; }
 .gtb-fb-groot {
     margin-top: 3px !important;
     border-top: 1px solid #1e2f46 !important;
@@ -5634,14 +5723,8 @@ td.details-control {
     max-height: 22px !important;
 }
 #gtb-float-bar.gtb-light .gtb-fb-groot { border-top-color: #c8cdd6 !important; color: #1a6fa8 !important; }
-.gtb-fb-groot:hover {
-    color: #6cb4ff !important;
-    background: rgba(108,180,255,0.13) !important;
-}
-#gtb-float-bar.gtb-light .gtb-fb-groot:hover {
-    color: #0d5c94 !important;
-    background: rgba(26,111,168,0.12) !important;
-}
+.gtb-fb-groot:hover { color: #6cb4ff !important; background: rgba(108,180,255,0.13) !important; }
+#gtb-float-bar.gtb-light .gtb-fb-groot:hover { color: #0d5c94 !important; background: rgba(26,111,168,0.12) !important; }
 
 /* ── Commodities popup v2 ──────────────────────────────────────────── */
 .cmd-wrap { display: flex; flex-direction: column; height: 100%; gap: 0; }
