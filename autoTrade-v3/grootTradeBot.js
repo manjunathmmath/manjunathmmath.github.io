@@ -773,6 +773,8 @@ async function scanNineFifteenCandle() {
             }
         }
         localStorage.setItem("VALID_BREAKOUT_NINE_FIFTEEN", JSON.stringify(breakOutNineFifteen));
+        _gtbProgress('9:15 scan done ✓', 'green');
+        setTimeout(_gtbProgressHide, 2500);
     }
 }
 
@@ -1061,6 +1063,7 @@ function commonMarkupPlaceHolder() {
         // ── Tabs ─────────────────────────────────────────────────────────────
         + '<button class="gtb-tab active" data-tab="main"><i class="bi bi-grid"></i> Overview</button>'
         + '<button class="gtb-tab" data-tab="signals"><i class="bi bi-layers-fill"></i> Signals</button>'
+        + '<button class="gtb-tab" data-tab="mpgex"><i class="bi bi-bar-chart-steps"></i> Max Pain</button>'
         + '<button class="gtb-tab" data-tab="analysis"><i class="bi bi-bar-chart-line-fill"></i> Analysis</button>'
         + '<button class="gtb-tab" data-tab="opps"><i class="bi bi-lightning-charge-fill"></i> Opportunities</button>'
         // ── Spacer ───────────────────────────────────────────────────────────
@@ -1430,6 +1433,7 @@ function commonMarkupPlaceHolder() {
 
     // Additional tab panes — populated lazily on first switch
     h += '<div id="gtb-pane-signals"  class="gtb-tab-pane" style="display:none;overflow-y:auto;padding:0;"></div>';
+    h += '<div id="gtb-pane-mpgex"    class="gtb-tab-pane" style="display:none;overflow-y:auto;padding:8px;"></div>';
     h += '<div id="gtb-pane-analysis" class="gtb-tab-pane" style="display:none;overflow-y:auto;padding:4px;"></div>';
     h += '<div id="gtb-pane-opps"     class="gtb-tab-pane" style="display:none;overflow-y:auto;padding:4px;"></div>';
 
@@ -1566,6 +1570,7 @@ function _gtbActivateTab(tabId) {
 
 var _GTB_PANE_GRIDS = {
     signals:  function() { return _gtbSignalsPaneHtml(); },
+    mpgex:    function() { return _gtbMpGexPaneHtml(); },
     // Analysis tab: full bloomberg dashboard rendered by _btRenderInPane
     analysis: function() { return ''; },
     // Opps tab: full opportunities dashboard rendered by _btoShow_inpane
@@ -1574,6 +1579,7 @@ var _GTB_PANE_GRIDS = {
 
 var _GTB_PANE_RENDERS = {
     signals:  [function(){try{_gtbRenderSignalsPane();}catch(e){}}],
+    mpgex:    [function(){try{_gtbRenderMpGexPane();}catch(e){}}],
     analysis: [function(){try{_btRenderInPane('#gtb-pane-analysis');}catch(e){}}],
     opps:     [function(){try{_btoShow_inpane('#gtb-pane-opps');}catch(e){}}]
 };
@@ -1585,12 +1591,18 @@ function _gtbSignalsPaneHtml() {
         + '<div id="gtb-sig-cols">'
         // Col 1 — Index / Stock
         + '<div class="gtb-sig-col">'
-        +   '<div class="gtb-sig-hdr"><i class="bi bi-layers-fill"></i> INDEX / STOCK OI</div>'
+        +   '<div class="gtb-sig-hdr">'
+        +     '<i class="bi bi-layers-fill"></i> INDEX / STOCK OI'
+        +     '<button class="gtb-sig-hdr-btn" id="gtb-sig-oi-index-reload" style="margin-left:auto;"><i class="bi bi-arrow-clockwise"></i> Reload</button>'
+        +   '</div>'
         +   '<div id="gtb-sig-oi-index" style="overflow:auto;"><div class="gtb-sig-wait"><i class="bi bi-hourglass-split"></i> Loading…</div></div>'
         + '</div>'
         // Col 2 — Weighted constituents
         + '<div class="gtb-sig-col">'
-        +   '<div class="gtb-sig-hdr"><i class="bi bi-diagram-3-fill"></i> WEIGHTED CONSTITUENTS OI</div>'
+        +   '<div class="gtb-sig-hdr">'
+        +     '<i class="bi bi-diagram-3-fill"></i> WEIGHTED CONSTITUENTS OI'
+        +     '<button class="gtb-sig-hdr-btn" id="gtb-sig-oi-wtd-reload" style="margin-left:auto;"><i class="bi bi-arrow-clockwise"></i> Reload</button>'
+        +   '</div>'
         +   '<div id="gtb-sig-oi-wtd" style="overflow:auto;"><div class="gtb-sig-wait"><i class="bi bi-hourglass-split"></i> Loading…</div></div>'
         + '</div>'
         // Col 3 — Futures Remark Accuracy
@@ -1602,56 +1614,582 @@ function _gtbSignalsPaneHtml() {
         +   '<div id="gtb-sig-fut-body"><div class="gtb-sig-wait"><i class="bi bi-hourglass-split"></i> Replaying 5-min candles…</div></div>'
         + '</div>'
         + '</div>'
+        // IV Signals section — below the OI columns
+        + '<div style="padding:6px 8px 8px;">'
+        +   '<div class="gtb-sig-hdr" style="margin-bottom:6px;">'
+        +     '<i class="bi bi-activity"></i> IV &amp; OI SIGNALS'
+        +     '<button class="gtb-sig-hdr-btn" id="gtb-sig-iv-reload" style="margin-left:auto;"><i class="bi bi-arrow-clockwise"></i> Reload</button>'
+        +   '</div>'
+        +   '<div id="gtb-sig-iv-section"><div class="gtb-sig-wait"><i class="bi bi-hourglass-split"></i> Loading…</div></div>'
+        + '</div>'
         + '</div>';
+}
+
+// Renders the IV & OI Signals section as a table — one row per instrument, one column per signal.
+function _gtbRenderIVSignalsSection() {
+    var allList = _gtbAllOIInstruments();
+    if (!allList.length) {
+        jQ('#gtb-sig-iv-section').html('<div class="gtb-sig-wait" style="color:var(--gtb-muted);">No OI data yet — reload OI first.</div>');
+        return;
+    }
+    var idxList = allList.filter(function(it) { return it.group === 'Index / Stock'; });
+    var wtdList = allList.filter(function(it) { return it.group === 'Weighted constituent'; });
+
+    var thStyle = 'padding:3px 6px;font-size:0.44rem;font-weight:600;color:var(--gtb-muted);border-bottom:1px solid var(--gtb-border);white-space:nowrap;text-align:left;';
+    var thead = '<thead><tr>'
+        + '<th style="' + thStyle + 'position:sticky;left:0;background:var(--gtb-surface2);z-index:1;">Instrument</th>'
+        + '<th style="' + thStyle + '">IV Skew ' + _ii('sig-iv-skew') + '</th>'
+        + '<th style="' + thStyle + '">ATM IV</th>'
+        + '<th style="' + thStyle + '">Vol ' + _ii('sig-vol-ratio') + '</th>'
+        + '<th style="' + thStyle + '">OI Conc ' + _ii('sig-oi-conc') + '</th>'
+        + '<th style="' + thStyle + '">OI Vel ' + _ii('sig-oi-vel') + '</th>'
+        + '<th style="' + thStyle + '">MP Δ ' + _ii('sig-mp-conv') + '</th>'
+        + '<th style="' + thStyle + '">Outcome ' + _ii('sig-strip-outcome') + '</th>'
+        + '</tr></thead>';
+
+    function _ivRow(name) {
+        var sm = INSTRUMENT_SCORE_MAP[name] || {};
+        var ex = sm.oiExtras;
+        var tdBase = 'padding:3px 6px;font-size:0.48rem;font-family:var(--gtb-mono);border-bottom:1px solid var(--gtb-border);white-space:nowrap;';
+
+        if (!ex) {
+            return '<tr>'
+                + '<td style="' + tdBase + 'position:sticky;left:0;background:var(--gtb-surface2);font-weight:700;font-family:inherit;color:var(--gtb-text);">' + name + '</td>'
+                + '<td colspan="7" style="' + tdBase + 'color:var(--gtb-muted);font-family:inherit;">No signal data — reload OI</td>'
+                + '</tr>';
+        }
+
+        // IV Skew cell
+        var ivSkewHtml = '—';
+        if (ex.ivSkew !== null && ex.ivSkew !== undefined) {
+            var sc = ex.ivSkew > 2 ? 'var(--gtb-red)' : ex.ivSkew < -2 ? 'var(--gtb-green)' : 'var(--gtb-muted)';
+            var sl = ex.ivSkew > 2 ? 'Put' : ex.ivSkew < -2 ? 'Call' : 'Neutral';
+            ivSkewHtml = '<span style="color:' + sc + ';font-weight:700;">' + (ex.ivSkew > 0 ? '+' : '') + ex.ivSkew + '% ' + sl + '</span>';
+        }
+
+        // ATM IV cell
+        var atmIvHtml = '—';
+        if (ex.atmIV !== null && ex.atmIV !== undefined) {
+            var ac = ex.atmIV > 25 ? 'var(--gtb-red)' : ex.atmIV > 15 ? 'var(--gtb-amber)' : 'var(--gtb-green)';
+            var an = ex.atmIV > 25 ? ' High' : ex.atmIV > 15 ? ' Normal' : ' Low';
+            atmIvHtml = '<span style="color:' + ac + ';font-weight:700;">' + ex.atmIV + '%' + an + '</span>';
+        }
+
+        // Vol cell
+        var volHtml = '—';
+        if (ex.volRatio !== null && ex.volRatio !== undefined) {
+            var vc = ex.volRatio >= 1.5 ? 'var(--gtb-green)' : ex.volRatio >= 0.8 ? 'var(--gtb-muted)' : 'var(--gtb-amber)';
+            var vl = ex.volRatio >= 1.5 ? 'High' : ex.volRatio >= 0.8 ? 'Normal' : 'Low';
+            volHtml = '<span style="color:' + vc + ';">' + ex.volRatio + '× (' + vl + ')</span>';
+        }
+
+        // OI Concentration cell
+        var concHtml = '—';
+        if (ex.oiConcentration !== null && ex.oiConcentration !== undefined) {
+            var cc = ex.oiConcentration >= 60 ? 'var(--gtb-green)' : ex.oiConcentration <= 35 ? 'var(--gtb-amber)' : 'var(--gtb-muted)';
+            var cl = ex.oiConcentration >= 60 ? 'Conc' : ex.oiConcentration <= 35 ? 'Spread' : 'Mod';
+            concHtml = '<span style="color:' + cc + ';">' + ex.oiConcentration + '% ' + cl + '</span>';
+        }
+
+        // OI Velocity cell
+        var velHtml = ex.oiVelocity
+            ? '<span style="color:' + ex.oiVelocity.color + ';">' + ex.oiVelocity.label + ' (' + ex.oiVelocity.minutesAgo + 'm)</span>'
+            : '<span style="color:var(--gtb-muted);">Pending</span>';
+
+        // MP Δ cell
+        var mpHtml = '—';
+        if (ex.mpConvergence) {
+            var ds = (ex.mpConvergence.delta > 0 ? '+' : '') + ex.mpConvergence.delta.toFixed(0);
+            mpHtml = '<span style="color:' + ex.mpConvergence.color + ';">' + ds + ' ' + ex.mpConvergence.label + '</span>';
+        } else {
+            mpHtml = '<span style="color:var(--gtb-muted);">First read</span>';
+        }
+
+        // Outcome cell
+        var sso = _gtbSigStripOutcome(ex);
+        var outcomeHtml = '<span style="color:' + sso.color + ';font-weight:700;" title="' + sso.reason.replace(/"/g,"'") + '">' + sso.label + '</span>';
+
+        return '<tr>'
+            + '<td style="' + tdBase + 'position:sticky;left:0;background:var(--gtb-surface2);font-weight:700;font-family:inherit;color:var(--gtb-text);">' + name + '</td>'
+            + '<td style="' + tdBase + '">' + ivSkewHtml + '</td>'
+            + '<td style="' + tdBase + '">' + atmIvHtml + '</td>'
+            + '<td style="' + tdBase + '">' + volHtml + '</td>'
+            + '<td style="' + tdBase + '">' + concHtml + '</td>'
+            + '<td style="' + tdBase + '">' + velHtml + '</td>'
+            + '<td style="' + tdBase + '">' + mpHtml + '</td>'
+            + '<td style="' + tdBase + '">' + outcomeHtml + '</td>'
+            + '</tr>';
+    }
+
+    function _groupRows(list, groupLabel) {
+        if (!list.length) return '';
+        var sepStyle = 'padding:3px 6px;font-size:0.42rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--gtb-muted);background:var(--gtb-surface2);border-bottom:1px solid var(--gtb-border);';
+        return '<tr><td colspan="8" style="' + sepStyle + '">' + groupLabel + '</td></tr>'
+            + list.map(function(it) { return _ivRow(it.name); }).join('');
+    }
+
+    var tblStyle = 'border-collapse:collapse;width:100%;font-size:0.48rem;';
+    var html = '<div style="overflow-x:auto;">'
+        + '<table style="' + tblStyle + '" class="oic-matrix">'
+        + thead + '<tbody>'
+        + _groupRows(idxList, 'Index / Stock')
+        + _groupRows(wtdList, 'Weighted Constituents')
+        + '</tbody></table></div>';
+
+    jQ('#gtb-sig-iv-section').html(html);
+}
+
+async function _gtbSigFetchAndRenderOI(isIndex) {
+    var containerId = isIndex ? '#gtb-sig-oi-index' : '#gtb-sig-oi-wtd';
+    var group       = isIndex ? 'Index / Stock' : 'Weighted constituent';
+    var label       = isIndex ? 'Index OI' : 'Weighted OI';
+    jQ(containerId).html('<div class="gtb-sig-wait"><i class="bi bi-hourglass-split"></i> Fetching OI data…</div>');
+    try {
+        var names;
+        if (isIndex) {
+            names = ['NIFTY 50', 'NIFTY BANK', 'RELIANCE', 'HDFCBANK', 'ICICIBANK', 'USDINR'];
+        } else {
+            var w = Object.keys(NIFTY_50_WEIGHTED_STOCKS || {}).concat(Object.keys(NIFTY_BANK_WEIGHTED_STOCKS || {}));
+            names = w.filter(function(n, i, a) { return a.indexOf(n) === i; });
+        }
+        var done = 0, total = names.length;
+        _gtbProgress(label + ': 0/' + total);
+        // Fetch sequentially so progress increments cleanly
+        for (var i = 0; i < names.length; i++) {
+            var name = names[i];
+            _gtbProgress(label + ': ' + name + ' (' + (i + 1) + '/' + total + ')');
+            try {
+                if (!(_gtbIsMcxFuture && _gtbIsMcxFuture(name))) {
+                    await showPrictionProbabilty(name);
+                    showOIOBVBarChart(name);
+                }
+            } catch(e) { console.log('sig OI reload', name, e); }
+            done++;
+        }
+        _gtbProgress(label + ' done ✓', 'green');
+        setTimeout(_gtbProgressHide, 2000);
+        var freshList = _gtbAllOIInstruments().filter(function(it) { return it.group === group; });
+        _gtbSigOiColHtml(freshList, containerId);
+        try { _gtbRenderIVSignalsSection(); } catch(e) {}
+    } catch(e) {
+        _gtbProgressHide();
+        jQ(containerId).html('<div class="gtb-sig-wait" style="color:var(--gtb-red);">Error fetching OI data.</div>');
+    }
+}
+
+// Renders the Max Pain & GEX panel inside an instrument detail column.
+// Called after OI data is loaded by _dvFetchAndRender.
+function _dvRenderMPGex(name, tid, sfx) {
+    var el = document.getElementById('dv-mpgex-body-' + tid + sfx);
+    if (!el) return;
+    var d = _gtbComputeMaxPainGEX(name);
+    if (!d) { el.innerHTML = '<div style="font-size:0.44rem;color:var(--gtb-muted);padding:4px;">No OI data available.</div>'; return; }
+
+    var dc = d.maxPainDist > 0 ? 'var(--gtb-green)' : d.maxPainDist < 0 ? 'var(--gtb-red)' : 'var(--gtb-muted)';
+    var gc = d.netGEX > 0 ? 'var(--gtb-green)' : d.netGEX < 0 ? 'var(--gtb-red)' : 'var(--gtb-muted)';
+    var gRegime = d.netGEX > 0 ? '<span style="color:var(--gtb-green);">Stabilising</span>' : '<span style="color:var(--gtb-red);">Trending</span>';
+    var flipHtml = d.flipZones.length
+        ? d.flipZones.map(function(f) { return '<span class="mp-flip-pill">' + f + '</span>'; }).join('')
+        : '<span style="color:var(--gtb-muted);">—</span>';
+    var oc = _gtbMaxPainOutcome(d);
+
+    // OI Signal Strip
+    var h = '<div style="margin-bottom:6px;padding:4px;background:var(--gtb-surface);border:1px solid var(--gtb-border);">'
+        + '<div style="font-size:0.38rem;color:var(--gtb-muted);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:3px;">OI Signals</div>'
+        + _gtbSigStripHtml(name)
+        + '</div>';
+
+    // Summary row (same columns as the popup table, stacked vertically for narrow column)
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 8px;font-size:0.48rem;margin-bottom:6px;">';
+    h += '<div><span style="color:var(--gtb-muted);font-size:0.4rem;">SPOT</span><br><b style="font-family:var(--gtb-mono);">' + d.spot + '</b></div>';
+    h += '<div><span style="color:var(--gtb-muted);font-size:0.4rem;">MAX PAIN</span><br><b style="color:#ffbe0b;font-family:var(--gtb-mono);">' + d.maxPainK + '</b></div>';
+    h += '<div><span style="color:var(--gtb-muted);font-size:0.4rem;">DISTANCE</span><br><b style="color:' + dc + ';font-family:var(--gtb-mono);">'
+        + (d.maxPainDist > 0 ? '+' : '') + d.maxPainDist.toFixed(0)
+        + ' (' + (d.maxPainPct > 0 ? '+' : '') + d.maxPainPct.toFixed(1) + '%)</b></div>';
+    h += '<div><span style="color:var(--gtb-muted);font-size:0.4rem;">NET GEX</span><br><b style="color:' + gc + ';font-family:var(--gtb-mono);">'
+        + (d.netGEX > 0 ? '+' : '') + d.netGEX.toFixed(0) + '</b> ' + gRegime + '</div>';
+    h += '<div><span style="color:var(--gtb-muted);font-size:0.4rem;">FLIP ZONES</span><br>' + flipHtml + '</div>';
+    h += '<div><span style="color:var(--gtb-muted);font-size:0.4rem;">OUTCOME</span><br>'
+        + '<b style="color:' + oc.color + ';font-size:0.48rem;">' + oc.label + '</b>'
+        + '<div style="font-size:0.42rem;color:var(--gtb-muted);margin-top:3px;line-height:1.4;">' + oc.reason + '</div></div>';
+    h += '</div>';
+
+    // GEX bar chart (full width, same as non-compact view)
+    h += _gtbMaxPainGEXHtml(name, false);
+
+    el.innerHTML = h;
+}
+
+// ── OI extended signal computation ────────────────────────────────────────────
+// Called after each OI fetch. Computes OI velocity and Max Pain convergence from
+// localStorage snapshots, and copies map-level metrics (IV skew, vol ratio,
+// OI concentration) into INSTRUMENT_SCORE_MAP[name].oiExtras for display.
+function _gtbComputeOIExtras(name, oiData) {
+    var sm = INSTRUMENT_SCORE_MAP[name];
+    if (!sm) return;
+    var now = Date.now();
+    var snapKey = 'GTB_OI_SNAP_' + name.replace(/ /g, '_');
+    var mpKey   = 'GTB_MP_PREV_' + name.replace(/ /g, '_');
+
+    // ── OI Velocity ──────────────────────────────────────────────────────────
+    // Compare total CHG_OI_CE+PE now vs a snapshot stored ≥20 min ago.
+    var curCE = 0, curPE = 0;
+    (oiData.tableData || []).forEach(function(r) {
+        curCE += parseFloat(r['CHG_OI_CE']) || 0;
+        curPE += parseFloat(r['CHG_OI_PE']) || 0;
+    });
+    var oiVelocity = null; // { deltaCE, deltaPE, minutesAgo, label, color }
+    try {
+        var snap = JSON.parse(localStorage.getItem(snapKey));
+        if (snap && (now - snap.ts) >= 20 * 60 * 1000) {
+            var minAgo = Math.round((now - snap.ts) / 60000);
+            var dCE = parseFloat((curCE - snap.ce).toFixed(1));
+            var dPE = parseFloat((curPE - snap.pe).toFixed(1));
+            var net = dPE - dCE; // positive = PE OI growing faster = bullish build
+            oiVelocity = {
+                deltaCE: dCE, deltaPE: dPE, minutesAgo: minAgo,
+                label: Math.abs(net) < 0.5 ? 'Slow' : net > 0 ? 'Fast ▲PE' : 'Fast ▲CE',
+                color: Math.abs(net) < 0.5 ? 'var(--gtb-muted)' : net > 0 ? 'var(--gtb-green)' : 'var(--gtb-red)'
+            };
+        }
+    } catch(e) {}
+    // Always refresh snapshot
+    try { localStorage.setItem(snapKey, JSON.stringify({ ts: now, ce: curCE, pe: curPE })); } catch(e) {}
+
+    // ── Max Pain Convergence ─────────────────────────────────────────────────
+    var mpConv = null; // { prev, curr, delta, label, color }
+    var d = _gtbComputeMaxPainGEX(name);
+    if (d) {
+        try {
+            var prevMp = parseFloat(localStorage.getItem(mpKey));
+            if (!isNaN(prevMp) && prevMp > 0) {
+                var delta = d.maxPainK - prevMp;
+                // Convergence: Max Pain moving toward spot (sign of delta = sign of spot pulling MP)
+                var converging = (delta > 0 && d.spot > d.maxPainK) || (delta < 0 && d.spot < d.maxPainK);
+                mpConv = {
+                    prev: prevMp, curr: d.maxPainK, delta: delta,
+                    label: Math.abs(delta) < 25 ? 'Stable' : converging ? 'Converging' : 'Diverging',
+                    color: Math.abs(delta) < 25 ? 'var(--gtb-muted)' : converging ? 'var(--gtb-green)' : 'var(--gtb-amber)'
+                };
+            }
+        } catch(e) {}
+        try { localStorage.setItem(mpKey, d.maxPainK); } catch(e) {}
+    }
+
+    // ── Volume Conviction Ratio ───────────────────────────────────────────────
+    var volRatio = null;
+    if (oiData.totalVolCE != null && oiData.prevVolCE != null) {
+        var todayVol  = (oiData.totalVolCE || 0) + (oiData.totalVolPE || 0);
+        var prevVol   = (oiData.prevVolCE  || 0) + (oiData.prevVolPE  || 0);
+        if (prevVol > 0) volRatio = parseFloat((todayVol / prevVol).toFixed(2));
+    }
+
+    sm.oiExtras = {
+        ivSkew:          oiData.ivSkew,
+        atmIV:           oiData.atmIV,
+        oiConcentration: oiData.oiConcentration,
+        volRatio:        volRatio,
+        totalVolCE:      oiData.totalVolCE,
+        totalVolPE:      oiData.totalVolPE,
+        oiVelocity:      oiVelocity,
+        mpConvergence:   mpConv,
+        fetchedAt:       now
+    };
+}
+
+function _gtbSigOiColHtml(list, containerId) {
+    if (!list.length) {
+        jQ(containerId).html('<div class="gtb-sig-wait">No OI data yet. Run a refresh first.</div>');
+        return;
+    }
+    var OFFS = [-2, -1, 0, 1, 2];
+    var h = '<table class="oic-matrix"><thead><tr>'
+        + '<th class="oic-sticky">Instrument</th>'
+        + '<th>OI Score ' + _ii('sig-oi-score') + '</th>'
+        + '<th>PCR ' + _ii('sig-oi-pcr') + '</th>'
+        + OFFS.map(function(o){ return '<th>' + (o===0?'ATM★':'ATM'+(o>0?'+'+o:o)) + ' ' + _ii(o===0?'sig-oi-atm':'sig-oi-wing') + '</th>'; }).join('')
+        + '</tr></thead><tbody>';
+    list.forEach(function(it) {
+        var name = it.name, sm = INSTRUMENT_SCORE_MAP[name] || {}, oiData = sm.oiData;
+        if (!oiData || !oiData.tableData || !oiData.tableData.length) return;
+        var td = oiData.tableData, atmIdx = -1;
+        for (var i = 0; i < td.length; i++) { if (td[i]['ATM_STRIKE']) { atmIdx = i; break; } }
+        if (atmIdx < 0) atmIdx = Math.floor(td.length / 2);
+        var pc = 0; try { pc = parseFloat(generateTrend(name).change) || 0; } catch(e2) {}
+        var oiScore = (sm.oi_obv != null) ? sm.oi_obv : 0;
+        var scColor = oiScore > 0 ? 'var(--gtb-green)' : oiScore < 0 ? 'var(--gtb-red)' : 'var(--gtb-muted)';
+        h += '<tr><td class="oic-sticky"><b>' + name + '</b></td>'
+            + '<td style="color:' + scColor + ';font-weight:700;font-family:var(--gtb-mono);">' + (oiScore > 0 ? '+' : '') + (typeof oiScore === 'number' ? oiScore.toFixed(1) : oiScore) + '</td>'
+            + '<td style="font-family:var(--gtb-mono);">' + (oiData.pcr != null ? oiData.pcr : '—') + '</td>';
+        OFFS.forEach(function(off) {
+            var idx = atmIdx + off;
+            h += _gtbOICellCompact((idx >= 0 && idx < td.length) ? td[idx] : null, pc, off === 0);
+        });
+        h += '</tr>';
+    });
+    h += '</tbody></table>';
+    jQ(containerId).html('<div style="overflow-x:auto;">' + h + '</div>');
+}
+
+// Renders a small labeled chip with tooltip for the OI signal strip.
+// infoKey (optional) — if provided, renders a _ii() icon next to the label.
+function _gtbSigChip(label, value, color, tip, infoKey) {
+    var safe = (tip || '').replace(/"/g, "'");
+    var lbl = label + (infoKey ? _ii(infoKey) : '');
+    return '<span title="' + safe + '" style="display:inline-flex;flex-direction:column;align-items:center;'
+        + 'background:var(--gtb-surface2);border:1px solid var(--gtb-border);padding:2px 5px;font-size:0.42rem;gap:1px;cursor:default;">'
+        + '<span style="color:var(--gtb-muted);font-size:0.38rem;text-transform:uppercase;letter-spacing:0.04em;">' + lbl + '</span>'
+        + '<span style="color:' + color + ';font-weight:700;font-family:var(--gtb-mono);">' + value + '</span>'
+        + '</span>';
+}
+
+// Synthesises all 5 OI extras signals into a single directional outcome verdict.
+// Returns { label, color, reason }.
+function _gtbSigStripOutcome(ex) {
+    if (!ex) return { label: 'No data', color: 'var(--gtb-muted)', reason: 'OI extras not yet computed.' };
+
+    var bull = 0, bear = 0, reasons = [];
+
+    // 1. IV Skew
+    if (ex.ivSkew !== null && ex.ivSkew !== undefined) {
+        if (ex.ivSkew > 2)       { bear++; reasons.push('Put skew (' + ex.ivSkew + '%) = fear bias'); }
+        else if (ex.ivSkew < -2) { bull++; reasons.push('Call skew (' + ex.ivSkew + '%) = bullish demand'); }
+        else                     { reasons.push('IV skew neutral (' + ex.ivSkew + '%)'); }
+    }
+
+    // 2. Volume conviction — amplifier, not direction
+    var volNote = '';
+    if (ex.volRatio !== null && ex.volRatio !== undefined) {
+        if (ex.volRatio < 0.8) volNote = ' [Low volume — signal confidence reduced]';
+        else if (ex.volRatio >= 1.5) volNote = ' [High volume — conviction confirmed]';
+    }
+
+    // 3. OI Concentration
+    if (ex.oiConcentration !== null && ex.oiConcentration !== undefined) {
+        if (ex.oiConcentration >= 60)     reasons.push('OI concentrated (' + ex.oiConcentration + '%) — strong wall at ATM');
+        else if (ex.oiConcentration <= 35) reasons.push('OI spread (' + ex.oiConcentration + '%) — weak directional signal');
+    }
+
+    // 4. OI Velocity
+    if (ex.oiVelocity) {
+        var v = ex.oiVelocity;
+        if (v.label.indexOf('▲PE') >= 0)  { bull++; reasons.push('OI velocity: fast PE build (bullish)'); }
+        else if (v.label.indexOf('▲CE') >= 0) { bear++; reasons.push('OI velocity: fast CE build (bearish)'); }
+        else                               { reasons.push('OI velocity slow — position rolling'); }
+    }
+
+    // 5. Max Pain Convergence
+    if (ex.mpConvergence) {
+        var mp = ex.mpConvergence;
+        if (mp.label === 'Converging') reasons.push('Max Pain converging — pin risk, expect range');
+        else if (mp.label === 'Diverging') reasons.push('Max Pain diverging — move expected');
+    }
+
+    var net = bull - bear;
+    var label, color;
+    if      (net >= 2)  { label = '▲ Bullish';  color = 'var(--gtb-green)'; }
+    else if (net === 1) { label = '↑ Mild Bull'; color = 'var(--gtb-green)'; }
+    else if (net === 0) { label = '↔ Neutral';  color = 'var(--gtb-muted)'; }
+    else if (net === -1){ label = '↓ Mild Bear'; color = 'var(--gtb-red)'; }
+    else                { label = '▼ Bearish';   color = 'var(--gtb-red)'; }
+
+    return { label: label, color: color, reason: reasons.join(' · ') + volNote };
+}
+
+// Returns standalone signal strip chip HTML for any instrument.
+// Used in commodities popup and instrument detail view (outside the OI table context).
+function _gtbSigStripHtml(name) {
+    var sm = INSTRUMENT_SCORE_MAP[name] || {};
+    var ex = sm.oiExtras;
+    var h = '<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;padding:3px 0;">';
+    if (ex) {
+        if (ex.ivSkew !== null && ex.ivSkew !== undefined) {
+            var skewColor = ex.ivSkew > 2 ? 'var(--gtb-red)' : ex.ivSkew < -2 ? 'var(--gtb-green)' : 'var(--gtb-muted)';
+            var skewLabel = ex.ivSkew > 2 ? 'Put Skew' : ex.ivSkew < -2 ? 'Call Skew' : 'Neutral';
+            var atmIvColor = ex.atmIV !== null && ex.atmIV > 25 ? 'var(--gtb-red)' : ex.atmIV > 15 ? 'var(--gtb-amber)' : 'var(--gtb-green)';
+            var atmIvStr = ex.atmIV !== null ? ex.atmIV + '%' : '—';
+            var atmIvNote = ex.atmIV !== null ? (ex.atmIV > 25 ? ' High' : ex.atmIV > 15 ? ' Normal' : ' Low') : '';
+            var skewTip = 'PE OTM IV minus CE OTM IV at ATM±2. +ve = put fear (bearish bias). −ve = call demand (bullish). ATM IV: ' + atmIvStr + ' — high ATM IV = elevated uncertainty.';
+            h += '<span title="' + skewTip.replace(/"/g,"'") + '" style="display:inline-flex;flex-direction:column;align-items:center;background:var(--gtb-surface2);border:1px solid var(--gtb-border);padding:2px 5px;font-size:0.42rem;gap:1px;cursor:default;">'
+                + '<span style="color:var(--gtb-muted);font-size:0.38rem;text-transform:uppercase;letter-spacing:0.04em;">IV Skew' + _ii('sig-iv-skew') + '</span>'
+                + '<span style="color:' + skewColor + ';font-weight:700;font-family:var(--gtb-mono);">' + (ex.ivSkew > 0 ? '+' : '') + ex.ivSkew + '% ' + skewLabel + '</span>'
+                + '<span style="color:' + atmIvColor + ';font-size:0.38rem;font-family:var(--gtb-mono);">ATM IV ' + atmIvStr + atmIvNote + '</span>'
+                + '</span>';
+        }
+        if (ex.volRatio !== null && ex.volRatio !== undefined) {
+            var vrColor = ex.volRatio >= 1.5 ? 'var(--gtb-green)' : ex.volRatio >= 0.8 ? 'var(--gtb-muted)' : 'var(--gtb-amber)';
+            var vrLabel = ex.volRatio >= 1.5 ? 'High' : ex.volRatio >= 0.8 ? 'Normal' : 'Low';
+            h += _gtbSigChip('Vol', ex.volRatio + '× (' + vrLabel + ')', vrColor,
+                'Today total option volume vs yesterday. ≥1.5× = high conviction. CE vol: ' + (ex.totalVolCE || '—') + ' PE vol: ' + (ex.totalVolPE || '—'), 'sig-vol-ratio');
+        }
+        if (ex.oiConcentration !== null && ex.oiConcentration !== undefined) {
+            var concColor = ex.oiConcentration >= 60 ? 'var(--gtb-green)' : ex.oiConcentration <= 35 ? 'var(--gtb-amber)' : 'var(--gtb-muted)';
+            var concLabel = ex.oiConcentration >= 60 ? 'Concentrated' : ex.oiConcentration <= 35 ? 'Spread' : 'Moderate';
+            h += _gtbSigChip('OI Conc', ex.oiConcentration + '% ' + concLabel, concColor,
+                '% of total OI at ATM±1. ≥60% = strong wall. ≤35% = OI spread thin.', 'sig-oi-conc');
+        }
+        if (ex.oiVelocity) {
+            var v = ex.oiVelocity;
+            h += _gtbSigChip('OI Vel', v.label + ' (' + v.minutesAgo + 'm)', v.color,
+                'OI build rate vs ' + v.minutesAgo + ' min ago. ΔCE: ' + v.deltaCE + ' ΔPE: ' + v.deltaPE + '.', 'sig-oi-vel');
+        } else {
+            h += _gtbSigChip('OI Vel', 'Pending', 'var(--gtb-muted)', 'OI velocity needs a snapshot ≥20 min old.', 'sig-oi-vel');
+        }
+        if (ex.mpConvergence) {
+            var mp = ex.mpConvergence;
+            var deltaStr = (mp.delta > 0 ? '+' : '') + mp.delta.toFixed(0);
+            h += _gtbSigChip('MP Δ', deltaStr + ' ' + mp.label, mp.color,
+                'Max Pain moved ' + deltaStr + ' pts since last fetch (prev: ' + mp.prev + ' → now: ' + mp.curr + ').', 'sig-mp-conv');
+        } else {
+            h += _gtbSigChip('MP Δ', 'First read', 'var(--gtb-muted)', 'Needs two OI fetches to compare.', 'sig-mp-conv');
+        }
+        var sso = _gtbSigStripOutcome(ex);
+        h += _gtbSigChip('Outcome', sso.label, sso.color, sso.reason, 'sig-strip-outcome');
+    } else {
+        h += '<span style="font-size:0.44rem;color:var(--gtb-muted);">Signal extras not yet computed — reload OI.</span>';
+    }
+    h += '</div>';
+    return h;
+}
+
+// Shared: returns unique weighted constituent names (N50 + BNK, deduped)
+function _gtbMpWeightedNames() {
+    var n50 = Object.keys(NIFTY_50_WEIGHTED_STOCKS || {});
+    var bnk = Object.keys(NIFTY_BANK_WEIGHTED_STOCKS || {});
+    return n50.concat(bnk).filter(function(n, i, a) { return a.indexOf(n) === i; });
+}
+
+// Shared: builds a Max Pain summary <tbody> rows string for a list of instruments
+function _gtbMpSummaryRows(instrs) {
+    return instrs.map(function(nm) {
+        var d = _gtbComputeMaxPainGEX(nm);
+        if (!d) return '<tr><td><b>' + nm + '</b></td><td colspan="7" style="color:var(--gtb-muted);font-size:0.5rem;">No OI data</td></tr>';
+        var dc = d.maxPainDist > 0 ? '#3fb950' : d.maxPainDist < 0 ? '#f85149' : '#7d8590';
+        var gc = d.netGEX > 0 ? '#3fb950' : d.netGEX < 0 ? '#f85149' : '#7d8590';
+        var gRegime = d.netGEX > 0 ? '<span style="color:#3fb950;">Stabilising</span>' : '<span style="color:#f85149;">Trending</span>';
+        var flipHtml = d.flipZones.length ? d.flipZones.map(function(f){return '<span class="mp-flip-pill">'+f+'</span>';}).join('') : '<span style="color:var(--gtb-muted);">—</span>';
+        var oc = _gtbMaxPainOutcome(d);
+        return '<tr>'
+            + '<td><b>' + nm + '</b></td>'
+            + '<td>' + d.spot + '</td>'
+            + '<td style="color:#ffbe0b;font-weight:700;">' + d.maxPainK + '</td>'
+            + '<td style="color:' + dc + ';">' + (d.maxPainDist > 0 ? '+' : '') + d.maxPainDist.toFixed(0) + ' (' + (d.maxPainPct > 0?'+':'') + d.maxPainPct.toFixed(1) + '%)</td>'
+            + '<td style="color:' + gc + ';font-weight:700;">' + (d.netGEX > 0?'+':'') + d.netGEX.toFixed(0) + '</td>'
+            + '<td>' + gRegime + '</td>'
+            + '<td>' + flipHtml + '</td>'
+            + '<td style="max-width:160px;width:160px;white-space:normal;word-break:break-word;">'
+            +   '<span style="font-weight:700;font-size:0.55rem;color:' + oc.color + ';" title="' + oc.reason.replace(/"/g,"'") + '">' + oc.label + '</span>'
+            +   '<div style="font-size:0.44rem;color:var(--gtb-muted);line-height:1.3;margin-top:2px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;" title="' + oc.reason.replace(/"/g,"'") + '">' + oc.reason + '</div>'
+            + '</td>'
+            + '</tr>';
+    }).join('');
+}
+
+// Shared: builds a complete Max Pain summary table HTML
+function _gtbMpSummaryTable(rows) {
+    return '<table class="aoi-tbl mp-summary-tbl" style="table-layout:fixed;width:100%;"><thead><tr>'
+        + '<th>Instrument</th>'
+        + '<th>Spot ' + _ii('mp-col-spot') + '</th>'
+        + '<th>Max Pain ' + _ii('mp-col-maxpain') + '</th>'
+        + '<th>Distance ' + _ii('mp-col-distance') + '</th>'
+        + '<th>Net GEX ' + _ii('mp-col-netgex') + '</th>'
+        + '<th>GEX Regime ' + _ii('mp-col-regime') + '</th>'
+        + '<th>Flip Zones ' + _ii('mp-col-flip') + '</th>'
+        + '<th>Outcome ' + _ii('mp-col-outcome') + '</th>'
+        + '</tr></thead><tbody>' + rows + '</tbody></table>';
+}
+
+// ── Max Pain tab: static shell ────────────────────────────────────────────────
+function _gtbMpGexPaneHtml() {
+    var instrs = ['NIFTY 50', 'NIFTY BANK', 'RELIANCE', 'HDFCBANK', 'ICICIBANK', 'CRUDEOILM'];
+    return '<div id="gtb-mp-pane">'
+        + '<div class="gtb-sig-hdr" style="margin-bottom:6px;">'
+        +   '<i class="bi bi-bar-chart-steps"></i> MAX PAIN &amp; GAMMA EXPOSURE ' + _ii('mp-summary')
+        +   '<button class="gtb-sig-hdr-btn" id="gtb-mp-reload" style="margin-left:auto;"><i class="bi bi-arrow-clockwise"></i> Reload OI</button>'
+        + '</div>'
+        + '<div class="gtb-sig-hdr" style="margin-bottom:4px;font-size:0.55rem;">Index / Stock</div>'
+        + '<div id="gtb-mp-summary-wrap" style="overflow-x:auto;margin-bottom:12px;">'
+        +   '<div class="gtb-sig-wait"><i class="bi bi-hourglass-split"></i> Loading…</div>'
+        + '</div>'
+        + '<div class="gtb-sig-hdr" style="margin-bottom:4px;font-size:0.55rem;">Weighted Constituents</div>'
+        + '<div id="gtb-mp-wtd-wrap" style="overflow-x:auto;margin-bottom:12px;">'
+        +   '<div class="gtb-sig-wait"><i class="bi bi-hourglass-split"></i> Loading…</div>'
+        + '</div>'
+        + '<div class="gtb-sig-hdr" style="margin-bottom:6px;">'
+        +   '<i class="bi bi-bar-chart-steps"></i> GEX PROFILE PER INSTRUMENT ' + _ii('mp-gex')
+        + '</div>'
+        + '<div id="gtb-mp-cards-wrap" class="mp-cards-grid">'
+        +   instrs.map(function(nm) {
+                return '<div class="mp-instr-card" id="gtb-mp-card-' + nm.replace(/ /g,'-') + '">'
+                    + '<div class="mp-instr-name"><i class="bi bi-bar-chart-steps"></i> ' + nm + '</div>'
+                    + '<div class="gtb-sig-wait"><i class="bi bi-hourglass-split"></i> Loading…</div>'
+                    + '</div>';
+            }).join('')
+        + '</div>'
+        + '</div>';
+}
+
+function _gtbRenderMpGexPane() {
+    var instrs = ['NIFTY 50', 'NIFTY BANK', 'RELIANCE', 'HDFCBANK', 'ICICIBANK', 'CRUDEOILM'];
+
+    // Index / Stock summary table
+    jQ('#gtb-mp-summary-wrap').html(_gtbMpSummaryTable(_gtbMpSummaryRows(instrs)));
+
+    // Weighted constituents summary table
+    var wtdNames = _gtbMpWeightedNames();
+    var wtdHtml = wtdNames.length
+        ? _gtbMpSummaryTable(_gtbMpSummaryRows(wtdNames))
+        : '<div style="font-size:0.5rem;color:var(--gtb-muted);padding:4px;">No weighted constituent OI data — reload OI first.</div>';
+    jQ('#gtb-mp-wtd-wrap').html(wtdHtml);
+
+    // GEX profile cards
+    instrs.forEach(function(nm) {
+        var cardEl = document.getElementById('gtb-mp-card-' + nm.replace(/ /g,'-'));
+        if (!cardEl) return;
+        var d = _gtbComputeMaxPainGEX(nm);
+        if (!d) {
+            cardEl.querySelector('.gtb-sig-wait') && (cardEl.querySelector('.gtb-sig-wait').innerHTML = '<span style="color:var(--gtb-muted);">No OI data.</span>');
+            return;
+        }
+        var chartHtml = '<div class="mp-instr-name"><i class="bi bi-bar-chart-steps"></i> ' + nm + '</div>'
+            + _gtbMaxPainGEXHtml(nm, false);
+        cardEl.innerHTML = chartHtml;
+    });
+
+    // Reload button — fetch fresh OI for index/stock AND weighted constituents then re-render
+    jQ(document).off('click.mpreload').on('click.mpreload', '#gtb-mp-reload', function() {
+        _gtbSigFetchAndRenderOI(true);   // index / stock
+        _gtbSigFetchAndRenderOI(false);  // weighted constituents
+        setTimeout(function() { try { _gtbRenderMpGexPane(); } catch(e) {} }, 1200);
+    });
 }
 
 function _gtbRenderSignalsPane() {
     // ── Col 1 & 2: OI Compare compact, split by group ────────────────────────
     try {
         var allList = _gtbAllOIInstruments();
-        var indexList = allList.filter(function(it) { return it.group === 'Index / Stock'; });
-        var wtdList   = allList.filter(function(it) { return it.group === 'Weighted constituent'; });
-
-        function _oiColHtml(list, containerId) {
-            if (!list.length) {
-                jQ(containerId).html('<div class="gtb-sig-wait">No OI data yet. Run a refresh first.</div>');
-                return;
-            }
-            // Build compact table without group-header rows (single group per column)
-            var OFFS = [-2, -1, 0, 1, 2];
-            var h = '<table class="oic-matrix"><thead><tr>'
-                + '<th class="oic-sticky">Instrument</th><th>OI</th><th>PCR</th>'
-                + OFFS.map(function(o){ return '<th>' + (o===0?'ATM':'ATM'+(o>0?'+'+o:o)) + '</th>'; }).join('')
-                + '</tr></thead><tbody>';
-            list.forEach(function(it) {
-                var name = it.name, sm = INSTRUMENT_SCORE_MAP[name] || {}, oiData = sm.oiData;
-                if (!oiData || !oiData.tableData || !oiData.tableData.length) return;
-                var td = oiData.tableData, atmIdx = -1;
-                for (var i = 0; i < td.length; i++) { if (td[i]['ATM_STRIKE']) { atmIdx = i; break; } }
-                if (atmIdx < 0) atmIdx = Math.floor(td.length / 2);
-                var pc = 0; try { pc = parseFloat(generateTrend(name).change) || 0; } catch(e2) {}
-                var oiScore = (sm.oi_obv != null) ? sm.oi_obv : 0;
-                var scColor = oiScore > 0 ? 'var(--gtb-green)' : oiScore < 0 ? 'var(--gtb-red)' : 'var(--gtb-muted)';
-                h += '<tr><td class="oic-sticky"><b>' + name + '</b></td>'
-                    + '<td style="color:' + scColor + ';font-weight:700;font-family:var(--gtb-mono);">' + (oiScore > 0 ? '+' : '') + (typeof oiScore === 'number' ? oiScore.toFixed(1) : oiScore) + '</td>'
-                    + '<td style="font-family:var(--gtb-mono);">' + (oiData.pcr != null ? oiData.pcr : '—') + '</td>';
-                OFFS.forEach(function(off) {
-                    var idx = atmIdx + off;
-                    h += _gtbOICellCompact((idx >= 0 && idx < td.length) ? td[idx] : null, pc, off === 0);
-                });
-                h += '</tr>';
-            });
-            h += '</tbody></table>';
-            jQ(containerId).html('<div style="overflow-x:auto;">' + h + '</div>');
-        }
-
-        _oiColHtml(indexList, '#gtb-sig-oi-index');
-        _oiColHtml(wtdList,   '#gtb-sig-oi-wtd');
+        _gtbSigOiColHtml(allList.filter(function(it) { return it.group === 'Index / Stock'; }),       '#gtb-sig-oi-index');
+        _gtbSigOiColHtml(allList.filter(function(it) { return it.group === 'Weighted constituent'; }), '#gtb-sig-oi-wtd');
     } catch(e) {}
+    try { _gtbRenderIVSignalsSection(); } catch(e) {}
 
     // ── Col 3: Futures Accuracy (async) ──────────────────────────────────────
     _gtbLoadFutAccInPane();
 
+    // OI reload buttons — fetch fresh data then re-render OI tables + IV section
+    jQ(document).off('click.sigoireload').on('click.sigoireload', '#gtb-sig-oi-index-reload, #gtb-sig-oi-wtd-reload', function() {
+        var isIndex = jQ(this).attr('id') === 'gtb-sig-oi-index-reload';
+        _gtbSigFetchAndRenderOI(isIndex);
+    });
+
+    // IV Signals reload — re-fetch both groups then re-render section
+    jQ(document).off('click.sigivreload').on('click.sigivreload', '#gtb-sig-iv-reload', function() {
+        _gtbSigFetchAndRenderOI(true);
+        _gtbSigFetchAndRenderOI(false);
+        setTimeout(function() { try { _gtbRenderIVSignalsSection(); } catch(e) {} }, 1200);
+    });
+
+    // Futures reload button
     jQ(document).off('click.sigfutreload').on('click.sigfutreload', '#gtb-sig-fut-reload', function() {
         jQ('#gtb-sig-fut-body').html('<div class="gtb-sig-wait"><i class="bi bi-hourglass-split"></i> Replaying 5-min candles…</div>');
         _gtbLoadFutAccInPane();
@@ -2171,6 +2709,16 @@ function resetCount() {
     RELIANCE_OI_OBV_SCORE = 0;
     HDFCBANK_OI_OBV_SCORE = 0;
     ICICIBANK_OI_OBV_SCORE = 0;
+    NIFTY_50_MAX_PAIN_SCORE = 0;
+    NIFTY_BANK_MAX_PAIN_SCORE = 0;
+    RELIANCE_MAX_PAIN_SCORE = 0;
+    HDFCBANK_MAX_PAIN_SCORE = 0;
+    ICICIBANK_MAX_PAIN_SCORE = 0;
+    NIFTY_50_IV_SKEW_SCORE = 0;
+    NIFTY_BANK_IV_SKEW_SCORE = 0;
+    RELIANCE_IV_SKEW_SCORE = 0;
+    HDFCBANK_IV_SKEW_SCORE = 0;
+    ICICIBANK_IV_SKEW_SCORE = 0;
     NIFTY_50_COMPONENT_SCORE = 0;
     NIFTY_BANK_COMPONENT_SCORE = 0;
     INSTRUMENT_SCORE_MAP = {};
@@ -2528,6 +3076,20 @@ let NIFTY_BANK_OI_OBV_SCORE = 0;
 let RELIANCE_OI_OBV_SCORE = 0;
 let HDFCBANK_OI_OBV_SCORE = 0;
 let ICICIBANK_OI_OBV_SCORE = 0;
+
+// Max Pain gravity score: +1 when Max Pain is above spot (bullish pull), -1 when below
+let NIFTY_50_MAX_PAIN_SCORE = 0;
+let NIFTY_BANK_MAX_PAIN_SCORE = 0;
+let RELIANCE_MAX_PAIN_SCORE = 0;
+let HDFCBANK_MAX_PAIN_SCORE = 0;
+let ICICIBANK_MAX_PAIN_SCORE = 0;
+
+// IV Skew score: -1 put skew >2% (fear/bearish), +1 call skew >2% (demand/bullish)
+let NIFTY_50_IV_SKEW_SCORE = 0;
+let NIFTY_BANK_IV_SKEW_SCORE = 0;
+let RELIANCE_IV_SKEW_SCORE = 0;
+let HDFCBANK_IV_SKEW_SCORE = 0;
+let ICICIBANK_IV_SKEW_SCORE = 0;
 
 // Weighted component composite scores: each stock's total signal × (weight/100), summed
 let NIFTY_50_COMPONENT_SCORE = 0;
@@ -3311,6 +3873,7 @@ async function fetchWeightedStocksOIScore() {
             INSTRUMENT_SCORE_MAP[name].pcr    = oiData.pcr;
             INSTRUMENT_SCORE_MAP[name].chPcr  = oiData.chPcr;
             INSTRUMENT_SCORE_MAP[name].oiData = oiData;
+            _gtbComputeOIExtras(name, oiData);
         } catch (e) {
             done++;
             console.log("OI score error for " + name, e);
@@ -3558,6 +4121,7 @@ async function _dvFetchAndRender(name, tid, sfx, isMcx) {
                         _gtbRenderOIMatrix(name, sfx);
                         var _lbl = document.getElementById(tid + '-oimatrix-lbl' + sfx);
                         if (_lbl) _lbl.textContent = 'live';
+                        try { _dvRenderMPGex(name, tid, sfx); } catch(e2) {}
                     }
                 } catch(e) { console.log('MCX OI matrix', name, e); }
             }
@@ -3574,6 +4138,7 @@ async function _dvFetchAndRender(name, tid, sfx, isMcx) {
                         _gtbRenderOIMatrix(name, sfx);
                         var _lbl = document.getElementById(tid + '-oimatrix-lbl' + sfx);
                         if (_lbl) _lbl.textContent = 'live';
+                        try { _dvRenderMPGex(name, tid, sfx); } catch(e2) {}
                     }
                 })(),
                 showFutureDetails(name),
@@ -3920,6 +4485,17 @@ function _gtbLoadInstrDetailPanel(name) {
     h +=   '</div>';
     h += '</div>';
 
+    // [9] Max Pain & GEX — full panel, populated after OI fetch in _dvFetchAndRender
+    h += '<div class="gtb-ic-panel" data-col="mpgex" id="dv-mpgex-' + tid + sfx + '">';
+    h +=   '<div class="gtb-ic-panel-hdr">';
+    h +=     '<span class="gtb-ic-panel-title"><i class="bi bi-bar-chart-steps"></i> MAX PAIN &amp; GEX ' + _ii('mp-summary') + '</span>';
+    h +=     '<span class="gtb-ic-panel-btns"><button class="sv-icon-btn mp-gex-btn" data-name="' + name + '" title="Expand"><i class="bi bi-fullscreen"></i></button></span>';
+    h +=   '</div>';
+    h +=   '<div class="gtb-ic-panel-body" id="dv-mpgex-body-' + tid + sfx + '" style="padding:4px;">';
+    h +=     '<div style="font-size:0.44rem;color:var(--gtb-muted);">Loading after OI fetch…</div>';
+    h +=   '</div>';
+    h += '</div>';
+
     // Trade Analysis panel — rendered inline after _dvFetchAndRender completes
     var _taSfxId2 = sfx.replace(/-/g,'_');
     h += '<div id="dv-ta-' + tid + _taSfxId2 + '" class="gtb-ic-panel" style="margin-top:6px;">'
@@ -4102,7 +4678,9 @@ function computeInstrumentScore(name) {
         }
     }
 
-    score.total = score.nine_fifteen + score.current_trend + score.futures_trend + score.oi_obv;
+    score.max_pain = _gtbMaxPainScore(name);
+    score.iv_skew  = _gtbIVSkewScore(name);
+    score.total = score.nine_fifteen + score.current_trend + score.futures_trend + score.oi_obv + score.max_pain + score.iv_skew;
     return score;
 }
 
@@ -4202,6 +4780,30 @@ function _renderGtbOverview(score, marketSignal) {
     } catch (e) {}
 }
 
+// Max Pain gravity: +1 when Max Pain is above spot (bullish pull), -1 when below.
+// At pin (distance < 0.3%) returns 0 — no directional pull when already at Max Pain.
+function _gtbMaxPainScore(name) {
+    try {
+        var d = _gtbComputeMaxPainGEX(name);
+        if (!d) return 0;
+        if (Math.abs(d.maxPainPct) < 0.3) return 0;
+        return d.maxPainDist > 0 ? 1 : -1;
+    } catch(e) { return 0; }
+}
+
+// IV Skew score: >2% put skew = bearish pressure (-1), >2% call skew = bullish (+1).
+function _gtbIVSkewScore(name) {
+    try {
+        var sm = INSTRUMENT_SCORE_MAP[name];
+        if (!sm || !sm.oiExtras) return 0;
+        var iv = sm.oiExtras.ivSkew;
+        if (iv === null || iv === undefined) return 0;
+        if (iv > 2) return -1;
+        if (iv < -2) return 1;
+        return 0;
+    } catch(e) { return 0; }
+}
+
 function setScore() {
 
 
@@ -4272,6 +4874,17 @@ function setScore() {
     HDFCBANK_OI_OBV_SCORE   = getOIScore('HDFCBANK');
     ICICIBANK_OI_OBV_SCORE  = getOIScore('ICICIBANK');
 
+    NIFTY_50_MAX_PAIN_SCORE   = _gtbMaxPainScore('NIFTY 50');
+    NIFTY_BANK_MAX_PAIN_SCORE = _gtbMaxPainScore('NIFTY BANK');
+    RELIANCE_MAX_PAIN_SCORE   = _gtbMaxPainScore('RELIANCE');
+    HDFCBANK_MAX_PAIN_SCORE   = _gtbMaxPainScore('HDFCBANK');
+    ICICIBANK_MAX_PAIN_SCORE  = _gtbMaxPainScore('ICICIBANK');
+    NIFTY_50_IV_SKEW_SCORE    = _gtbIVSkewScore('NIFTY 50');
+    NIFTY_BANK_IV_SKEW_SCORE  = _gtbIVSkewScore('NIFTY BANK');
+    RELIANCE_IV_SKEW_SCORE    = _gtbIVSkewScore('RELIANCE');
+    HDFCBANK_IV_SKEW_SCORE    = _gtbIVSkewScore('HDFCBANK');
+    ICICIBANK_IV_SKEW_SCORE   = _gtbIVSkewScore('ICICIBANK');
+
     let SCORE = ALL_9_15_CLOSE_SCORE +
         NIFTY_50_9_15_CLOSE_SCORE +
         NIFTY_BANK_9_15_CLOSE_SCORE +
@@ -4290,6 +4903,16 @@ function setScore() {
         RELIANCE_OI_OBV_SCORE +
         HDFCBANK_OI_OBV_SCORE +
         ICICIBANK_OI_OBV_SCORE +
+        NIFTY_50_MAX_PAIN_SCORE +
+        NIFTY_BANK_MAX_PAIN_SCORE +
+        RELIANCE_MAX_PAIN_SCORE +
+        HDFCBANK_MAX_PAIN_SCORE +
+        ICICIBANK_MAX_PAIN_SCORE +
+        NIFTY_50_IV_SKEW_SCORE +
+        NIFTY_BANK_IV_SKEW_SCORE +
+        RELIANCE_IV_SKEW_SCORE +
+        HDFCBANK_IV_SKEW_SCORE +
+        ICICIBANK_IV_SKEW_SCORE +
         NIFTY_50_COMPONENT_SCORE +
         NIFTY_BANK_COMPONENT_SCORE;
 
@@ -5568,10 +6191,64 @@ var GTB_INFO = {
         body:'Top-6 weighted constituents for NIFTY 50 or NIFTY BANK (by index weight). The bar shows each stock\'s computed score contribution. A strongly green set means heavyweight stocks are bullish — this drives the NIFTY_50_COMPONENT_SCORE and NIFTY_BANK_COMPONENT_SCORE that feed the master gauge.' },
     'dv-detail':  { icon:'bi-info-circle-fill', title:'Details',
         body:'Raw per-instrument data: ATR-based SL and Target levels, live PCR, the individual OI/OBV score, ADX regime (trending vs ranging), and the strike levels (BST/BSO/ASO/AST) derived from today\'s open price plus the NSE strike step for this instrument.' },
+    'dv-mpgex':   { icon:'bi-bar-chart-steps', title:'Max Pain & GEX',
+        body:'Max Pain is the strike where total option-writer loss is minimised — spot is magnetically pulled toward it near expiry. Distance shows how far spot needs to move and in which direction. Net GEX (Gamma Exposure) tells you the market character: <b style="color:#3fb950">positive GEX = stabilising</b> (dealers fade moves, expect range), <b style="color:#f85149">negative GEX = trending</b> (dealers amplify moves, expect momentum). Flip Zones are strikes where GEX crosses zero — price accelerates through them. The Outcome chip synthesises all of this into an actionable verdict (Expiry Pin / Gradual Drift / Sharp Rally / Sharp Fall). The GEX bar chart shows green (stabilising) and red (trending) bars per strike, with the Max Pain strike marked ★ and flip zones as purple dashed lines.' },
     'dv-ta':      { icon:'bi-lightbulb-fill', title:'Trade Analysis',
         body:'Synthesised trade recommendation covering: <b>Price Level Map</b> (LTP bar vs all key levels), <b>Suggested Setup</b> (CE buy / PE buy / spread / condor based on score and direction), <b>Entry Triggers</b> (exact price conditions to confirm before entering), <b>Risk/Reward</b> (entry, SL, T1, T2, R:R, VIX-adjusted SL), <b>OI &amp; Flow</b> (net CE/PE OI, max walls, PCR trend), and <b>Scenario Analysis</b> (Bull/Bear/Base/Reversal cases with triggers, probability, and action). Rendered after OI/Futures data loads.' },
     'dv-risk':    { icon:'bi-shield-fill-check', title:'Risk Manager',
         body:'Instrument-specific position sizing. Enter your <b>available funds</b> and <b>risk % per trade</b>. The panel derives: entry zone (ASO for bull / BSO for bear), stop loss (BSO / ASO), targets (AST / BST and VIX range), <b>risk per lot</b> (|entry − SL| × lot size), <b>suggested lots</b> (floor of max-risk ÷ risk-per-lot), and a <b>VIX-adjusted lot count</b> (reduced by 15–50% when VIX is elevated). Hit ↺ to recalculate after changing funds or risk %.' },
+    // ── Max Pain & GEX popup ─────────────────────────────────────────────────────
+    // ── Signals tab — OI signal strip chips ──────────────────────────────────────
+    'sig-iv-skew':   { icon:'bi-symmetry-horizontal', title:'IV Skew',
+        body:'Implied Volatility of the PE strike at ATM−2 minus IV of the CE strike at ATM+2. Both are equidistant from ATM so any IV difference reveals directional bias in the options market itself. <b style="color:#f85149">Positive (Put Skew)</b>: traders are paying more for downside protection than upside calls — bearish fear premium. <b style="color:#3fb950">Negative (Call Skew)</b>: upside calls are more expensive — bullish demand. Values within ±2% are neutral. ATM IV shows current overall premium level; high ATM IV = elevated uncertainty.' },
+    'sig-vol-ratio': { icon:'bi-bar-chart-fill', title:'Volume Conviction',
+        body:'Today\'s total CE+PE option volume divided by yesterday\'s total volume. Acts as a conviction multiplier for OI signals. <b style="color:#3fb950">≥1.5×</b>: unusually high activity — OI changes today are backed by real directional intent (institutions entering new positions). <b>0.8–1.5×</b>: normal activity, OI signal is reliable. <b style="color:#f97316">&lt;0.8×</b>: thin trading — could be position rolling or adjustment rather than directional bets; treat OI signals with lower confidence.' },
+    'sig-oi-conc':   { icon:'bi-fullscreen', title:'OI Concentration',
+        body:'Percentage of total open interest (CE+PE) sitting at ATM−1, ATM, and ATM+1 combined. <b style="color:#3fb950">≥60%</b>: OI is tightly clustered — strong, decisive support/resistance wall at those strikes. The market is likely to respect these levels. <b>35–60%</b>: moderate concentration. <b style="color:#f97316">≤35%</b>: OI is spread across many strikes — no dominant wall, support/resistance signals are weaker and the market is less likely to pin at any single level.' },
+    'sig-oi-vel':    { icon:'bi-speedometer', title:'OI Velocity',
+        body:'Rate of OI change compared to a snapshot taken ≥20 minutes ago. Shows HOW FAST positions are being built — slow OI growth can mean rolling/adjustment, fast growth means fresh directional conviction. <b style="color:#3fb950">Fast ▲PE</b>: put OI growing rapidly — fresh put writing = strong bullish support being built. <b style="color:#f85149">Fast ▲CE</b>: call OI growing rapidly — fresh call writing = resistance being reinforced. <b>Slow</b>: positions are adjusting slowly, likely expiry-related rolling rather than new directional bets. Updates after each OI reload once a prior snapshot exists.' },
+    'sig-strip-outcome': { icon:'bi-flag-fill', title:'Signal Strip Outcome',
+        body:'A synthesised verdict from all 5 OI extras signals combined. Scoring: <b>IV Skew</b> votes bullish (call skew) or bearish (put skew). <b>OI Velocity</b> votes bullish (fast PE build) or bearish (fast CE build). <b>OI Concentration</b> and <b>Max Pain</b> provide context notes. <b>Volume</b> acts as a confidence modifier — low volume reduces conviction, high volume confirms. Net bull/bear votes: ≥2 = ▲ Bullish, 1 = ↑ Mild Bull, 0 = ↔ Neutral, -1 = ↓ Mild Bear, ≤-2 = ▼ Bearish. Hover for the full reasoning behind the verdict.' },
+    'sig-mp-conv':   { icon:'bi-bullseye', title:'Max Pain Convergence',
+        body:'Whether Max Pain is moving toward or away from the current spot price between OI fetches. <b style="color:#3fb950">Converging</b>: Max Pain is drifting toward spot — option writers are defending a level near current price, expiry pin risk is rising. Expect tighter range near Max Pain. <b style="color:#f97316">Diverging</b>: Max Pain is moving away from spot — writers are repositioning to a new level, a directional move is more likely. <b>Stable</b>: Max Pain changed less than 25 pts — equilibrium, no strong pull signal. Requires two separate OI fetches to compute; will show "First read" on initial load.' },
+    // ── Signals tab — OI table columns ───────────────────────────────────────────
+    'sig-oi-score':  { icon:'bi-speedometer2', title:'OI Score',
+        body:'The composite OI/OBV score for this instrument — the same value that feeds the master score gauge. It is the sum of per-strike scores across ATM ± 5 strikes. <b style="color:#3fb950">Positive (+)</b> = more bullish OI activity (PE writing, CE unwinding, PE OBV rising) than bearish. <b style="color:#f85149">Negative (−)</b> = more bearish OI activity. Range is roughly −5 to +5; anything beyond ±3 is a strong signal.' },
+    'sig-oi-pcr':    { icon:'bi-bar-chart-steps', title:'Put–Call Ratio (PCR)',
+        body:'Total PE Open Interest ÷ Total CE Open Interest across all strikes. <b>PCR &gt; 1</b>: more puts written than calls — typically bullish (put writers expect the market to stay above their strikes). <b>PCR &lt; 1</b>: more calls written — typically bearish. <b>PCR &gt; 1.3</b> is considered very bullish; <b>PCR &lt; 0.7</b> is very bearish. Extreme values (above 1.5 or below 0.5) can signal contrarian reversals.' },
+    'sig-oi-atm':    { icon:'bi-crosshair', title:'ATM Strike',
+        body:'The At-The-Money strike — the option strike closest to the current spot price. The score inside the cell is the sum of CE and PE OI signals at this exact strike. <b style="color:#3fb950">Positive</b> = PE OI being added or CE OI being removed at ATM (bullish). <b style="color:#f85149">Negative</b> = CE OI being added or PE OI being removed (bearish). The ATM strike carries the highest gamma and is the most sensitive to spot movement — watch it closely. Hover the cell for CE/PE signal labels.' },
+    'sig-oi-wing':   { icon:'bi-distribute-horizontal', title:'Wing Strikes (ATM±1, ATM±2)',
+        body:'Strikes one and two steps away from ATM. Each cell score combines CE and PE OI signals at that strike: <b style="color:#3fb950">green = net bullish OI activity</b> (put writing / call unwinding), <b style="color:#f85149">red = net bearish OI activity</b> (call writing / put unwinding). How to read the pattern:<br><br>'
+            + '• <b style="color:#3fb950">All green (PE + CE side)</b> = put writers adding below + call shorts covering above → strong bullish structure, breakout likely.<br>'
+            + '• <b style="color:#f85149">All red (PE + CE side)</b> = call writers adding above + put shorts covering below → strong bearish structure, breakdown likely.<br>'
+            + '• <b>Green PE side + Red CE side</b> = support built below + resistance built above → range-bound, market likely to oscillate between these strikes.<br>'
+            + '• <b>Red PE side + Green CE side</b> = puts being unwound below + calls being unwound above → both sides covering → indecisive, low conviction.<br><br>'
+            + 'Hover any cell to see the strike price, CE and PE signal labels, and raw Delta-OI values.' },
+    'mp-col-spot':     { icon:'bi-cursor-text', title:'Spot',
+        body:'The current Live LTP (Last Traded Price) of the instrument. This is the reference price used to compute the distance to Max Pain and to determine whether the market is above or below the GEX flip zone.' },
+    'mp-col-maxpain':  { icon:'bi-bullseye', title:'Max Pain',
+        body:'The strike price at which the total financial loss for all option writers (both CE and PE combined) is the smallest. Near expiry, markets tend to gravitate toward this level because it minimises the payout to option buyers. A large cluster of OI at a strike creates magnetic pull on the spot price.' },
+    'mp-col-distance': { icon:'bi-arrows-expand', title:'Distance',
+        body:'Spot minus Max Pain, shown as points and %. <b style="color:#3fb950">Positive (+)</b> = spot is above Max Pain — bearish gravity, market may drift down toward Max Pain into expiry. <b style="color:#f85149">Negative (−)</b> = spot is below Max Pain — bullish gravity, market may drift up. The further the distance, the stronger the pull. Small distance (&lt; 0.3%) = spot is near max-pain equilibrium.' },
+    'mp-col-netgex':   { icon:'bi-graph-up-arrow', title:'Net GEX',
+        body:'Net Gamma Exposure = Σ (gamma × OI × lot-size) across all strikes, CE minus PE. <b style="color:#3fb950">Positive GEX</b>: market makers are net long gamma — they buy dips and sell rallies to delta-hedge, acting as a natural stabiliser (range-bound action). <b style="color:#f85149">Negative GEX</b>: market makers are net short gamma — they must chase the move to hedge, amplifying trends and causing sharp directional swings. The magnitude indicates how strong this effect is.' },
+    'mp-col-regime':   { icon:'bi-shield-half', title:'GEX Regime',
+        body:'A label derived from Net GEX. <b style="color:#3fb950">Stabilising</b> (positive GEX): dealers act as shock absorbers — expect chop, mean reversion, and tight intraday ranges. Good for iron condors and short-premium strategies. <b style="color:#f85149">Trending</b> (negative GEX): dealers amplify moves — expect breakouts, momentum runs, and wider intraday ranges. Good for directional CE/PE buying.' },
+    'mp-col-outcome':  { icon:'bi-flag-fill', title:'Outcome',
+        body:'A synthesised verdict combining Max Pain pull direction, GEX regime, and proximity to flip zones. Five possible verdicts:<br><br>'
+            + '<b style="color:#a78bfa">Expiry Pin</b> — spot is within 0.3% of Max Pain. Writers are defending the level hard; expect a very tight range and rapid premium decay. Avoid buying options.<br>'
+            + '<b style="color:#3fb950">↑ Gradual Drift Up</b> — Max Pain above spot + positive GEX. Slow, orderly pull upward. Good for PE spreads / upward-biased condors.<br>'
+            + '<b style="color:#f85149">↓ Gradual Drift Down</b> — Max Pain below spot + positive GEX. Slow bleed lower. Good for CE spreads / downward-biased condors.<br>'
+            + '<b style="color:#3fb950">⚡ Sharp Rally Risk</b> — Max Pain above spot + negative GEX. Dealers will amplify the move — expect a sharper-than-normal rally, especially if a flip zone is crossed. Buy CE.<br>'
+            + '<b style="color:#f85149">⚡ Sharp Fall Risk</b> — Max Pain below spot + negative GEX. Dealers amplify the sell-off. Buy PE.<br><br>'
+            + 'The "+ Flip Risk" suffix is added when a GEX flip zone is within 0.5% of spot, warning that crossing it could change the move character.' },
+    'mp-col-flip':     { icon:'bi-lightning-charge', title:'Flip Zones',
+        body:'Strikes where the cumulative GEX flips from positive to negative (or vice versa). These are the key threshold levels — price action tends to be orderly and range-bound on the positive-GEX side, and fast/trending on the negative-GEX side. A break through a flip zone often signals a regime change from stable to trending (or back). Use these as breakout confirmation levels.' },
+    'mp-summary': { icon:'bi-table', title:'Max Pain — Summary',
+        body:'One row per instrument. <b>Max Pain</b> is the strike where total open-interest loss for all option writers is minimised — spot tends to be pulled toward it near expiry. <b>Distance</b> = spot minus Max Pain (positive = spot above Max Pain, bearish pull back; negative = below, bullish pull up). <b>Net GEX</b> (Gamma Exposure) = sum of (gamma × OI × lot size) across all strikes; positive GEX = dealers are long gamma and act as market stabilisers (fade rallies/drops), negative GEX = dealers short gamma and amplify moves. <b>Flip Zones</b> are strikes where GEX crosses zero — price action typically accelerates beyond these levels.' },
+    'mp-gex':     { icon:'bi-bar-chart-steps', title:'GEX Profile per Instrument',
+        body:'Each card shows a per-strike GEX bar chart. <b>Green bars</b> = positive GEX at that strike (dealer long gamma → stabilising), <b>red bars</b> = negative GEX (dealer short gamma → trending/amplifying). The tallest bar is the dominant support/resistance level. The Max Pain strike is marked with a ★. Use this to identify where the market is likely to consolidate (cluster of positive GEX) vs where it can trend freely (negative GEX zone).' },
 };
 
 // Build the popover element once, lazily
@@ -6497,31 +7174,76 @@ function _gtbMaxPainGEXHtml(name, compact) {
         + '</div>';
 }
 
+// Synthesises Max Pain + GEX into a plain-English outcome verdict for one instrument.
+// Returns { label, color, reason } — label is the short verdict chip text.
+function _gtbMaxPainOutcome(d) {
+    if (!d) return { label: 'No data', color: 'var(--gtb-muted)', reason: 'OI data not loaded.' };
+
+    var absPct  = Math.abs(d.maxPainPct);
+    var pullDir = d.maxPainDist < 0 ? 'up' : d.maxPainDist > 0 ? 'down' : 'flat';   // spot needs to move which way to reach Max Pain
+    var bullGEX = d.netGEX > 0;   // true = stabilising, false = trending/amplifying
+    var nearFlip = d.flipZones.length > 0 && d.flipZones.some(function(f) {
+        return Math.abs(f - d.spot) / d.spot < 0.005;  // flip zone within 0.5% of spot
+    });
+
+    // Small distance (<0.3%) = already at Max Pain — expiry pin risk
+    if (absPct < 0.3) {
+        return {
+            label: 'Expiry Pin',
+            color: '#a78bfa',
+            reason: 'Spot is within 0.3% of Max Pain (' + d.maxPainK + '). Option writers have maximum incentive to keep price here. Expect a tight range and time-decay compression. Avoid buying options — premium will erode rapidly.'
+        };
+    }
+
+    // Stabilising GEX (dealers hedge by fading moves)
+    if (bullGEX) {
+        if (pullDir === 'up') {
+            return {
+                label: nearFlip ? '↑ Pull + Flip Risk' : '↑ Gradual Drift Up',
+                color: '#3fb950',
+                reason: 'Max Pain (' + d.maxPainK + ') is ' + absPct.toFixed(1) + '% above spot — gravity pulls price upward into expiry. GEX is positive (stabilising), so the move will be slow and orderly, not a sharp rally. '
+                    + (nearFlip ? 'A GEX flip zone is near spot — a break above it could switch the regime to trending and accelerate the move.' : 'No flip zone near spot — expect measured mean-reversion rather than momentum.')
+                    + ' Strategy: sell PE spreads / iron condor biased upward.'
+            };
+        } else {
+            return {
+                label: nearFlip ? '↓ Pull + Flip Risk' : '↓ Gradual Drift Down',
+                color: '#f85149',
+                reason: 'Max Pain (' + d.maxPainK + ') is ' + absPct.toFixed(1) + '% below spot — gravity pulls price downward into expiry. GEX is positive (stabilising), so the drift will be slow. '
+                    + (nearFlip ? 'A GEX flip zone is near spot — a break below it could turn the drift into a sharper sell-off.' : 'No flip zone near current price — expect gradual bleed, not a crash.')
+                    + ' Strategy: sell CE spreads / iron condor biased downward.'
+            };
+        }
+    }
+
+    // Trending GEX (dealers amplify — sharp directional moves possible)
+    if (pullDir === 'up') {
+        return {
+            label: nearFlip ? '⚡ Sharp Rally Risk' : '↑ Momentum Up',
+            color: '#3fb950',
+            reason: 'Max Pain pull is upward (' + absPct.toFixed(1) + '% to ' + d.maxPainK + ') AND GEX is negative (dealers will amplify the move, not fade it). Expect a sharper-than-normal rally. '
+                + (nearFlip ? 'Spot is near a GEX flip zone — crossing it could trigger an accelerated squeeze.' : '')
+                + ' Strategy: buy CE / CE debit spreads. Avoid selling calls — short gamma pain if move extends.'
+        };
+    } else {
+        return {
+            label: nearFlip ? '⚡ Sharp Fall Risk' : '↓ Momentum Down',
+            color: '#f85149',
+            reason: 'Max Pain pull is downward (' + absPct.toFixed(1) + '% to ' + d.maxPainK + ') AND GEX is negative (dealers amplify moves). Expect a sharper-than-normal sell-off. '
+                + (nearFlip ? 'Spot is near a GEX flip zone — a break below could cascade into a momentum flush.' : '')
+                + ' Strategy: buy PE / PE debit spreads. Avoid selling puts — short gamma risk on the downside.'
+        };
+    }
+}
+
 // ── Max Pain / GEX popup (all OI instruments) ─────────────────────────────────
 jQ(document).on('click', '#show-maxpain-gex', function(e) {
     e.preventDefault();
     var _divId = 'popup-custom-style-maxpain-gex';
     var _instrs = ['NIFTY 50', 'NIFTY BANK', 'RELIANCE', 'HDFCBANK', 'ICICIBANK', 'CRUDEOILM'];
+    var _wtdNames = _gtbMpWeightedNames();
 
-    // Summary table
-    var summaryRows = _instrs.map(function(nm) {
-        var d = _gtbComputeMaxPainGEX(nm);
-        if (!d) return '<tr><td>' + nm + '</td><td colspan="6" style="color:var(--gtb-muted);">No OI data</td></tr>';
-        var dc = d.maxPainDist > 0 ? '#3fb950' : d.maxPainDist < 0 ? '#f85149' : '#7d8590';
-        var gc = d.netGEX > 0 ? '#3fb950' : d.netGEX < 0 ? '#f85149' : '#7d8590';
-        var gRegime = d.netGEX > 0 ? '<span style="color:#3fb950;">Stabilising</span>' : '<span style="color:#f85149;">Trending</span>';
-        return '<tr>'
-            + '<td><b>' + nm + '</b></td>'
-            + '<td>' + d.spot + '</td>'
-            + '<td style="color:#ffbe0b;font-weight:700;">' + d.maxPainK + '</td>'
-            + '<td style="color:' + dc + ';">' + (d.maxPainDist > 0 ? '+' : '') + d.maxPainDist.toFixed(0) + ' (' + (d.maxPainPct > 0?'+':'') + d.maxPainPct.toFixed(1) + '%)</td>'
-            + '<td style="color:' + gc + ';font-weight:700;">' + (d.netGEX > 0?'+':'') + d.netGEX.toFixed(0) + '</td>'
-            + '<td>' + gRegime + '</td>'
-            + '<td>' + (d.flipZones.length ? d.flipZones.map(function(f){return '<span class="mp-flip-pill">'+f+'</span>';}).join('') : '<span style="color:var(--gtb-muted);">—</span>') + '</td>'
-            + '</tr>';
-    }).join('');
-
-    // Per-instrument GEX cards
+    // Per-instrument GEX cards (index/stock only)
     var cards = _instrs.map(function(nm) {
         return '<div class="mp-instr-card">'
             + '<div class="mp-instr-name"><i class="bi bi-bar-chart-steps"></i> ' + nm + '</div>'
@@ -6529,14 +7251,16 @@ jQ(document).on('click', '#show-maxpain-gex', function(e) {
             + '</div>';
     }).join('');
 
+    var wtdTableHtml = _wtdNames.length
+        ? '<div style="overflow-x:auto;">' + _gtbMpSummaryTable(_gtbMpSummaryRows(_wtdNames)) + '</div>'
+        : '<div style="font-size:0.5rem;color:var(--gtb-muted);padding:4px;">No weighted constituent OI data — run an OI scan first.</div>';
+
     var body = '<div class="mp-popup-wrap">'
-        + '<div class="mp-section-label">Summary — all instruments</div>'
-        + '<div style="overflow-x:auto;">'
-        + '<table class="aoi-tbl mp-summary-tbl"><thead><tr>'
-        + '<th>Instrument</th><th>Spot</th><th>Max Pain</th><th>Distance</th><th>Net GEX</th><th>GEX Regime</th><th>Flip Zones</th>'
-        + '</tr></thead><tbody>' + summaryRows + '</tbody></table>'
-        + '</div>'
-        + '<div class="mp-section-label" style="margin-top:14px;">GEX Profile per Instrument</div>'
+        + '<div class="mp-section-label">Index / Stock Summary ' + _ii('mp-summary') + '</div>'
+        + '<div style="overflow-x:auto;">' + _gtbMpSummaryTable(_gtbMpSummaryRows(_instrs)) + '</div>'
+        + '<div class="mp-section-label" style="margin-top:14px;">Weighted Constituents ' + _ii('mp-summary') + '</div>'
+        + wtdTableHtml
+        + '<div class="mp-section-label" style="margin-top:14px;">GEX Profile per Instrument ' + _ii('mp-gex') + '</div>'
         + '<div class="mp-cards-grid">' + cards + '</div>'
         + '</div>';
 
@@ -6868,6 +7592,14 @@ jQ(document).on('click', '#show-commodities', function (e) {
         +     '<div class="cmd-st" style="margin-top:4px;">OBV (CE/PE)</div>'
         +     '<div id="cmd-crude-obv" style="height:130px;"></div>'
         +     '<div id="cmd-crude-oi-table" style="overflow-x:auto;margin-top:8px;"><div class="cmd-load"><i class="bi bi-hourglass-split"></i> Loading OI…</div></div>'
+        // OI Signal Strip
+        +     '<div class="cmd-st" style="margin-top:8px;display:flex;align-items:center;gap:6px;"><i class="bi bi-activity"></i> OI SIGNALS</div>'
+        +     '<div id="cmd-crude-sig-strip" style="margin-bottom:4px;"><div class="cmd-load"><i class="bi bi-hourglass-split"></i> Loading after OI fetch…</div></div>'
+        // Max Pain & GEX
+        +     '<div class="cmd-st" style="margin-top:8px;display:flex;align-items:center;gap:6px;">'
+        +       '<i class="bi bi-bar-chart-steps"></i> MAX PAIN &amp; GEX ' + _ii('dv-mpgex')
+        +     '</div>'
+        +     '<div id="cmd-crude-mpgex"><div class="cmd-load"><i class="bi bi-hourglass-split"></i> Loading after OI fetch…</div></div>'
         // Futures Remark Accuracy
         +     '<div class="cmd-st" style="margin-top:8px;display:flex;align-items:center;gap:6px;">'
         +       '<i class="bi bi-bullseye"></i> FUTURES REMARK ACCURACY'
@@ -6963,13 +7695,39 @@ jQ(document).on('click', '#show-commodities', function (e) {
         }
         jQ('#cmd-crude-prob').html(_cmdTrendProb('CRUDEOILM', fres));
         try { if (fres) await showPrictionProbabiltyMCX('CRUDEOILM', fres); showOIOBVBarChart('CRUDEOILM'); } catch(e4) {}
+        jQ('#cmd-crude-sig-strip').html(_gtbSigStripHtml('CRUDEOILM'));
         var oiData=INSTRUMENT_SCORE_MAP['CRUDEOILM']&&INSTRUMENT_SCORE_MAP['CRUDEOILM'].oiData;
         if (oiData&&oiData.tableData&&oiData.tableData.length) {
             var pc=0; try{pc=parseFloat(generateTrend('CRUDEOILM').change)||0;}catch(e5){}
             try{_cmdRenderOI(oiData,'#cmd-crude-oi','#cmd-crude-obv');}catch(e6){}
             jQ('#cmd-crude-oi-table').html(_gtbOITableHtml(oiData,pc));
+            // Max Pain & GEX
+            try {
+                var _mpd = _gtbComputeMaxPainGEX('CRUDEOILM');
+                if (_mpd) {
+                    var _mdc = _mpd.maxPainDist > 0 ? 'var(--gtb-green)' : _mpd.maxPainDist < 0 ? 'var(--gtb-red)' : 'var(--gtb-muted)';
+                    var _mgc = _mpd.netGEX > 0 ? 'var(--gtb-green)' : _mpd.netGEX < 0 ? 'var(--gtb-red)' : 'var(--gtb-muted)';
+                    var _moc = _gtbMaxPainOutcome(_mpd);
+                    var _mfHtml = _mpd.flipZones.length
+                        ? _mpd.flipZones.map(function(f){return '<span class="mp-flip-pill">'+f+'</span>';}).join('')
+                        : '<span style="color:var(--gtb-muted);">—</span>';
+                    var _mSummary = '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px 8px;font-size:0.48rem;margin-bottom:6px;padding:6px;background:var(--gtb-surface);border:1px solid var(--gtb-border);">'
+                        + '<div><span style="color:var(--gtb-muted);font-size:0.4rem;">SPOT</span><br><b style="font-family:var(--gtb-mono);">'+_mpd.spot+'</b></div>'
+                        + '<div><span style="color:var(--gtb-muted);font-size:0.4rem;">MAX PAIN</span><br><b style="color:#ffbe0b;font-family:var(--gtb-mono);">'+_mpd.maxPainK+'</b></div>'
+                        + '<div><span style="color:var(--gtb-muted);font-size:0.4rem;">DISTANCE</span><br><b style="color:'+_mdc+';font-family:var(--gtb-mono);">'+((_mpd.maxPainDist>0?'+':'')+_mpd.maxPainDist.toFixed(0)+' ('+((_mpd.maxPainPct>0?'+':'')+_mpd.maxPainPct.toFixed(1))+'%)')+'</b></div>'
+                        + '<div><span style="color:var(--gtb-muted);font-size:0.4rem;">NET GEX</span><br><b style="color:'+_mgc+';font-family:var(--gtb-mono);">'+(_mpd.netGEX>0?'+':'')+_mpd.netGEX.toFixed(0)+'</b> <span style="color:'+_mgc+';">'+(_mpd.netGEX>0?'Stabilising':'Trending')+'</span></div>'
+                        + '<div><span style="color:var(--gtb-muted);font-size:0.4rem;">FLIP ZONES</span><br>'+_mfHtml+'</div>'
+                        + '<div style="grid-column:1/-1;"><span style="color:var(--gtb-muted);font-size:0.4rem;">OUTCOME</span><br><b style="color:'+_moc.color+';">'+_moc.label+'</b><div style="font-size:0.42rem;color:var(--gtb-muted);margin-top:3px;line-height:1.4;">'+_moc.reason+'</div></div>'
+                        + '</div>'
+                        + _gtbMaxPainGEXHtml('CRUDEOILM', false);
+                    jQ('#cmd-crude-mpgex').html(_mSummary);
+                } else {
+                    jQ('#cmd-crude-mpgex').html('<div class="cmd-load" style="color:var(--gtb-muted);">No OI data for Max Pain.</div>');
+                }
+            } catch(e7) { jQ('#cmd-crude-mpgex').html('<div class="cmd-load" style="color:var(--gtb-red);">Max Pain error.</div>'); }
         } else {
             jQ('#cmd-crude-oi-table').html('<div class="cmd-load" style="color:var(--gtb-red);">CRUDEOILM OI unavailable.</div>');
+            jQ('#cmd-crude-mpgex').html('<div class="cmd-load" style="color:var(--gtb-muted);">OI unavailable — Max Pain requires OI data.</div>');
         }
         // CRUDEOILM Futures Remark Accuracy
         _cmdLoadCrudeAcc();
@@ -8134,10 +8892,22 @@ function renderRangeScoreboard() {
             + (HDFCBANK_OI_OBV_SCORE  || 0)
             + (ICICIBANK_OI_OBV_SCORE || 0);
 
+    var sMP = (NIFTY_50_MAX_PAIN_SCORE  || 0)
+            + (NIFTY_BANK_MAX_PAIN_SCORE|| 0)
+            + (RELIANCE_MAX_PAIN_SCORE  || 0)
+            + (HDFCBANK_MAX_PAIN_SCORE  || 0)
+            + (ICICIBANK_MAX_PAIN_SCORE || 0);
+
+    var sIV = (NIFTY_50_IV_SKEW_SCORE  || 0)
+            + (NIFTY_BANK_IV_SKEW_SCORE|| 0)
+            + (RELIANCE_IV_SKEW_SCORE  || 0)
+            + (HDFCBANK_IV_SKEW_SCORE  || 0)
+            + (ICICIBANK_IV_SKEW_SCORE || 0);
+
     var sCOMP = (NIFTY_50_COMPONENT_SCORE  || 0)
               + (NIFTY_BANK_COMPONENT_SCORE || 0);
 
-    var total = parseFloat((s915 + sAD + sFT + sOI + sCOMP).toFixed(2));
+    var total = parseFloat((s915 + sAD + sFT + sOI + sMP + sIV + sCOMP).toFixed(2));
 
     // Verdict
     var verdict, vColor, vIcon, vBg;
@@ -8699,6 +9469,7 @@ function showOIOBVBarChart(name, suffix, _oiDataOverride) {
     // Cache per-instrument so maximize can re-render without re-fetching
     if (!INSTRUMENT_SCORE_MAP[name]) INSTRUMENT_SCORE_MAP[name] = {};
     INSTRUMENT_SCORE_MAP[name].oiData = oiData;
+    _gtbComputeOIExtras(name, oiData);
 
 
     let pcrHtml = ''
@@ -10779,6 +11550,16 @@ function _gtbShowTradeChecklist() {
         (RELIANCE_OI_OBV_SCORE || 0) +
         (HDFCBANK_OI_OBV_SCORE || 0) +
         (ICICIBANK_OI_OBV_SCORE || 0) +
+        (NIFTY_50_MAX_PAIN_SCORE || 0) +
+        (NIFTY_BANK_MAX_PAIN_SCORE || 0) +
+        (RELIANCE_MAX_PAIN_SCORE || 0) +
+        (HDFCBANK_MAX_PAIN_SCORE || 0) +
+        (ICICIBANK_MAX_PAIN_SCORE || 0) +
+        (NIFTY_50_IV_SKEW_SCORE || 0) +
+        (NIFTY_BANK_IV_SKEW_SCORE || 0) +
+        (RELIANCE_IV_SKEW_SCORE || 0) +
+        (HDFCBANK_IV_SKEW_SCORE || 0) +
+        (ICICIBANK_IV_SKEW_SCORE || 0) +
         (NIFTY_50_COMPONENT_SCORE || 0) +
         (NIFTY_BANK_COMPONENT_SCORE || 0)
     ).toFixed(2));
@@ -10896,7 +11677,40 @@ function _gtbShowTradeChecklist() {
         oiOk
     );
 
+    var _mpN50  = NIFTY_50_MAX_PAIN_SCORE  || 0;
+    var _mpBNK  = NIFTY_BANK_MAX_PAIN_SCORE|| 0;
+    var _mpREL  = RELIANCE_MAX_PAIN_SCORE  || 0;
+    var _mpHDFC = HDFCBANK_MAX_PAIN_SCORE  || 0;
+    var _mpICICI= ICICIBANK_MAX_PAIN_SCORE || 0;
+    var _ivN50  = NIFTY_50_IV_SKEW_SCORE   || 0;
+    var _ivBNK  = NIFTY_BANK_IV_SKEW_SCORE || 0;
+    var _ivREL  = RELIANCE_IV_SKEW_SCORE   || 0;
+    var _ivHDFC = HDFCBANK_IV_SKEW_SCORE   || 0;
+    var _ivICICI= ICICIBANK_IV_SKEW_SCORE  || 0;
+    var _mpIVSum = _mpN50 + _mpBNK + _mpREL + _mpHDFC + _mpICICI + _ivN50 + _ivBNK + _ivREL + _ivHDFC + _ivICICI;
+    var _mpIVOk = _mpIVSum > 0 ? true : _mpIVSum < 0 ? false : null;
+    var _mpLabel = function(v) { return v > 0 ? '↑ Above' : v < 0 ? '↓ Below' : '≈ Pin'; };
+    var _ivLabel = function(v) { return v > 0 ? '↑ Call' : v < 0 ? '↓ Put' : '≈'; };
     h += _step(6,
+        '<div style="font-size:0.65rem;font-weight:700;">Max Pain + IV Skew</div>'
+        + '<div style="font-size:0.55rem;margin-top:2px;display:grid;grid-template-columns:repeat(5,1fr);gap:1px 6px;">'
+        + '<span style="color:var(--gtb-muted);grid-column:1/-1;font-size:0.45rem;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:1px;">Max Pain (spot vs max pain gravity)</span>'
+        + _row('N50',    (_mpN50  > 0 ? '+' : '') + _mpN50  + ' ' + _mpLabel(_mpN50),  _scoreColor(_mpN50))
+        + _row('BANK',   (_mpBNK  > 0 ? '+' : '') + _mpBNK  + ' ' + _mpLabel(_mpBNK),  _scoreColor(_mpBNK))
+        + _row('REL',    (_mpREL  > 0 ? '+' : '') + _mpREL  + ' ' + _mpLabel(_mpREL),  _scoreColor(_mpREL))
+        + _row('HDFC',   (_mpHDFC > 0 ? '+' : '') + _mpHDFC + ' ' + _mpLabel(_mpHDFC), _scoreColor(_mpHDFC))
+        + _row('ICICI',  (_mpICICI> 0 ? '+' : '') + _mpICICI+ ' ' + _mpLabel(_mpICICI),_scoreColor(_mpICICI))
+        + '<span style="color:var(--gtb-muted);grid-column:1/-1;font-size:0.45rem;text-transform:uppercase;letter-spacing:0.05em;margin-top:3px;margin-bottom:1px;">IV Skew (put vs call fear)</span>'
+        + _row('N50',    (_ivN50  > 0 ? '+' : '') + _ivN50  + ' ' + _ivLabel(_ivN50),  _scoreColor(_ivN50))
+        + _row('BANK',   (_ivBNK  > 0 ? '+' : '') + _ivBNK  + ' ' + _ivLabel(_ivBNK),  _scoreColor(_ivBNK))
+        + _row('REL',    (_ivREL  > 0 ? '+' : '') + _ivREL  + ' ' + _ivLabel(_ivREL),  _scoreColor(_ivREL))
+        + _row('HDFC',   (_ivHDFC > 0 ? '+' : '') + _ivHDFC + ' ' + _ivLabel(_ivHDFC), _scoreColor(_ivHDFC))
+        + _row('ICICI',  (_ivICICI> 0 ? '+' : '') + _ivICICI+ ' ' + _ivLabel(_ivICICI),_scoreColor(_ivICICI))
+        + '</div>',
+        _mpIVOk
+    );
+
+    h += _step(7,
         '<div style="font-size:0.65rem;font-weight:700;">Component Score</div>'
         + '<div style="font-size:0.62rem;margin-top:2px;display:grid;grid-template-columns:1fr 1fr;gap:1px 10px;">'
         + _row('NIFTY 50 Weighted', (NIFTY_50_COMPONENT_SCORE > 0 ? '+' : '') + NIFTY_50_COMPONENT_SCORE.toFixed(2), _scoreColor(NIFTY_50_COMPONENT_SCORE))
@@ -10905,11 +11719,11 @@ function _gtbShowTradeChecklist() {
         ((NIFTY_50_COMPONENT_SCORE + NIFTY_BANK_COMPONENT_SCORE) > 0 ? true : (NIFTY_50_COMPONENT_SCORE + NIFTY_BANK_COMPONENT_SCORE) < 0 ? false : null)
     );
 
-    h += _step(7,
+    h += _step(8,
         '<div style="font-size:0.65rem;font-weight:700;">Composite Score</div>'
         + '<div style="display:flex;align-items:center;gap:8px;margin-top:3px;">'
         + '<span style="font-size:1.1rem;font-weight:900;color:' + scCol + ';">' + (SCORE > 0 ? '+' : '') + SCORE + '</span>'
-        + '<span style="font-size:0.62rem;color:var(--gtb-muted);">out of ~40 max (green ≥ 8, yellow 5–7, orange 1–4, red &lt; 0)</span>'
+        + '<span style="font-size:0.62rem;color:var(--gtb-muted);">out of ~44 max (green ≥ 8, yellow 5–7, orange 1–4, red &lt; 0)</span>'
         + '</div>',
         scoreOk
     );
@@ -10933,6 +11747,8 @@ function _gtbShowTradeChecklist() {
     h += '<th style="text-align:center;padding:4px 4px;color:var(--gtb-muted);font-weight:600;border-bottom:1px solid var(--gtb-border);">Trend</th>';
     h += '<th style="text-align:center;padding:4px 4px;color:var(--gtb-muted);font-weight:600;border-bottom:1px solid var(--gtb-border);">Fut</th>';
     h += '<th style="text-align:center;padding:4px 4px;color:var(--gtb-muted);font-weight:600;border-bottom:1px solid var(--gtb-border);">OI/OBV</th>';
+    h += '<th style="text-align:center;padding:4px 4px;color:var(--gtb-muted);font-weight:600;border-bottom:1px solid var(--gtb-border);">MP</th>';
+    h += '<th style="text-align:center;padding:4px 4px;color:var(--gtb-muted);font-weight:600;border-bottom:1px solid var(--gtb-border);">IV</th>';
     h += '<th style="text-align:center;padding:4px 4px;color:var(--gtb-muted);font-weight:600;border-bottom:1px solid var(--gtb-border);">Total</th>';
     h += '<th style="text-align:left;padding:4px 6px;color:var(--gtb-muted);font-weight:600;border-bottom:1px solid var(--gtb-border);">Action</th>';
     h += '</tr></thead><tbody>';
@@ -10953,6 +11769,8 @@ function _gtbShowTradeChecklist() {
             h += '<td style="text-align:center;padding:4px;color:' + _scoreColor(sc.current_trend) + ';">' + (sc.current_trend > 0 ? '+' : '') + sc.current_trend + '</td>';
             h += '<td style="text-align:center;padding:4px;color:' + _scoreColor(sc.futures_trend) + ';">' + (sc.futures_trend > 0 ? '+' : '') + sc.futures_trend + '</td>';
             h += '<td style="text-align:center;padding:4px;color:' + _scoreColor(sc.oi_obv) + ';">' + (sc.oi_obv > 0 ? '+' : '') + sc.oi_obv + '</td>';
+            h += '<td style="text-align:center;padding:4px;color:' + _scoreColor(sc.max_pain||0) + ';">' + ((sc.max_pain||0) > 0 ? '+' : '') + (sc.max_pain||0) + '</td>';
+            h += '<td style="text-align:center;padding:4px;color:' + _scoreColor(sc.iv_skew||0) + ';">' + ((sc.iv_skew||0) > 0 ? '+' : '') + (sc.iv_skew||0) + '</td>';
             h += '<td style="text-align:center;padding:4px;font-weight:800;color:' + totCol + ';">' + (tot > 0 ? '+' : '') + tot + '</td>';
             h += '<td style="padding:4px 6px;font-size:0.6rem;font-weight:700;color:' + action.col + ';">' + action.txt + '</td>';
             h += '</tr>';
