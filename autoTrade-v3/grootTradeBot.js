@@ -1257,7 +1257,8 @@ function commonMarkupPlaceHolder() {
     h += '<div id="gtb-right">';
     h += '<div id="gtb-tab-strip">'
         // ── Tabs ─────────────────────────────────────────────────────────────
-        + '<button class="gtb-tab active" data-tab="main"><i class="bi bi-grid"></i> Overview</button>'
+        + '<button class="gtb-tab active" data-tab="metrics"><i class="bi bi-speedometer2"></i> Metrics</button>'
+        + '<button class="gtb-tab" data-tab="main"><i class="bi bi-grid"></i> Overview</button>'
         + '<button class="gtb-tab" data-tab="signals"><i class="bi bi-layers-fill"></i> Signals</button>'
         + '<button class="gtb-tab" data-tab="mpgex"><i class="bi bi-bar-chart-steps"></i> Max Pain</button>'
         + '<button class="gtb-tab" data-tab="analysis"><i class="bi bi-bar-chart-line-fill"></i> Analysis</button>'
@@ -1283,7 +1284,8 @@ function commonMarkupPlaceHolder() {
         + '<a id="gtb-settings-toggle"       class="gtb-ctrl-link" title="Settings"><i class="bi bi-gear-fill"></i></a>'
         + '<a id="data-load"                 class="gtb-ctrl-link" title="Data Settings"><i class="bi bi-sliders"></i></a>'
         + '</div>';
-    h += '<div id="gtb-pane-main" class="gtb-tab-pane">';
+    h += '<div id="gtb-pane-metrics" class="gtb-tab-pane" style="display:none;overflow-y:auto;padding:0;"></div>';
+    h += '<div id="gtb-pane-main"  class="gtb-tab-pane" style="display:none;">';
 
     // Populate the module-level _allInstruments with custom instruments before rendering
     _allInstruments = [
@@ -1749,6 +1751,9 @@ function _gtbInitTabs() {
         _gtbActivateTab(jQ(this).data('tab'));
     });
 
+    // Render default tab (Metrics) on init
+    try { _gtbRenderMetricsPane(); } catch(e) {}
+
 
     // Drawer close
     jQ(document).off('click.gtb-drawer-close').on('click.gtb-drawer-close', '#gtb-analyze-drawer-close', function() {
@@ -1768,20 +1773,16 @@ function _gtbInitTabs() {
 }
 
 function _gtbActivateTab(tabId) {
-    // Show selected pane, hide rest
     jQ('.gtb-tab-pane').each(function() {
-        var id = jQ(this).attr('id');
-        var isMain = id === 'gtb-pane-main';
-        var isTarget = id === 'gtb-pane-' + tabId;
-        jQ(this).toggle(tabId === 'main' ? isMain : isTarget);
+        jQ(this).toggle(jQ(this).attr('id') === 'gtb-pane-' + tabId);
     });
     jQ('#gtb-tab-strip .gtb-tab').removeClass('active');
     jQ('#gtb-tab-strip [data-tab="' + tabId + '"]').addClass('active');
-    // Render content on every switch (fresh data)
     if (tabId !== 'main') _gtbRenderPane(tabId);
 }
 
 var _GTB_PANE_GRIDS = {
+    metrics:  function() { return ''; },
     signals:  function() { return _gtbSignalsPaneHtml(); },
     mpgex:    function() { return _gtbMpGexPaneHtml(); },
     // Analysis tab: full bloomberg dashboard rendered by _btRenderInPane
@@ -1795,6 +1796,7 @@ var _GTB_PANE_GRIDS = {
 };
 
 var _GTB_PANE_RENDERS = {
+    metrics:  [function(){try{_gtbRenderMetricsPane();}catch(e){}}],
     signals:  [function(){try{_gtbRenderSignalsPane();}catch(e){}}],
     mpgex:    [function(){try{_gtbRenderMpGexPane();}catch(e){}}],
     analysis: [function(){try{_btRenderInPane('#gtb-pane-analysis');}catch(e){}}],
@@ -6297,6 +6299,7 @@ function setScore() {
     RELIANCE_IV_SKEW_SCORE    = _gtbIVSkewScore('RELIANCE');
     HDFCBANK_IV_SKEW_SCORE    = _gtbIVSkewScore('HDFCBANK');
     ICICIBANK_IV_SKEW_SCORE   = _gtbIVSkewScore('ICICIBANK');
+    try { if (jQ('#gtb-pane-metrics').is(':visible')) _gtbRenderMetricsPane(); } catch(e) {}
 
     var _includeLagging = localStorage.getItem('GTB_INCLUDE_LAGGING') !== '0';
 
@@ -13333,6 +13336,253 @@ function _gtbBuildChecklistHtml() {
 }
 
 // Renders the checklist inline into #gtb-pane-checklist.
+// ── Metrics tab ───────────────────────────────────────────────────────────────
+function _gtbRenderMetricsPane() {
+    var $pane = jQ('#gtb-pane-metrics');
+    if (!$pane.length) return;
+
+    var _includeLagging = localStorage.getItem('GTB_INCLUDE_LAGGING') !== '0';
+
+    // Score vars
+    var b9 = {};
+    try { b9 = JSON.parse(localStorage.getItem('VALID_BREAKOUT_NINE_FIFTEEN') || '{}'); } catch(e) {}
+
+    var SCORE = ALL_9_15_CLOSE_SCORE + NIFTY_50_9_15_CLOSE_SCORE + NIFTY_BANK_9_15_CLOSE_SCORE +
+        GIFT_NIFTY_9_15_CLOSE_SCORE + SENSEX_9_15_CLOSE_SCORE + RELIANCE_9_15_CLOSE_SCORE + HDFCBANK_9_15_CLOSE_SCORE +
+        ALL_ADVANCE_DECLINE_SCORE + NIFTY_50_ADVANCE_DECLINE_SCORE + NIFTY_BANK_ADVANCE_DECLINE_SCORE +
+        ALL_FUTURES_TREND_SCORE + NIFTY_50_FUTURES_TREND_SCORE + NIFTY_BANK_FUTURES_TREND_SCORE +
+        (_includeLagging ? (NIFTY_50_OI_OBV_SCORE + NIFTY_BANK_OI_OBV_SCORE + RELIANCE_OI_OBV_SCORE + HDFCBANK_OI_OBV_SCORE + ICICIBANK_OI_OBV_SCORE +
+            NIFTY_50_MAX_PAIN_SCORE + NIFTY_BANK_MAX_PAIN_SCORE + RELIANCE_MAX_PAIN_SCORE + HDFCBANK_MAX_PAIN_SCORE + ICICIBANK_MAX_PAIN_SCORE +
+            NIFTY_50_IV_SKEW_SCORE + NIFTY_BANK_IV_SKEW_SCORE + RELIANCE_IV_SKEW_SCORE + HDFCBANK_IV_SKEW_SCORE + ICICIBANK_IV_SKEW_SCORE +
+            NIFTY_50_COMPONENT_SCORE + NIFTY_BANK_COMPONENT_SCORE) : 0);
+
+    var ms = null;
+    try { ms = getMarketSignal(parseFloat(SCORE.toFixed(2)), b9); } catch(e) {}
+
+    var _s = function(v) { return (v > 0 ? '+' : '') + parseFloat(v).toFixed(2); };
+    var _col = function(v) { return v > 0 ? 'var(--gtb-green)' : v < 0 ? 'var(--gtb-red)' : 'var(--gtb-muted)'; };
+    var _bar = function(v, max) {
+        max = max || 2;
+        var pct = Math.min(Math.abs(v / max) * 100, 100);
+        var col = v > 0 ? 'var(--gtb-green)' : v < 0 ? 'var(--gtb-red)' : 'var(--gtb-border)';
+        var left = v >= 0 ? '50%' : (50 - pct/2) + '%';
+        var width = pct/2 + '%';
+        return '<div style="position:relative;height:4px;background:var(--gtb-border);margin-top:2px;">'
+            + '<div style="position:absolute;top:0;left:' + left + ';width:' + width + ';height:100%;background:' + col + ';"></div>'
+            + '<div style="position:absolute;top:0;left:50%;width:1px;height:100%;background:var(--gtb-muted);opacity:0.4;"></div>'
+            + '</div>';
+    };
+
+    var _row = function(label, val, max, note) {
+        var c = _col(val);
+        return '<div style="display:grid;grid-template-columns:1fr auto;align-items:center;gap:4px;padding:4px 0;border-bottom:1px solid var(--gtb-border)18;">'
+            + '<div>'
+            +   '<div style="font-size:0.48rem;color:var(--gtb-muted);">' + label + (note ? ' <span style="color:var(--gtb-accent);font-size:0.42rem;">' + note + '</span>' : '') + '</div>'
+            +   _bar(val, max)
+            + '</div>'
+            + '<div style="font-size:0.56rem;font-weight:800;font-family:var(--gtb-mono);color:' + c + ';text-align:right;min-width:36px;">' + _s(val) + '</div>'
+            + '</div>';
+    };
+
+    var _section = function(title, icon, badge, content) {
+        var bc = badge > 0 ? 'var(--gtb-green)' : badge < 0 ? 'var(--gtb-red)' : 'var(--gtb-muted)';
+        return '<div style="background:var(--gtb-surface);margin:6px;padding:8px 10px;">'
+            + '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--gtb-border);">'
+            +   '<i class="bi ' + icon + '" style="color:var(--gtb-accent);font-size:0.6rem;"></i>'
+            +   '<span style="font-size:0.52rem;font-weight:800;color:var(--gtb-text);">' + title + '</span>'
+            +   '<span style="margin-left:auto;font-size:0.6rem;font-weight:900;font-family:var(--gtb-mono);color:' + bc + ';">' + _s(badge) + '</span>'
+            + '</div>'
+            + content
+            + '</div>';
+    };
+
+    // Leading score
+    var leadingScore = ALL_9_15_CLOSE_SCORE + NIFTY_50_9_15_CLOSE_SCORE + NIFTY_BANK_9_15_CLOSE_SCORE +
+        GIFT_NIFTY_9_15_CLOSE_SCORE + SENSEX_9_15_CLOSE_SCORE + RELIANCE_9_15_CLOSE_SCORE + HDFCBANK_9_15_CLOSE_SCORE +
+        ALL_ADVANCE_DECLINE_SCORE + NIFTY_50_ADVANCE_DECLINE_SCORE + NIFTY_BANK_ADVANCE_DECLINE_SCORE +
+        ALL_FUTURES_TREND_SCORE + NIFTY_50_FUTURES_TREND_SCORE + NIFTY_BANK_FUTURES_TREND_SCORE;
+
+    var laggingScore = NIFTY_50_OI_OBV_SCORE + NIFTY_BANK_OI_OBV_SCORE + RELIANCE_OI_OBV_SCORE + HDFCBANK_OI_OBV_SCORE + ICICIBANK_OI_OBV_SCORE +
+        NIFTY_50_MAX_PAIN_SCORE + NIFTY_BANK_MAX_PAIN_SCORE + RELIANCE_MAX_PAIN_SCORE + HDFCBANK_MAX_PAIN_SCORE + ICICIBANK_MAX_PAIN_SCORE +
+        NIFTY_50_IV_SKEW_SCORE + NIFTY_BANK_IV_SKEW_SCORE + RELIANCE_IV_SKEW_SCORE + HDFCBANK_IV_SKEW_SCORE + ICICIBANK_IV_SKEW_SCORE +
+        NIFTY_50_COMPONENT_SCORE + NIFTY_BANK_COMPONENT_SCORE;
+
+    var sigCol = ms ? (ms.color === 'sv-badge-green' ? 'var(--gtb-green)' : ms.color === 'sv-badge-red' ? 'var(--gtb-red)' : 'var(--gtb-amber)') : 'var(--gtb-muted)';
+
+    // VIX value and regime
+    var _vixVal = 0;
+    try { _vixVal = parseFloat((JSON.parse(localStorage.getItem('INSTRUMENT_LTP_PRICE') || '{}')['INDIA VIX'] || {}).ltp) || 0; } catch(e) {}
+    var _vixLabel = '', _vixCol = 'var(--gtb-muted)';
+    if (_vixVal) {
+        if (_vixVal < 13)      { _vixLabel = 'LOW';      _vixCol = 'var(--gtb-green)'; }
+        else if (_vixVal < 18) { _vixLabel = 'NORMAL';   _vixCol = 'var(--gtb-accent)'; }
+        else if (_vixVal < 25) { _vixLabel = 'ELEVATED'; _vixCol = 'var(--gtb-amber)'; }
+        else                   { _vixLabel = 'HIGH';     _vixCol = 'var(--gtb-red)'; }
+    }
+
+    var h = '<div style="display:flex;flex-direction:column;height:100%;overflow:hidden;">';
+
+    // Header
+    h += '<div style="display:flex;align-items:center;gap:8px;padding:6px 12px;border-bottom:1px solid var(--gtb-border);background:var(--gtb-surface);flex-shrink:0;">'
+        + '<i class="bi bi-speedometer2" style="color:var(--gtb-accent);"></i>'
+        + '<span style="font-size:0.55rem;font-weight:800;color:var(--gtb-muted);text-transform:uppercase;letter-spacing:0.08em;">METRICS DASHBOARD</span>'
+        + (_vixVal ? '<span style="font-size:0.46rem;color:var(--gtb-muted);padding:1px 6px;border:1px solid ' + _vixCol + ';color:' + _vixCol + ';background:' + _vixCol + '18;"><i class="bi bi-activity"></i> VIX ' + _vixVal.toFixed(2) + ' · ' + _vixLabel + '</span>' : '')
+        + '<div style="margin-left:auto;display:flex;align-items:center;gap:8px;">'
+        +   '<span style="font-size:0.52rem;font-weight:900;color:' + sigCol + ';padding:2px 8px;border:1px solid ' + sigCol + ';background:' + sigCol + '18;">' + (ms ? ms.signal : '—') + '</span>'
+        +   '<span style="font-size:0.48rem;color:var(--gtb-muted);">Score <b style="color:' + _col(SCORE) + ';">' + _s(SCORE) + '</b></span>'
+        +   '<button id="gtb-metrics-refresh" style="background:transparent;border:1px solid var(--gtb-border);color:var(--gtb-muted);padding:2px 8px;font-size:0.46rem;cursor:pointer;"><i class="bi bi-arrow-clockwise"></i> Refresh</button>'
+        + '</div>'
+        + '</div>';
+
+    h += '<div style="flex:1;overflow-y:auto;display:flex;flex-wrap:wrap;align-content:flex-start;gap:0;">';
+
+    // ── Leading / Lagging summary bar ─────────────────────────────────────────
+    h += '<div style="width:100%;margin:6px;padding:8px 10px;background:var(--gtb-surface);display:flex;gap:12px;align-items:center;">'
+        + '<div style="flex:1;">'
+        +   '<div style="font-size:0.44rem;color:var(--gtb-muted);margin-bottom:2px;">⚡ LEADING (9:15 + A/D + Futures)</div>'
+        +   '<div style="font-size:0.72rem;font-weight:900;font-family:var(--gtb-mono);color:' + _col(leadingScore) + ';">' + _s(leadingScore) + '</div>'
+        + '</div>'
+        + '<div style="width:1px;background:var(--gtb-border);align-self:stretch;"></div>'
+        + '<div style="flex:1;">'
+        +   '<div style="font-size:0.44rem;color:var(--gtb-muted);margin-bottom:2px;">🐢 LAGGING (OI/OBV + MP + IV + Components)</div>'
+        +   '<div style="font-size:0.72rem;font-weight:900;font-family:var(--gtb-mono);color:' + _col(laggingScore) + ';">' + (_includeLagging ? _s(laggingScore) : '<span style="color:var(--gtb-muted);font-size:0.5rem;">excluded</span>') + '</div>'
+        + '</div>'
+        + '<div style="width:1px;background:var(--gtb-border);align-self:stretch;"></div>'
+        + '<div style="flex:1;">'
+        +   '<div style="font-size:0.44rem;color:var(--gtb-muted);margin-bottom:2px;">∑ COMPOSITE</div>'
+        +   '<div style="font-size:0.72rem;font-weight:900;font-family:var(--gtb-mono);color:' + _col(SCORE) + ';">' + _s(SCORE) + '</div>'
+        + '</div>'
+        + '</div>';
+
+    // 2-column layout for sections
+    h += '<div style="width:100%;display:grid;grid-template-columns:1fr 1fr;gap:0;">';
+
+    // ── 9:15 Opening Candle ───────────────────────────────────────────────────
+    var n915Score = ALL_9_15_CLOSE_SCORE + NIFTY_50_9_15_CLOSE_SCORE + NIFTY_BANK_9_15_CLOSE_SCORE +
+        GIFT_NIFTY_9_15_CLOSE_SCORE + SENSEX_9_15_CLOSE_SCORE + RELIANCE_9_15_CLOSE_SCORE + HDFCBANK_9_15_CLOSE_SCORE;
+    h += _section('9:15 OPENING CANDLE', 'bi-alarm', n915Score,
+        _row('All F&O (weighted ratio)', ALL_9_15_CLOSE_SCORE, 1)
+        + _row('NIFTY 50', NIFTY_50_9_15_CLOSE_SCORE, 2)
+        + _row('NIFTY BANK', NIFTY_BANK_9_15_CLOSE_SCORE, 2)
+        + _row('GIFT NIFTY', GIFT_NIFTY_9_15_CLOSE_SCORE, 2)
+        + _row('SENSEX', SENSEX_9_15_CLOSE_SCORE, 2)
+        + _row('RELIANCE', RELIANCE_9_15_CLOSE_SCORE, 2)
+        + _row('HDFCBANK', HDFCBANK_9_15_CLOSE_SCORE, 2)
+    );
+
+    // ── Advance / Decline ─────────────────────────────────────────────────────
+    var adScore = ALL_ADVANCE_DECLINE_SCORE + NIFTY_50_ADVANCE_DECLINE_SCORE + NIFTY_BANK_ADVANCE_DECLINE_SCORE;
+    h += _section('ADVANCE / DECLINE', 'bi-graph-up-arrow', adScore,
+        _row('All F&O', ALL_ADVANCE_DECLINE_SCORE, 1)
+        + _row('NIFTY 50', NIFTY_50_ADVANCE_DECLINE_SCORE, 1)
+        + _row('NIFTY BANK', NIFTY_BANK_ADVANCE_DECLINE_SCORE, 1)
+    );
+
+    // ── Futures Trend ─────────────────────────────────────────────────────────
+    var futScore = ALL_FUTURES_TREND_SCORE + NIFTY_50_FUTURES_TREND_SCORE + NIFTY_BANK_FUTURES_TREND_SCORE;
+    h += _section('FUTURES TREND', 'bi-flag-fill', futScore,
+        _row('All F&O', ALL_FUTURES_TREND_SCORE, 1)
+        + _row('NIFTY 50', NIFTY_50_FUTURES_TREND_SCORE, 1)
+        + _row('NIFTY BANK', NIFTY_BANK_FUTURES_TREND_SCORE, 1)
+    );
+
+    // ── LTP Zone (current_trend) ──────────────────────────────────────────────
+    var _zoneLabel = function(v) {
+        if (v >= 2)  return 'AST';
+        if (v >= 1)  return 'ASO';
+        if (v > 0)   return 'Above';
+        if (v === 0) return 'Neutral';
+        if (v >= -1) return 'BSO';
+        if (v >= -2) return 'BST';
+        return 'Below';
+    };
+    var _zoneRow = function(name) {
+        var sc2 = null; try { sc2 = computeInstrumentScore(name); } catch(e2) {}
+        if (!sc2) return '<div style="font-size:0.46rem;color:var(--gtb-muted);padding:3px 0;">' + name + ' —</div>';
+        var v = sc2.current_trend || 0;
+        var c = _col(v);
+        return '<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid var(--gtb-border)18;font-size:0.46rem;">'
+            + '<span style="color:var(--gtb-muted);">' + name + '</span>'
+            + '<span style="font-weight:700;font-family:var(--gtb-mono);color:' + c + ';">' + _zoneLabel(v) + ' (' + (v > 0 ? '+' : '') + v + ')</span>'
+            + '</div>';
+    };
+    h += _section('LTP ZONE', 'bi-geo-alt-fill', 0,
+        _zoneRow('NIFTY 50')
+        + _zoneRow('NIFTY BANK')
+        + _zoneRow('SENSEX')
+        + _zoneRow('GIFT NIFTY')
+        + _zoneRow('RELIANCE')
+        + _zoneRow('HDFCBANK')
+        + _zoneRow('ICICIBANK')
+    );
+
+    // ── OI / OBV ──────────────────────────────────────────────────────────────
+    var oiScore = NIFTY_50_OI_OBV_SCORE + NIFTY_BANK_OI_OBV_SCORE + RELIANCE_OI_OBV_SCORE + HDFCBANK_OI_OBV_SCORE + ICICIBANK_OI_OBV_SCORE;
+    h += _section('OI / OBV', 'bi-layers-fill', oiScore,
+        _row('NIFTY 50', NIFTY_50_OI_OBV_SCORE, 3)
+        + _row('NIFTY BANK', NIFTY_BANK_OI_OBV_SCORE, 3)
+        + _row('RELIANCE', RELIANCE_OI_OBV_SCORE, 3)
+        + _row('HDFCBANK', HDFCBANK_OI_OBV_SCORE, 3)
+        + _row('ICICIBANK', ICICIBANK_OI_OBV_SCORE, 3)
+    );
+
+    // ── Max Pain ──────────────────────────────────────────────────────────────
+    var mpScore = NIFTY_50_MAX_PAIN_SCORE + NIFTY_BANK_MAX_PAIN_SCORE + RELIANCE_MAX_PAIN_SCORE + HDFCBANK_MAX_PAIN_SCORE + ICICIBANK_MAX_PAIN_SCORE;
+    h += _section('MAX PAIN', 'bi-bullseye', mpScore,
+        _row('NIFTY 50', NIFTY_50_MAX_PAIN_SCORE, 1)
+        + _row('NIFTY BANK', NIFTY_BANK_MAX_PAIN_SCORE, 1)
+        + _row('RELIANCE', RELIANCE_MAX_PAIN_SCORE, 1)
+        + _row('HDFCBANK', HDFCBANK_MAX_PAIN_SCORE, 1)
+        + _row('ICICIBANK', ICICIBANK_MAX_PAIN_SCORE, 1)
+    );
+
+    // ── IV Skew ───────────────────────────────────────────────────────────────
+    var ivScore = NIFTY_50_IV_SKEW_SCORE + NIFTY_BANK_IV_SKEW_SCORE + RELIANCE_IV_SKEW_SCORE + HDFCBANK_IV_SKEW_SCORE + ICICIBANK_IV_SKEW_SCORE;
+    h += _section('IV SKEW', 'bi-distribute-vertical', ivScore,
+        _row('NIFTY 50', NIFTY_50_IV_SKEW_SCORE, 1)
+        + _row('NIFTY BANK', NIFTY_BANK_IV_SKEW_SCORE, 1)
+        + _row('RELIANCE', RELIANCE_IV_SKEW_SCORE, 1)
+        + _row('HDFCBANK', HDFCBANK_IV_SKEW_SCORE, 1)
+        + _row('ICICIBANK', ICICIBANK_IV_SKEW_SCORE, 1)
+    );
+
+    // ── Component Scores (full width) ─────────────────────────────────────────
+    h += '</div>';
+    var compScore = NIFTY_50_COMPONENT_SCORE + NIFTY_BANK_COMPONENT_SCORE;
+    h += _section('COMPONENT SCORES', 'bi-diagram-3-fill', compScore,
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">'
+        + '<div>' + _row('NIFTY 50 (weighted top-10)', NIFTY_50_COMPONENT_SCORE, 5) + '</div>'
+        + '<div>' + _row('NIFTY BANK (weighted top-10)', NIFTY_BANK_COMPONENT_SCORE, 5) + '</div>'
+        + '</div>'
+    );
+
+    // ── AVWAP for key instruments ─────────────────────────────────────────────
+    var _avwapRows = ['NIFTY 50', 'NIFTY BANK', 'CRUDEOILM', 'USDINR'].map(function(nm) {
+        var sm = INSTRUMENT_SCORE_MAP[nm] || {};
+        var avwap = sm.avwap || 0;
+        var ltp = 0;
+        try { ltp = parseFloat((JSON.parse(localStorage.getItem('INSTRUMENT_LTP_PRICE') || '{}')[nm] || {}).ltp) || 0; } catch(e) {}
+        if (!avwap || !ltp) return '<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--gtb-border)18;font-size:0.46rem;"><span style="color:var(--gtb-muted);">' + nm + '</span><span style="color:var(--gtb-muted);">—</span></div>';
+        var above = ltp > avwap;
+        var col = above ? 'var(--gtb-green)' : 'var(--gtb-red)';
+        return '<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid var(--gtb-border)18;font-size:0.46rem;">'
+            + '<span style="color:var(--gtb-muted);">' + nm + '</span>'
+            + '<span style="color:' + col + ';font-weight:700;font-family:var(--gtb-mono);">' + (above ? '▲' : '▼') + ' ' + avwap.toFixed(1) + '</span>'
+            + '</div>';
+    }).join('');
+    h += _section('AVWAP (9:15 FUTURES ANCHOR)', 'bi-bar-chart-line-fill', 0, _avwapRows);
+
+    h += '</div></div>';
+
+    $pane.html('<div style="display:flex;flex-direction:column;height:100%;overflow:hidden;">'
+        + h
+        + '</div>');
+}
+
+jQ(document).on('click', '#gtb-metrics-refresh', function() {
+    _gtbRenderMetricsPane();
+});
+
 function _gtbRenderChecklistPane() {
     var $pane = jQ('#gtb-pane-checklist');
     if (!$pane.length) return;
