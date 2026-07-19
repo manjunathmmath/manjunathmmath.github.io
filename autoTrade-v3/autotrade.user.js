@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Groot Bot
 // @namespace    Groot Bot
-// @version      25.63
+// @version      26.14
 // @description  Groot Bot
 // @author       Manjunath
 // @match        https://kite.zerodha.com/*

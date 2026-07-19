@@ -85,6 +85,7 @@
 #gtb-info-pop {
   display: none; position: fixed; z-index: 100000;
   width: 280px; max-width: 90vw;
+  max-height: 80vh; overflow-y: auto;
   background: var(--gtb-surface); color: var(--gtb-text);
   border: 1px solid var(--gtb-border);
   box-shadow: 0 12px 40px rgba(0,0,0,0.55);
