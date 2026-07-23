@@ -7787,12 +7787,22 @@ var GTB_INFO = {
     'ms-compare': { icon:'bi-calendar-check', title:'Scan vs Next-Day Open',
         body:'Scores a saved Master Scanner run against what actually happened, so you get a real <b>hit rate</b> on the confluence verdict instead of guessing.<br><br>'
            + '<b>How to use:</b> after a scan (best around <b>2:50 PM</b>, when the carry verdict is most meaningful), click <b>Save Scan</b> — it stores each instrument\'s verdict plus its price at that moment. The <b>next session</b>, open <b>Compare</b>, pick that date, and hit Compare.<br><br>'
-           + '<b>Scoring:</b> gap % = (today\'s OPEN − price at scan) ÷ price at scan.<br>'
-           + '<b style="color:var(--gtb-green)">HIT</b> — a LONG verdict that gapped up, or a SHORT verdict that gapped down.<br>'
+           + '<b>Four comparison modes</b> (dropdown) — same saved snapshots, different horizons:<br>'
+           + '• <b>vs Next-day CLOSE</b> — full follow-through from scan to the next session\'s close. Best test for a <i>post-close</i> carry scan.<br>'
+           + '• <b>vs Next-day OPEN</b> — the overnight gap only; noisy (dominated by global cues), and gaps often reverse.<br>'
+           + '• <b>vs Next-day BEST</b> — scan price vs the next day\'s favourable extreme (HIGH for LONG, LOW for SHORT). This is <b>max favourable excursion</b>: did the call ever go green intraday, i.e. would a target have filled? "Went-Green" rate.<br>'
+           + '• <b>vs Scan-day CLOSE</b> — intraday follow-through within the <i>same</i> session. Fairest for the intraday engines, but only if you scanned <b>mid-session</b> — a post-close scan makes this ~all FLAT (auto-warned).<br><br>'
+           + '<b>Post-close scans:</b> the saved-time badge flags a scan taken after 15:30 IST; for those, the price at scan is ≈ that day\'s close, so use Next-day CLOSE, not Scan-day CLOSE.<br><br>'
+           + '<b>Scoring:</b> move % = (compare price − price at scan) ÷ price at scan.<br>'
+           + '<b style="color:var(--gtb-green)">HIT</b> — a LONG verdict that moved up, or a SHORT verdict that moved down.<br>'
            + '<b style="color:var(--gtb-red)">MISS</b> — it gapped the other way.<br>'
            + '<b>FLAT</b> — gap under ±0.15%, too small to call either way.<br>'
            + 'WAIT / NO EDGE rows are excluded from the hit rate — the scanner didn\'t make a call, so it can\'t be scored.<br><br>'
-           + 'The summary shows hit rate, how many directional calls were made, and the <b>average gap for LONG vs SHORT calls</b> — that split tells you whether one side of the score is carrying the edge. Hit rate is colour-coded: <b style="color:var(--gtb-green)">≥60%</b>, <b style="color:var(--gtb-amber)">45–60%</b>, <b style="color:var(--gtb-red)">below 45%</b>. The last 10 saved scans are kept; older ones are pruned automatically.' },
+           + '<b>Where prices come from:</b> the <b>daily historical API</b> — one day-candle per instrument for the compare date, so the open/close is accurate for exactly that session (unlike the loaded open store, which only holds one undated day). This means ~1 fetch per instrument, so a 200-name scan takes a bit to compare (rate-limited).<br><br>'
+           + '<b>Compare date:</b> defaults to the app\'s CURRENT_DAY; set it to the session you want to score against (must be <b>after</b> the saved scan date). Scan-day CLOSE mode ignores it and uses the saved day itself.<br><br>'
+           + '<b>vs NIFTY (relative / alpha):</b> tick this to score each call against NIFTY 50\'s move over the same window instead of against zero — a LONG is a HIT if it <b>out</b>performed the index, a SHORT if it <b>under</b>performed. This de-betas the test: in a broad up- or down-drift, absolute hit rates are dominated by market direction; alpha isolates whether the call had real relative edge (needs a NIFTY 50 row in the scan). Applies to both single compare and the aggregate.<br><br>'
+           + '<b>Aggregate All Days:</b> scores <i>every</i> saved scan against its own next trading session (in the selected mode) and rolls them into one hit rate — so you judge the system on many days, not one. It also breaks out <b>LONG vs SHORT</b> and <b>STRONG vs weak</b> call accuracy, and a <b>Fade (inverse)</b> number (= 100 − hit rate) to see if the verdict is a contrarian signal. Each instrument is fetched once over the whole range (~1 call per unique name).<br><br>'
+           + 'The single-scan summary shows hit rate, how many directional calls were made, and the <b>average move for LONG vs SHORT calls</b> — that split tells you whether one side of the score is carrying the edge. Hit rate is colour-coded: <b style="color:var(--gtb-green)">≥60%</b>, <b style="color:var(--gtb-amber)">45–60%</b>, <b style="color:var(--gtb-red)">below 45%</b>. The last 10 saved scans are kept; older ones are pruned automatically.' },
     // ── Liquidity / SL-Hunt Scanner ───────────────────────────────────────────────
     'lq-scan':    { icon:'bi-water', title:'Liquidity / Stop-Loss Hunt Scanner',
         body:'Detects <b>stop runs</b> (liquidity grabs): institutions push price THROUGH an obvious level to trigger clustered retail stops (free liquidity to fill against), then reclaim the level and reverse. All from Kite <b>1-min</b> candles for the current session.<br><br>'
@@ -16608,7 +16618,45 @@ function _ocFutToken(name) {
 }
 
 function _ocSpotToken(name) {
-    return (typeof INSTRUMENT_TOKENS !== 'undefined' && INSTRUMENT_TOKENS[name]) ? INSTRUMENT_TOKENS[name] : null;
+    if (typeof INSTRUMENT_TOKENS !== 'undefined' && INSTRUMENT_TOKENS[name]) return INSTRUMENT_TOKENS[name];
+    // MCX commodity (e.g. CRUDEOILM) has no cash spot — use its futures contract as underlying
+    if (typeof COMMODITIES_FUTURE_INSTRUMENT_LIST !== 'undefined') {
+        var f = COMMODITIES_FUTURE_INSTRUMENT_LIST.find(function(x){ return x.name === name; });
+        if (f) return f.instrument_token;
+    }
+    return null;
+}
+
+// MCX instruments trade on MCX dates, not NSE dates — pick the right day per instrument
+function _msIsMcx(name)     { return typeof _gtbIsMcxFuture === 'function' && _gtbIsMcxFuture(name); }
+function _msCurrDay(name)   { return _msIsMcx(name) ? _gtbMcxCurrDay()   : CURRENT_DAY; }
+function _msCurrDayTo(name) { return _msIsMcx(name) ? _gtbMcxCurrDayTo() : _gtbCurrDayTo(); }
+function _msPrevDay(name)   { return _msIsMcx(name) ? _gtbMcxPrevDay()   : _gtbPrevDay(); }
+// Strike-diff string for any instrument (NSE stocks/indices or MCX commodities)
+function _msStrikeDiff(name) {
+    if (typeof NSE_STRIKE_DIFF !== 'undefined' && NSE_STRIKE_DIFF[name]) return NSE_STRIKE_DIFF[name];
+    if (typeof MCX_FUTURE_STRIKE_DIFF !== 'undefined' && MCX_FUTURE_STRIKE_DIFF[name]) return MCX_FUTURE_STRIKE_DIFF[name];
+    return '100';
+}
+
+// IV Skew (PE OTM IV @ATM−2 minus CE OTM IV @ATM+2) rolled up from per-strike IVs.
+// The MCX OI function computes CE_IV/PE_IV per strike but doesn't roll them into a
+// top-level ivSkew like the NSE one does — so we derive it here for commodities.
+function _msIvSkewFromTable(oiData) {
+    try {
+        var td = oiData && oiData.tableData;
+        if (!td || !td.length) return null;
+        var atmIdx = -1;
+        for (var i = 0; i < td.length; i++) { if (td[i]['ATM_STRIKE']) { atmIdx = i; break; } }
+        if (atmIdx < 0) atmIdx = Math.floor(td.length / 2);
+        var peOTM = td[atmIdx - 2], ceOTM = td[atmIdx + 2];
+        if (peOTM && ceOTM) {
+            var pe = (peOTM['PE_IV'] && peOTM['PE_IV'].length) ? peOTM['PE_IV'][peOTM['PE_IV'].length - 1].iv : null;
+            var ce = (ceOTM['CE_IV'] && ceOTM['CE_IV'].length) ? ceOTM['CE_IV'][ceOTM['CE_IV'].length - 1].iv : null;
+            if (pe != null && ce != null) return parseFloat((pe - ce).toFixed(2));
+        }
+    } catch(e) {}
+    return null;
 }
 
 function _ocZoneFromCandles(candles, name) {
@@ -16622,7 +16670,7 @@ function _ocZoneFromCandles(candles, name) {
 
     var pct = ((close - open) / open) * 100;
 
-    var diff  = (typeof NSE_STRIKE_DIFF !== 'undefined' && NSE_STRIKE_DIFF[name]) ? NSE_STRIKE_DIFF[name] : '100';
+    var diff  = _msStrikeDiff(name);
     var parts = diff.split(',');
     var s1 = parseFloat(parts[0]) || 100;
     var s2 = parseFloat(parts[1]) || s1;
@@ -16669,11 +16717,12 @@ async function _ocAnalyzeStock(name, onProgress) {
     if (!spotToken) { if (onProgress) onProgress(name + ': no spot token'); return null; }
     if (!futInfo)   { if (onProgress) onProgress(name + ': no futures token'); return null; }
 
-    var fromDay = _gtbPrevDay(), toDay = CURRENT_DAY;
+    // MCX commodities (CRUDEOILM) use MCX trading dates, not NSE dates
+    var curDay = _msCurrDay(name), toDay = _msCurrDayTo(name), fromDay = _msPrevDay(name);
 
     // ── 1. Spot candles → zone score ─────────────────────────────────────────
     if (onProgress) onProgress('[1/3] Spot candles: ' + name);
-    var spotRaw = await getHistoricalDataUsingPromise(spotToken, CURRENT_DAY, toDay, '5minute').catch(function(){ return null; });
+    var spotRaw = await getHistoricalDataUsingPromise(spotToken, curDay, toDay, '5minute').catch(function(){ return null; });
     var spotCandles = spotRaw && spotRaw.data && spotRaw.data.candles ? spotRaw.data.candles : [];
     var zoneData = _ocZoneFromCandles(spotCandles, name);
 
@@ -16681,19 +16730,34 @@ async function _ocAnalyzeStock(name, onProgress) {
     if (onProgress) onProgress('[2/3] Futures candles: ' + name);
     var futRaw = await getHistoricalDataUsingPromise(futInfo.token, fromDay, toDay, '5minute').catch(function(){ return null; });
     var futAllCandles = futRaw && futRaw.data && futRaw.data.candles ? futRaw.data.candles : [];
-    var todayStr = CURRENT_DAY.substring(0, 10);
+    var todayStr = String(curDay).substring(0, 10);
     var todayFut = futAllCandles.filter(function(c) { return (c[0] || '').startsWith(todayStr); });
     var prevFut  = futAllCandles.filter(function(c) { return !(c[0] || '').startsWith(todayStr); });
     var futData  = _ocFuturesRemark(todayFut, prevFut, futInfo.lot);
 
-    // ── 3. OI/OBV + Max Pain + IV Skew via showTrendingOI (all Kite candles) ─
+    // ── 3. OI/OBV + Max Pain + IV Skew via option chain (all Kite candles) ───
+    //   MCX commodities (CRUDEOILM) → showTrendingOIMCX (scans MCX_OPTION_LIST);
+    //   NSE stocks/indices → showTrendingOI (scans OPTION_STRIKE_LIST). Both return
+    //   the same tableData shape, so the downstream scoring is identical.
     if (onProgress) onProgress('[3/3] OI/OBV + MaxPain + IVSkew: ' + name);
     var oiScore = 0, mpScore = 0, ivScore = 0, pcr = null;
     try {
         // Temporarily seed INSTRUMENT_SCORE_MAP so _gtbComputeOIExtras/MaxPain/IVSkew can write
         if (!INSTRUMENT_SCORE_MAP[name]) INSTRUMENT_SCORE_MAP[name] = {};
-        var oiData = await showTrendingOI(name, 2);
+        var oiData;
+        if (_msIsMcx(name) && typeof showTrendingOIMCX === 'function') {
+            // showTrendingOIMCX reads the global `stock[0]` for the ATM reference price
+            // (normally seeded by the commodities panel) — seed it from our spot candles.
+            var _mcxOpen = spotCandles.length ? parseFloat(spotCandles[0][1]) : zoneData.open;
+            var _mcxLtp  = spotCandles.length ? parseFloat(spotCandles[spotCandles.length - 1][4]) : zoneData.ltp;
+            stock = [{ TRADINGSYMBOL: name, LTP: _mcxLtp, OPEN: _mcxOpen }];
+            oiData = await showTrendingOIMCX(name, 2);
+        } else {
+            oiData = await showTrendingOI(name, 2);
+        }
         if (oiData && oiData.tableData) {
+            // MCX OI omits the top-level ivSkew rollup — derive it from per-strike IVs
+            if (oiData.ivSkew === undefined || oiData.ivSkew === null) oiData.ivSkew = _msIvSkewFromTable(oiData);
             oiScore = computeOIScoreFromData(oiData);
             INSTRUMENT_SCORE_MAP[name].oi_obv = oiScore;
             INSTRUMENT_SCORE_MAP[name].oiData  = oiData;
@@ -16912,8 +16976,9 @@ function _vpInstrumentList() {
     var add = function(n) { if (n) set[n] = 1; };
     ['NIFTY 50','NIFTY BANK','SENSEX','NIFTY FIN SERVICE','RELIANCE','HDFCBANK','ICICIBANK'].forEach(add);
     (typeof FO_LIST !== 'undefined' ? FO_LIST : []).forEach(add);
-    // Only keep names we actually have a spot token for
-    return Object.keys(set).filter(function(n) { return typeof INSTRUMENT_TOKENS !== 'undefined' && INSTRUMENT_TOKENS[n]; });
+    ['CRUDEOILM'].forEach(add);   // MCX commodity (underlying = its futures contract)
+    // Keep names we can resolve an underlying token for (NSE spot OR MCX futures)
+    return Object.keys(set).filter(function(n) { return _ocSpotToken(n); });
 }
 
 function _vpDateMinus(baseYmd, days) {
@@ -16933,6 +16998,11 @@ function _gtbFutTokenFor(name) {
     var list = (typeof FUTURE_INTRUMENT_LIST !== 'undefined') ? FUTURE_INTRUMENT_LIST : [];
     for (var i = 0; i < list.length; i++) {
         if (list[i].name === n) return { token: list[i].instrument_token, lot: parseInt(list[i].lot_size) || 1 };
+    }
+    // MCX commodity futures (CRUDEOILM etc.)
+    if (typeof COMMODITIES_FUTURE_INSTRUMENT_LIST !== 'undefined') {
+        var f = COMMODITIES_FUTURE_INSTRUMENT_LIST.find(function(x){ return x.name === name; });
+        if (f) return { token: f.instrument_token, lot: parseInt(f.lot_size) || 1 };
     }
     return null;
 }
@@ -17308,7 +17378,7 @@ function _lqBuildLevels(candles, name, profile, prevDayCandle) {
     }
 
     // 9:15 strike levels (BSO/BST/ASO/AST) — stops sit right under/over these
-    var diff = (typeof NSE_STRIKE_DIFF !== 'undefined' && NSE_STRIKE_DIFF[name]) ? NSE_STRIKE_DIFF[name] : null;
+    var diff = _msStrikeDiff(name);
     if (diff) {
         var parts = diff.split(','), s1 = parseFloat(parts[0]) || 0, s2 = parseFloat(parts[1]) || s1;
         if (s1) {
@@ -17429,11 +17499,20 @@ function _gtbShowLiquidityScanner() {
             var action = isBull ? 'LONG reversal' : 'SHORT reversal';
             var opt = isBull ? 'Buy CE (or long futures)' : 'Buy PE (or short futures)';
 
-            // Targets from the profile: reclaim toward POC, then value-area far edge
-            var t1, t2;
-            if (isBull) { t1 = profile ? (lastClose < profile.pocPrice ? profile.pocPrice : profile.vah) : null; t2 = profile ? profile.vah : null; }
-            else        { t1 = profile ? (lastClose > profile.pocPrice ? profile.pocPrice : profile.val) : null; t2 = profile ? profile.val : null; }
-            var sl = isBull ? active.close - active.pen - Math.abs(active.close * 0.0005) : active.close + active.pen;
+            // Targets: nearest, then next volume-profile level on the FAVOURABLE side of
+            // entry (above for a long, below for a short). Falls back to 2R/3R measured moves.
+            var _entry = active.close;
+            var _stopDist = Math.max(active.pen || 0, _entry * 0.001);
+            var sl = isBull ? _entry - _stopDist : _entry + _stopDist;
+            var t1 = null, t2 = null;
+            if (profile) {
+                var _c = [profile.pocPrice, profile.vah, profile.val]
+                    .filter(function(x){ return isFinite(x) && (isBull ? x > _entry : x < _entry); })
+                    .sort(function(a, b){ return isBull ? a - b : b - a; });   // nearest favourable first
+                t1 = _c[0]; t2 = _c[1];
+            }
+            if (t1 == null) t1 = isBull ? _entry + 2 * _stopDist : _entry - 2 * _stopDist;
+            if (t2 == null) t2 = isBull ? _entry + 3 * _stopDist : _entry - 3 * _stopDist;
 
             h += '<div style="background:' + bg + ';border:1px solid ' + col + ';border-radius:6px;padding:10px 12px;margin-bottom:10px;">'
                 + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
@@ -17592,13 +17671,16 @@ async function _uniAnalyze(name, onProgress) {
     var spotToken = _ocSpotToken(name);
     if (!spotToken) { if (onProgress) onProgress(name + ': no spot token'); return null; }
 
+    // MCX commodities (CRUDEOILM) use MCX trading dates, not NSE dates
+    var curDay = _msCurrDay(name), toDay = _msCurrDayTo(name), prevDay = _msPrevDay(name);
+
     // ── 1. Carry (also gives us zone / futures / OI / MaxPain / IV) ───────────
     if (onProgress) onProgress(name + ' · carry…');
     var carry = await _ocAnalyzeStock(name, null);   // may be null if no futures at all
 
     // ── 2. Volume Profile — ~10 trading days of 15-min candles ────────────────
     if (onProgress) onProgress(name + ' · volume profile…');
-    var vpFrom = _vpDateMinus(CURRENT_DAY, 14), vpTo = _gtbCurrDayTo();
+    var vpFrom = _vpDateMinus(curDay, 14), vpTo = toDay;
     var vpRaw = await getHistoricalDataUsingPromise(spotToken, vpFrom, vpTo, '15minute').catch(function(){ return null; });
     var vpC = vpRaw && vpRaw.data && vpRaw.data.candles ? vpRaw.data.candles : [];
     var vpAtt = await _gtbAttachVolume(name, vpC, '15minute', vpFrom, vpTo);
@@ -17612,12 +17694,12 @@ async function _uniAnalyze(name, onProgress) {
 
     // ── 3. SL-Hunt — today's 1-min candles ────────────────────────────────────
     if (onProgress) onProgress(name + ' · liquidity…');
-    var minRaw = await getHistoricalDataUsingPromise(spotToken, CURRENT_DAY, _gtbCurrDayTo(), 'minute').catch(function(){ return null; });
+    var minRaw = await getHistoricalDataUsingPromise(spotToken, curDay, toDay, 'minute').catch(function(){ return null; });
     var minC = minRaw && minRaw.data && minRaw.data.candles ? minRaw.data.candles : [];
-    var slAtt = (minC.length >= 5) ? await _gtbAttachVolume(name, minC, 'minute', CURRENT_DAY, _gtbCurrDayTo()) : { candles: minC, source: 'none' };
+    var slAtt = (minC.length >= 5) ? await _gtbAttachVolume(name, minC, 'minute', curDay, toDay) : { candles: minC, source: 'none' };
     var sweeps = [], active = null, slConfirmed = false, slRecent = false;
     if (slAtt.source !== 'none' && slAtt.candles.length >= 5) {
-        var pdRaw = await getHistoricalDataUsingPromise(spotToken, _gtbPrevDay(), _gtbPrevDay(), 'day').catch(function(){ return null; });
+        var pdRaw = await getHistoricalDataUsingPromise(spotToken, prevDay, prevDay, 'day').catch(function(){ return null; });
         var prevDayCandle = pdRaw && pdRaw.data && pdRaw.data.candles && pdRaw.data.candles.length ? pdRaw.data.candles[0] : null;
         var vwap = _lqVwapSeries(slAtt.candles);
         var levels = _lqBuildLevels(slAtt.candles, name, prof, prevDayCandle);
@@ -17683,14 +17765,26 @@ function _uniVerdict(r) {
     var trade = null;
     if (r.sl && r.sl.active && r.sl.recent) {
         var isB = r.sl.active.dir === 'bull';
-        var t1 = r.vp && r.vp.prof ? (isB ? (r.ltp < r.vp.prof.pocPrice ? r.vp.prof.pocPrice : r.vp.prof.vah) : (r.ltp > r.vp.prof.pocPrice ? r.vp.prof.pocPrice : r.vp.prof.val)) : null;
+        var entryPx = r.sl.active.close;
+        // Stop = beyond the sweep wick, but floored to ≥0.1% so it isn't unrealistically tight
+        var stopDist = Math.max(r.sl.active.pen || 0, entryPx * 0.001);
+        var stopPx   = isB ? entryPx - stopDist : entryPx + stopDist;
+        // Target = nearest volume-profile level on the FAVOURABLE side of entry
+        // (above for a long, below for a short). Falls back to a 2R measured move.
+        var tgtPx = null;
+        if (r.vp && r.vp.prof) {
+            var p = r.vp.prof;
+            var cands = [p.pocPrice, p.vah, p.val].filter(function(x){ return isFinite(x) && (isB ? x > entryPx : x < entryPx); });
+            if (cands.length) tgtPx = isB ? Math.min.apply(null, cands) : Math.max.apply(null, cands);
+        }
+        if (tgtPx == null) tgtPx = isB ? entryPx + 2 * stopDist : entryPx - 2 * stopDist;
         trade = {
             source: 'SL-Hunt trigger',
             dir: isB ? 'LONG' : 'SHORT',
             col: isB ? 'var(--gtb-green)' : 'var(--gtb-red)',
-            entry: _vpFmt(r.sl.active.close),
-            stop: _vpFmt(isB ? r.sl.active.close - r.sl.active.pen : r.sl.active.close + r.sl.active.pen),
-            target: t1 != null ? _vpFmt(t1) : '—',
+            entry: _vpFmt(entryPx),
+            stop: _vpFmt(stopPx),
+            target: _vpFmt(tgtPx),
             note: 'Liquidity grab ' + (isB ? 'below' : 'above') + ' ' + r.sl.active.level + ' on ' + r.sl.active.volR.toFixed(1) + '× vol' + (r.sl.confirmed ? ', OI confirms.' : ', OI unconfirmed.')
         };
     } else if (r.vp && r.vp.trade && r.vp.trade.dir !== 0) {
@@ -18184,17 +18278,63 @@ function _msSaveSnap(results) {
     return day;
 }
 
-// Today's OPEN for an instrument — prefer the already-loaded open, else fetch the day candle
-async function _msTodayOpen(name) {
-    try {
-        var g = JSON.parse(localStorage.getItem('INSTRUMENT_LIST_GLOBAL') || '{}');
-        if (g[name] && g[name].price) { var p = parseFloat(g[name].price); if (p) return p; }
-    } catch(e) {}
+// Daily OHLC for an instrument on a specific date, from the historical API
+// (date-accurate, unlike the single-day INSTRUMENT_LIST_GLOBAL store).
+// Returns { o, h, l, c } or null.
+async function _msDayOHLC(name, dateStr) {
     var tok = _ocSpotToken(name);
     if (!tok) return null;
-    var raw = await getHistoricalDataUsingPromise(tok, CURRENT_DAY, CURRENT_DAY, 'day').catch(function(){ return null; });
+    var raw = await getHistoricalDataUsingPromise(tok, dateStr, dateStr, 'day').catch(function(){ return null; });
     var c = raw && raw.data && raw.data.candles ? raw.data.candles : [];
-    return c.length ? parseFloat(c[0][1]) : null;
+    if (!c.length) return null;
+    return { o: parseFloat(c[0][1]), h: parseFloat(c[0][2]), l: parseFloat(c[0][3]), c: parseFloat(c[0][4]) };
+}
+
+// Fetch daily candles for a date range once, return { map: {date:{o,h,l,c}}, arr:[sorted] }.
+// Used by the multi-day aggregate so each instrument is fetched a single time.
+async function _msDailyMap(name, fromDate, toDate) {
+    var tok = _ocSpotToken(name);
+    if (!tok) return null;
+    var raw = await getHistoricalDataUsingPromise(tok, fromDate, toDate, 'day').catch(function(){ return null; });
+    var c = raw && raw.data && raw.data.candles ? raw.data.candles : [];
+    if (!c.length) return null;
+    var map = {}, arr = [];
+    c.forEach(function(k) {
+        var d = String(k[0] || '').substring(0, 10);
+        var o = { o: parseFloat(k[1]), h: parseFloat(k[2]), l: parseFloat(k[3]), c: parseFloat(k[4]), date: d };
+        map[d] = o; arr.push(o);
+    });
+    arr.sort(function(a, b){ return a.date < b.date ? -1 : 1; });
+    return { map: map, arr: arr };
+}
+// First trading session strictly after dayStr (skips weekends/holidays automatically).
+function _msNextSession(arr, dayStr) {
+    for (var i = 0; i < arr.length; i++) if (arr[i].date > dayStr) return arr[i];
+    return null;
+}
+
+// NIFTY 50 benchmark move (%) for the same scan→compare window — used to de-beta the
+// test (a call is "right" if the stock beat the index in its direction). Uses the
+// index's scan-time price stored in the snapshot; benchmark field is OPEN for the
+// open mode, else CLOSE (the market's realized move). Returns null if unavailable.
+async function _msIndexMove(snap, cmpDate, field) {
+    var idxRow = (snap.rows || []).find(function(r){ return r.n === 'NIFTY 50'; });
+    if (!idxRow || !idxRow.c) return null;
+    var ohlc = await _msDayOHLC('NIFTY 50', cmpDate);
+    if (!ohlc) return null;
+    var px = (field === 'o') ? ohlc.o : ohlc.c;
+    return ((px - idxRow.c) / idxRow.c) * 100;
+}
+
+// Parse a snapshot's savedAt into IST { hhmm, postClose } — a scan saved after ~15:30
+// IST is a post-close scan, for which the intraday (scan-day-close) test is ~all-flat.
+function _msSavedIST(snap) {
+    try {
+        var d = new Date(snap.savedAt);
+        var ist = new Date(d.getTime() + d.getTimezoneOffset() * 60000 + 5.5 * 3600000);
+        var m = ist.getHours() * 60 + ist.getMinutes();
+        return { hhmm: ist.toTimeString().substring(0, 5), postClose: m >= 15 * 60 + 30, mins: m };
+    } catch(e) { return { hhmm: '', postClose: false, mins: 0 }; }
 }
 
 // Was the saved verdict right? Directional calls only; WAIT rows are excluded.
@@ -18223,10 +18363,20 @@ function _gtbShowMasterCompare() {
         + '<div style="display:flex;gap:8px;align-items:center;padding:8px 10px;border-bottom:1px solid var(--gtb-border);flex-shrink:0;flex-wrap:wrap;">'
         + '<span style="color:var(--gtb-muted);">Saved scan:</span>'
         + '<select id="mc-day" style="font-size:0.63rem;padding:3px 5px;background:var(--gtb-surface);color:var(--gtb-text);border:1px solid var(--gtb-border);border-radius:3px;">' + opts + '</select>'
-        + '<span style="color:var(--gtb-muted);">vs</span><b>today\'s OPEN</b>'
+        + '<select id="mc-mode" style="font-size:0.62rem;padding:3px 5px;background:var(--gtb-surface);color:var(--gtb-text);border:1px solid var(--gtb-border);border-radius:3px;">'
+        + '<option value="close">vs Next-day CLOSE (full follow-through)</option>'
+        + '<option value="open">vs Next-day OPEN (overnight gap)</option>'
+        + '<option value="best">vs Next-day BEST (max favourable excursion)</option>'
+        + '<option value="intraday">vs Scan-day CLOSE (intraday follow-through)</option>'
+        + '</select>'
+        + '<span id="mc-date-wrap"><span style="color:var(--gtb-muted);">on</span> '
+        + '<input type="date" id="mc-target" value="' + String(CURRENT_DAY || '').substring(0, 10) + '" style="font-size:0.63rem;padding:2px 5px;background:var(--gtb-surface);color:var(--gtb-text);border:1px solid var(--gtb-border);border-radius:3px;"></span>'
+        + '<label style="font-size:0.6rem;display:flex;align-items:center;gap:3px;cursor:pointer;" title="Score each call vs NIFTY 50 over the same window (alpha) — de-betas the test"><input type="checkbox" id="mc-rel"> vs NIFTY</label>'
         + '<button id="mc-run" style="margin-left:auto;padding:3px 14px;font-size:0.65rem;background:var(--gtb-accent,#58a6ff);color:#fff;border:none;border-radius:3px;cursor:pointer;font-weight:600;"><i class="bi bi-arrow-left-right"></i> Compare</button>'
+        + '<button id="mc-agg" style="padding:3px 10px;font-size:0.62rem;border:1px solid var(--gtb-accent,#58a6ff);background:var(--gtb-surface);color:var(--gtb-accent,#58a6ff);border-radius:3px;cursor:pointer;font-weight:600;" title="Aggregate every saved scan vs its own next session"><i class="bi bi-clipboard-data"></i> Aggregate All Days</button>'
         + '<button id="mc-del" style="padding:3px 8px;font-size:0.6rem;border:1px solid var(--gtb-border);background:var(--gtb-surface);color:var(--gtb-text);border-radius:3px;cursor:pointer;" title="Delete this saved scan">Delete</button>'
         + '</div>'
+        + '<div id="mc-snapinfo" style="padding:3px 10px;font-size:0.57rem;color:var(--gtb-muted);border-bottom:1px solid var(--gtb-border);flex-shrink:0;"></div>'
         + '<div id="mc-progress" style="padding:4px 10px;font-size:0.6rem;color:var(--gtb-muted);border-bottom:1px solid var(--gtb-border);flex-shrink:0;min-height:20px;"></div>'
         + '<div id="mc-summary" style="flex-shrink:0;"></div>'
         + '<div id="mc-body" style="flex:1;overflow:auto;padding:6px 10px;">'
@@ -18246,6 +18396,29 @@ function _gtbShowMasterCompare() {
     jQ('.' + _cls).find('.popupwindow_titlebar').removeClass('popupwindow_titlebar_draggable');
     jQ('.' + _cls).toggleClass('gtb-light', (localStorage.getItem('GTB_THEME') || 'dark') === 'light');
 
+    // OPEN/CLOSE/BEST modes need a picked date (fetched via historical API).
+    // Intraday uses the saved day's own close, so it hides the date picker.
+    function _mcDateVis() { jQ('#mc-date-wrap').css('display', jQ('#mc-mode').val() === 'intraday' ? 'none' : ''); }
+
+    // Show when the selected scan was saved, and nudge away from intraday if post-close
+    function _mcSnapInfo() {
+        var d = jQ('#mc-day').val();
+        var snap = d ? _msLoadSnaps()[d] : null;
+        if (!snap) { jQ('#mc-snapinfo').html(''); return; }
+        var t = _msSavedIST(snap);
+        var base = 'Saved at <b>' + (t.hhmm || '—') + ' IST</b> · ' + snap.rows.length + ' rows.';
+        if (t.postClose) {
+            base += ' <span style="color:var(--gtb-amber);"><i class="bi bi-info-circle"></i> Post-close scan — the price at scan is ≈ that day\'s close, so <b>Scan-day CLOSE</b> mode will be ~all FLAT. Use <b>Next-day CLOSE</b> (the true carry test).</span>';
+            // Auto-steer the mode away from the useless intraday option
+            if (jQ('#mc-mode').val() === 'intraday') { jQ('#mc-mode').val('close'); _mcDateVis(); }
+        }
+        jQ('#mc-snapinfo').html(base);
+    }
+
+    jQ(document).off('change.mcmode').on('change.mcmode', '#mc-mode', _mcDateVis);
+    jQ(document).off('change.mcday').on('change.mcday', '#mc-day', _mcSnapInfo);
+    setTimeout(function(){ _mcDateVis(); _mcSnapInfo(); }, 100);
+
     jQ(document).off('click.mcdel').on('click.mcdel', '#mc-del', function() {
         var d = jQ('#mc-day').val(); if (!d) return;
         var s = _msLoadSnaps(); delete s[d];
@@ -18260,23 +18433,71 @@ function _gtbShowMasterCompare() {
         if (!day) { jQ('#mc-progress').html('<span style="color:var(--gtb-amber);">No saved scan selected.</span>'); return; }
         var snap = _msLoadSnaps()[day];
         if (!snap || !snap.rows.length) { jQ('#mc-progress').html('<span style="color:var(--gtb-red);">Saved scan is empty.</span>'); return; }
-        var today = String(CURRENT_DAY || '').substring(0, 10);
-        if (day === today) { jQ('#mc-progress').html('<span style="color:var(--gtb-amber);">That scan is from today — compare works against a LATER session\'s open.</span>'); return; }
+        var mode = jQ('#mc-mode').val() || 'close';
+        // Resolve which date + candle field each mode measures against (all via historical API)
+        var cmpDate, field, priceHdr, modeDesc;
+        if (mode === 'intraday') {
+            cmpDate = day; field = 'c';   // scan-time price → the SAME day's close
+            priceHdr = 'Close ' + day; modeDesc = 'scan-time price vs the same day\'s CLOSE (did the direction play out intraday)';
+        } else {
+            cmpDate = String(jQ('#mc-target').val() || CURRENT_DAY || '').substring(0, 10);
+            if (!cmpDate) { jQ('#mc-progress').html('<span style="color:var(--gtb-amber);">Pick the session date to compare against.</span>'); return; }
+            if (cmpDate <= day) {
+                jQ('#mc-progress').html('<span style="color:var(--gtb-amber);">Compare date must be <b>after</b> the saved scan (' + day + ').</span>');
+                return;
+            }
+            if (mode === 'close') { field = 'c'; priceHdr = 'Close ' + cmpDate; modeDesc = 'scan-time price vs ' + cmpDate + ' CLOSE (full overnight + next-day follow-through)'; }
+            else if (mode === 'best') { field = 'best'; priceHdr = 'Best ' + cmpDate; modeDesc = 'scan-time price vs ' + cmpDate + ' favourable extreme — HIGH for LONG, LOW for SHORT (max favourable excursion: did the call ever go green)'; }
+            else { field = 'o'; priceHdr = 'Open ' + cmpDate; modeDesc = 'scan-time price vs ' + cmpDate + ' OPEN (overnight gap only)'; }
+        }
+
+        // Post-close scan → intraday mode is meaningless (scan price ≈ that day's close)
+        if (mode === 'intraday' && _msSavedIST(snap).postClose) {
+            jQ('#mc-progress').html('<span style="color:var(--gtb-amber);">This scan was saved post-close — Scan-day CLOSE will be ~all FLAT. Switch to <b>Next-day CLOSE</b>.</span>');
+            return;
+        }
+
+        // Relative-to-NIFTY (alpha): subtract the index's move so we score outperformance
+        var relative = jQ('#mc-rel').is(':checked');
+        var idxMove = relative ? await _msIndexMove(snap, cmpDate, field) : null;
+        if (relative && idxMove == null) { jQ('#mc-progress').html('<span style="color:var(--gtb-amber);">Relative mode needs a NIFTY 50 row in the scan — scoring absolute instead.</span>'); }
 
         jQ('#mc-run').prop('disabled', true);
         var out = [];
         for (var i = 0; i < snap.rows.length; i++) {
             var row = snap.rows[i];
-            jQ('#mc-progress').html('<i class="bi bi-arrow-clockwise"></i> [' + (i+1) + '/' + snap.rows.length + '] ' + row.n + '…');
-            var op = await _msTodayOpen(row.n);
-            if (op && row.c) {
-                var gap = ((op - row.c) / row.c) * 100;
-                out.push({ r: row, open: op, gap: gap, res: _msOutcome(row.v, gap) });
+            jQ('#mc-progress').html('<i class="bi bi-arrow-clockwise"></i> [' + (i+1) + '/' + snap.rows.length + '] fetching ' + row.n + '…');
+            var ohlc = await _msDayOHLC(row.n, cmpDate);
+            var px = null;
+            if (ohlc) {
+                if (field === 'best') {
+                    // Favourable extreme in the call's direction; WAIT rows have no call
+                    if (row.v.indexOf('LONG')  >= 0) px = ohlc.h;
+                    else if (row.v.indexOf('SHORT') >= 0) px = ohlc.l;
+                    else px = null;
+                } else px = ohlc[field];
+            }
+            if (px && row.c) {
+                var mv = ((px - row.c) / row.c) * 100;
+                if (idxMove != null) mv -= idxMove;   // alpha = stock move − index move
+                out.push({ r: row, px: px, gap: mv, res: _msOutcome(row.v, mv) });
+            } else if (ohlc && field === 'best' && row.v.indexOf('LONG') < 0 && row.v.indexOf('SHORT') < 0) {
+                // WAIT verdict has no direction → no favourable extreme to score (not a fetch failure)
+                out.push({ r: row, px: null, gap: null, res: { cls: 'na', label: 'no call', col: 'var(--gtb-muted)' } });
             } else {
-                out.push({ r: row, open: null, gap: null, res: { cls: 'na', label: 'no data', col: 'var(--gtb-muted)' } });
+                out.push({ r: row, px: null, gap: null, res: { cls: 'na', label: 'no data', col: 'var(--gtb-muted)' } });
             }
         }
         jQ('#mc-run').prop('disabled', false);
+
+        // Nothing resolved
+        if (!out.filter(function(o){ return o.px != null; }).length) {
+            jQ('#mc-summary').html('');
+            jQ('#mc-body').html('<div style="padding:20px;color:var(--gtb-amber);">No candle data for <b>' + cmpDate + '</b> from the historical API — '
+                + 'that date may be a holiday/weekend, or not yet traded (for CLOSE/BEST the session must be complete).</div>');
+            jQ('#mc-progress').html('<span style="color:var(--gtb-amber);">No data for ' + cmpDate + '.</span>');
+            return;
+        }
 
         // ── Accuracy summary (directional calls only) ────────────────────────
         var hit = out.filter(function(o){ return o.res.cls === 'hit'; }).length;
@@ -18295,13 +18516,16 @@ function _gtbShowMasterCompare() {
                 + '<div style="font-size:0.48rem;color:var(--gtb-muted);">' + (sub || '') + '</div></div>';
         };
         jQ('#mc-summary').html('<div style="display:flex;gap:10px;flex-wrap:wrap;padding:8px 10px;border-bottom:1px solid var(--gtb-border);">'
-            + card('Hit Rate', rate.toFixed(0) + '%', rateCol, hit + ' hit / ' + miss + ' miss')
+            + card(mode === 'best' ? 'Went-Green' : 'Hit Rate', rate.toFixed(0) + '%', rateCol, hit + (mode === 'best' ? ' green / ' : ' hit / ') + miss + (mode === 'best' ? ' never' : ' miss'))
             + card('Directional', String(dir), 'var(--gtb-text)', flat + ' flat, ' + (out.length - dir - flat) + ' n/a')
-            + card('Avg gap · LONG', (avg(longs) >= 0 ? '+' : '') + avg(longs).toFixed(2) + '%', avg(longs) >= 0 ? 'var(--gtb-green)' : 'var(--gtb-red)', longs.length + ' calls')
-            + card('Avg gap · SHORT', (avg(shorts) >= 0 ? '+' : '') + avg(shorts).toFixed(2) + '%', avg(shorts) <= 0 ? 'var(--gtb-green)' : 'var(--gtb-red)', shorts.length + ' calls')
-            + '<div style="flex:1;min-width:170px;background:var(--gtb-surface);border:1px solid var(--gtb-border);border-radius:4px;padding:6px 8px;font-size:0.58rem;line-height:1.35;">'
-            + '<b>' + day + '</b> scan vs <b>' + today + '</b> open.<br>'
-            + 'HIT = LONG verdict gapped up, or SHORT verdict gapped down. Gaps under ±0.15% count as FLAT; WAIT rows are excluded.'
+            + card('Avg ' + (idxMove != null ? 'alpha' : 'move') + ' · LONG', (avg(longs) >= 0 ? '+' : '') + avg(longs).toFixed(2) + '%', avg(longs) >= 0 ? 'var(--gtb-green)' : 'var(--gtb-red)', longs.length + ' calls')
+            + card('Avg ' + (idxMove != null ? 'alpha' : 'move') + ' · SHORT', (avg(shorts) >= 0 ? '+' : '') + avg(shorts).toFixed(2) + '%', avg(shorts) <= 0 ? 'var(--gtb-green)' : 'var(--gtb-red)', shorts.length + ' calls')
+            + '<div style="flex:1;min-width:190px;background:var(--gtb-surface);border:1px solid var(--gtb-border);border-radius:4px;padding:6px 8px;font-size:0.58rem;line-height:1.35;">'
+            + '<b>' + day + '</b> scan — ' + modeDesc + (idxMove != null ? ', <b>relative to NIFTY</b> (' + (idxMove >= 0 ? '+' : '') + idxMove.toFixed(2) + '%)' : '') + '.<br>'
+            + (idxMove != null
+                ? 'HIT = LONG <b>out</b>performed NIFTY, or SHORT <b>under</b>performed. Alpha = stock move − index move. WAIT rows excluded.'
+                : 'HIT = LONG verdict moved up, or SHORT verdict moved down. Moves under ±0.15% count as FLAT; WAIT rows excluded.')
+            + ' Prices from the daily historical API.'
             + '</div></div>');
 
         // ── Per-instrument table ─────────────────────────────────────────────
@@ -18309,7 +18533,7 @@ function _gtbShowMasterCompare() {
         var th = function(t, al){ return '<th style="padding:4px 6px;text-align:' + (al||'center') + ';border-bottom:1px solid var(--gtb-border);position:sticky;top:0;background:var(--gtb-surface2);white-space:nowrap;">' + t + '</th>'; };
         var h = '<table style="width:100%;border-collapse:collapse;font-size:0.62rem;"><thead><tr>'
             + th('Instrument','left') + th('Verdict') + th('Score') + th('9:15') + th('Now')
-            + th('Close @ scan','right') + th('Open today','right') + th('Gap %','right') + th('Result')
+            + th('Price @ scan','right') + th(priceHdr,'right') + th(idxMove != null ? 'Alpha %' : 'Move %','right') + th('Result')
             + '</tr></thead><tbody>';
         out.forEach(function(o) {
             var vCol = o.r.v.indexOf('LONG') >= 0 ? 'var(--gtb-green)' : o.r.v.indexOf('SHORT') >= 0 ? 'var(--gtb-red)' : 'var(--gtb-amber)';
@@ -18322,7 +18546,7 @@ function _gtbShowMasterCompare() {
                 + '<td style="padding:3px 6px;text-align:center;">' + (o.r.z9 || '—') + '</td>'
                 + '<td style="padding:3px 6px;text-align:center;">' + (o.r.zc || '—') + '</td>'
                 + '<td style="padding:3px 6px;text-align:right;font-family:var(--gtb-mono,monospace);">' + (o.r.c ? o.r.c.toFixed(2) : '—') + '</td>'
-                + '<td style="padding:3px 6px;text-align:right;font-family:var(--gtb-mono,monospace);">' + (o.open ? o.open.toFixed(2) : '—') + '</td>'
+                + '<td style="padding:3px 6px;text-align:right;font-family:var(--gtb-mono,monospace);">' + (o.px ? o.px.toFixed(2) : '—') + '</td>'
                 + '<td style="padding:3px 6px;text-align:right;color:' + gCol + ';font-weight:600;">' + (o.gap == null ? '—' : (o.gap >= 0 ? '+' : '') + o.gap.toFixed(2) + '%') + '</td>'
                 + '<td style="padding:3px 6px;text-align:center;color:' + o.res.col + ';font-weight:700;"><i class="bi ' + icon + '"></i> ' + o.res.label + '</td>'
                 + '</tr>';
@@ -18330,6 +18554,122 @@ function _gtbShowMasterCompare() {
         h += '</tbody></table>';
         jQ('#mc-body').html(h);
         jQ('#mc-progress').html('<span style="color:var(--gtb-green);">Compared ' + out.length + ' instruments · ' + hit + ' hit / ' + miss + ' miss (' + rate.toFixed(0) + '%).</span>');
+    });
+
+    // ── Multi-day aggregate: score EVERY saved scan vs its own next session ────
+    jQ(document).off('click.mcagg').on('click.mcagg', '#mc-agg', async function() {
+        var mode = jQ('#mc-mode').val() || 'close';
+        if (mode === 'intraday') { mode = 'close'; jQ('#mc-mode').val('close'); _mcDateVis(); }
+        var snaps = _msLoadSnaps();
+        var days = Object.keys(snaps).sort();
+        if (!days.length) { jQ('#mc-progress').html('<span style="color:var(--gtb-amber);">No saved scans to aggregate.</span>'); return; }
+
+        // Unique instruments across all snapshots → fetch each ONE time over the full range
+        var nameSet = {};
+        days.forEach(function(d){ snaps[d].rows.forEach(function(r){ nameSet[r.n] = 1; }); });
+        var uniq = Object.keys(nameSet);
+        var fromDate = days[0];
+        var toDate = _vpDateMinus(days[days.length - 1], -12); // saved range + 12 calendar days of forward candles
+
+        jQ('#mc-agg').prop('disabled', true); jQ('#mc-run').prop('disabled', true);
+        var dmap = {};
+        for (var u = 0; u < uniq.length; u++) {
+            jQ('#mc-progress').html('<i class="bi bi-arrow-clockwise"></i> Aggregating — fetching daily candles [' + (u+1) + '/' + uniq.length + '] ' + uniq[u] + '…');
+            dmap[uniq[u]] = await _msDailyMap(uniq[u], fromDate, toDate);
+        }
+        jQ('#mc-agg').prop('disabled', false); jQ('#mc-run').prop('disabled', false);
+
+        var pxFor = function(v, nx) {
+            if (mode === 'best') return v.indexOf('LONG') >= 0 ? nx.h : v.indexOf('SHORT') >= 0 ? nx.l : null;
+            return mode === 'open' ? nx.o : nx.c;
+        };
+
+        // Relative-to-NIFTY (alpha): per day, the index's own next-session move
+        var relative = jQ('#mc-rel').is(':checked');
+        var idxMoveFor = function(day) {
+            if (!relative) return null;
+            var idxRow = (snaps[day].rows || []).find(function(r){ return r.n === 'NIFTY 50'; });
+            var dm = dmap['NIFTY 50'];
+            if (!idxRow || !idxRow.c || !dm) return null;
+            var nx = _msNextSession(dm.arr, day);
+            if (!nx) return null;
+            var bp = mode === 'open' ? nx.o : nx.c;
+            return ((bp - idxRow.c) / idxRow.c) * 100;
+        };
+
+        var overall = { hit: 0, miss: 0, flat: 0, na: 0 };
+        var side = { long: { hit: 0, miss: 0 }, short: { hit: 0, miss: 0 } };
+        var strength = { strong: { hit: 0, miss: 0 }, weak: { hit: 0, miss: 0 } };
+        var perDay = [];
+
+        days.forEach(function(day) {
+            var d = { day: day, hit: 0, miss: 0, flat: 0, na: 0 };
+            var idxMove = idxMoveFor(day);
+            snaps[day].rows.forEach(function(row) {
+                var dm = dmap[row.n];
+                var nx = dm ? _msNextSession(dm.arr, day) : null;
+                var px = nx ? pxFor(row.v, nx) : null;
+                if (px == null || !row.c) { d.na++; overall.na++; return; }
+                var mv = ((px - row.c) / row.c) * 100;
+                if (idxMove != null) mv -= idxMove;   // alpha = stock move − index move
+                var res = _msOutcome(row.v, mv);
+                if (res.cls === 'hit')  { d.hit++;  overall.hit++; }
+                else if (res.cls === 'miss') { d.miss++; overall.miss++; }
+                else if (res.cls === 'flat') { d.flat++; overall.flat++; return; }
+                else { d.na++; overall.na++; return; }
+                // side + strength (directional only)
+                var isL = row.v.indexOf('LONG') >= 0, isS = row.v.indexOf('SHORT') >= 0, isStrong = row.v.indexOf('STRONG') >= 0;
+                if (isL) side.long[res.cls]++; else if (isS) side.short[res.cls]++;
+                (isStrong ? strength.strong : strength.weak)[res.cls]++;
+            });
+            perDay.push(d);
+        });
+
+        var pct = function(h, m) { var t = h + m; return t ? (h / t * 100) : 0; };
+        var rateCol = function(r) { return r >= 60 ? 'var(--gtb-green)' : r >= 45 ? 'var(--gtb-amber)' : 'var(--gtb-red)'; };
+        var dirTotal = overall.hit + overall.miss;
+        var oRate = pct(overall.hit, overall.miss);
+
+        var card = function(l, v, c, sub) {
+            return '<div style="background:var(--gtb-surface);border:1px solid var(--gtb-border);border-radius:4px;padding:6px 10px;min-width:92px;">'
+                + '<div style="font-size:0.5rem;color:var(--gtb-muted);text-transform:uppercase;letter-spacing:0.4px;">' + l + '</div>'
+                + '<div style="font-size:0.85rem;font-weight:700;color:' + c + ';font-family:var(--gtb-mono,monospace);">' + v + '</div>'
+                + '<div style="font-size:0.48rem;color:var(--gtb-muted);">' + (sub || '') + '</div></div>';
+        };
+        var lR = pct(side.long.hit, side.long.miss), sR = pct(side.short.hit, side.short.miss);
+        var stR = pct(strength.strong.hit, strength.strong.miss), wR = pct(strength.weak.hit, strength.weak.miss);
+        var modeLbl = (mode === 'best' ? 'next-session BEST (MFE)' : mode === 'open' ? 'next-session OPEN' : 'next-session CLOSE')
+            + (relative ? ', <b>relative to NIFTY</b> (alpha)' : '');
+
+        jQ('#mc-summary').html('<div style="display:flex;gap:10px;flex-wrap:wrap;padding:8px 10px;border-bottom:1px solid var(--gtb-border);">'
+            + card('Overall', oRate.toFixed(0) + '%', rateCol(oRate), overall.hit + ' hit / ' + overall.miss + ' miss · ' + days.length + ' days')
+            + card('Fade (inverse)', (100 - oRate).toFixed(0) + '%', rateCol(100 - oRate), 'if you faded every call')
+            + card('LONG calls', lR.toFixed(0) + '%', rateCol(lR), side.long.hit + '/' + (side.long.hit + side.long.miss))
+            + card('SHORT calls', sR.toFixed(0) + '%', rateCol(sR), side.short.hit + '/' + (side.short.hit + side.short.miss))
+            + card('STRONG', stR.toFixed(0) + '%', rateCol(stR), strength.strong.hit + '/' + (strength.strong.hit + strength.strong.miss))
+            + card('Weak', wR.toFixed(0) + '%', rateCol(wR), strength.weak.hit + '/' + (strength.weak.hit + strength.weak.miss))
+            + '<div style="flex:1;min-width:180px;background:var(--gtb-surface);border:1px solid var(--gtb-border);border-radius:4px;padding:6px 8px;font-size:0.58rem;line-height:1.35;">'
+            + 'Aggregate of <b>' + days.length + '</b> saved scans, each vs its own <b>' + modeLbl + '</b> (next trading session after the scan). '
+            + 'Directional calls only; ' + overall.flat + ' flat, ' + overall.na + ' n/a. HIT = call moved in its direction.'
+            + '</div></div>');
+
+        var th = function(t, al){ return '<th style="padding:4px 6px;text-align:' + (al||'center') + ';border-bottom:1px solid var(--gtb-border);position:sticky;top:0;background:var(--gtb-surface2);white-space:nowrap;">' + t + '</th>'; };
+        var h = '<table style="width:100%;border-collapse:collapse;font-size:0.63rem;"><thead><tr>'
+            + th('Scan date','left') + th('Dir calls') + th('Hit') + th('Miss') + th('Flat') + th('Hit rate') + '</tr></thead><tbody>';
+        perDay.forEach(function(d) {
+            var dr = pct(d.hit, d.miss), dt = d.hit + d.miss;
+            h += '<tr style="border-bottom:1px solid var(--gtb-border);">'
+                + '<td style="padding:3px 6px;font-weight:600;">' + d.day + '</td>'
+                + '<td style="padding:3px 6px;text-align:center;">' + dt + '</td>'
+                + '<td style="padding:3px 6px;text-align:center;color:var(--gtb-green);">' + d.hit + '</td>'
+                + '<td style="padding:3px 6px;text-align:center;color:var(--gtb-red);">' + d.miss + '</td>'
+                + '<td style="padding:3px 6px;text-align:center;color:var(--gtb-muted);">' + d.flat + '</td>'
+                + '<td style="padding:3px 6px;text-align:center;font-weight:700;color:' + rateCol(dr) + ';">' + dr.toFixed(0) + '%</td>'
+                + '</tr>';
+        });
+        h += '</tbody></table>';
+        jQ('#mc-body').html(h);
+        jQ('#mc-progress').html('<span style="color:var(--gtb-green);">Aggregated ' + days.length + ' scans · overall ' + oRate.toFixed(0) + '% (' + overall.hit + '/' + dirTotal + ' directional).</span>');
     });
 }
 
