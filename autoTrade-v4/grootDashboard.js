@@ -74,9 +74,12 @@ function _gdbWidgetPulse() {
     ];
     var vixVal = 0;
     try { vixVal = parseFloat((ltps['INDIA VIX'] || {}).ltp) || 0; } catch(e) {}
-    if (!vixVal) try { vixVal = VIX || 0; } catch(e) {}
-    var vixLabel = vixVal < 13 ? 'LOW -- trend day' : vixVal < 18 ? 'NORMAL' : vixVal < 25 ? 'ELEVATED' : 'HIGH -- caution';
-    var vixCol   = vixVal < 13 ? '#3fb950' : vixVal < 18 ? '#fbbf24' : vixVal < 25 ? '#f97316' : '#f85149';
+    // NOTE: VIX (config.js) is a manually-entered OVX proxy for the crude commodities
+    // dashboard — never use it as an India VIX fallback here (NSE context).
+    // vixVal === 0 means no India VIX LTP cached yet, not "actually zero" — don't let it
+    // fall into the LOW bucket, which would misleadingly imply a real calm reading.
+    var vixLabel = !vixVal ? 'NO DATA' : vixVal < 13 ? 'LOW -- trend day' : vixVal < 18 ? 'NORMAL' : vixVal < 25 ? 'ELEVATED' : 'HIGH -- caution';
+    var vixCol   = !vixVal ? '#7d8590' : vixVal < 13 ? '#3fb950' : vixVal < 18 ? '#fbbf24' : vixVal < 25 ? '#f97316' : '#f85149';
     var fc = function(v) { return parseFloat(v).toLocaleString('en-IN',{maximumFractionDigits:1}); };
 
     var scoreCards = metrics.map(function(m) {
@@ -469,10 +472,13 @@ function _gdbWidgetRisk() {
     var ltps = _btLtps();
     var vixVal = 0;
     try { vixVal = parseFloat((ltps['INDIA VIX']||{}).ltp) || 0; } catch(e) {}
-    if (!vixVal) try { vixVal = VIX || 0; } catch(e) {}
-    var vixSizeMult = vixVal > 25 ? 0.5 : vixVal > 18 ? 0.7 : vixVal > 13 ? 0.85 : 1.0;
-    var vixLabel    = vixVal > 25 ? 'Reduce to 50%' : vixVal > 18 ? 'Reduce to 70%' : vixVal > 13 ? 'Reduce to 85%' : 'Full size OK';
-    var vixCol      = vixVal > 25 ? '#f85149' : vixVal > 18 ? '#f97316' : vixVal > 13 ? '#fbbf24' : '#3fb950';
+    // NOTE: VIX (config.js) is a manually-entered OVX proxy for the crude commodities
+    // dashboard — never use it as an India VIX fallback here (NSE context).
+    // vixVal === 0 means no India VIX LTP cached yet, not "actually zero" — don't let it
+    // silently read as "Full size OK", which would misleadingly imply a real calm reading.
+    var vixSizeMult = !vixVal ? 1.0 : vixVal > 25 ? 0.5 : vixVal > 18 ? 0.7 : vixVal > 13 ? 0.85 : 1.0;
+    var vixLabel    = !vixVal ? 'NO DATA' : vixVal > 25 ? 'Reduce to 50%' : vixVal > 18 ? 'Reduce to 70%' : vixVal > 13 ? 'Reduce to 85%' : 'Full size OK';
+    var vixCol      = !vixVal ? '#7d8590' : vixVal > 25 ? '#f85149' : vixVal > 18 ? '#f97316' : vixVal > 13 ? '#fbbf24' : '#3fb950';
 
     var totalPL = 0, posCount = _GDB.positions.length;
     var posHtml = _GDB.positions.map(function(p, i) {

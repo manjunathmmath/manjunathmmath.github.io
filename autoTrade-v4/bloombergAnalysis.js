@@ -112,9 +112,13 @@ function _btRenderPrediction() {
     (function() {
         var v = 0;
         try { v = parseFloat((ltps['INDIA VIX'] || {}).ltp) || 0; } catch(e) {}
-        if (!v) try { v = VIX || 0; } catch(e) {}
-        vixMod = v < 13 ? 1.15 : v < 18 ? 1.0 : v < 25 ? 0.85 : 0.65;
-        var detail = v < 13  ? 'Low VIX ' + v.toFixed(1) + ' -- trend day likely, signals amplified'
+        // NOTE: VIX (config.js) is a manually-entered OVX proxy for the crude commodities
+        // dashboard — never use it as an India VIX fallback here (NSE context).
+        // v === 0 means no India VIX LTP cached yet, not "actually zero" — don't let it
+        // silently amplify confidence (×1.15) as if it were a genuine low-VIX reading.
+        vixMod = !v ? 1.0 : v < 13 ? 1.15 : v < 18 ? 1.0 : v < 25 ? 0.85 : 0.65;
+        var detail = !v     ? 'India VIX not loaded yet — confidence unmodified'
+                   : v < 13  ? 'Low VIX ' + v.toFixed(1) + ' -- trend day likely, signals amplified'
                    : v < 18  ? 'Normal VIX ' + v.toFixed(1) + ' -- balanced conviction'
                    : v < 25  ? 'Elevated VIX ' + v.toFixed(1) + ' -- wider swings, lower conviction'
                               : 'High VIX ' + v.toFixed(1) + ' -- choppy; reducing confidence';
@@ -250,7 +254,8 @@ function _btAnalyzeInstrument(name, targetEl) {
 
     var vixVal = 0;
     try { vixVal = parseFloat((ltps['INDIA VIX'] || {}).ltp) || 0; } catch(e) {}
-    if (!vixVal) try { vixVal = VIX || 0; } catch(e) {}
+    // NOTE: VIX (config.js) is a manually-entered OVX proxy for the crude commodities
+    // dashboard — never use it as an India VIX fallback here (NSE context).
 
     var f2 = function(v) { return v != null ? parseFloat(v).toLocaleString('en-IN', {maximumFractionDigits:2}) : '--'; };
     var zoneCss = function(z) {
@@ -696,10 +701,14 @@ function _btBreadthContext() {
 
     var vixVal = 0, vixRegime = '--', vixCol = '#7d8590';
     try { vixVal = parseFloat((ltps['INDIA VIX'] || {}).ltp) || 0; } catch(e) {}
-    if (!vixVal) try { vixVal = VIX || 0; } catch(e) {}
-    if      (vixVal < 13) { vixRegime = 'LOW -- trend day likely';   vixCol = '#3fb950'; }
-    else if (vixVal < 18) { vixRegime = 'NORMAL -- balanced';        vixCol = '#fbbf24'; }
-    else if (vixVal < 25) { vixRegime = 'ELEVATED -- wider stops';   vixCol = '#f97316'; }
+    // NOTE: VIX (config.js) is a manually-entered OVX proxy for the crude commodities
+    // dashboard — never use it as an India VIX fallback here (NSE context).
+    // vixVal === 0 means no India VIX LTP cached yet — must not fall into the LOW bucket,
+    // which would misleadingly imply a real, calm reading instead of missing data.
+    if      (!vixVal)      { vixRegime = 'NO DATA';                  vixCol = '#7d8590'; }
+    else if (vixVal < 13)  { vixRegime = 'LOW -- trend day likely';   vixCol = '#3fb950'; }
+    else if (vixVal < 18)  { vixRegime = 'NORMAL -- balanced';        vixCol = '#fbbf24'; }
+    else if (vixVal < 25)  { vixRegime = 'ELEVATED -- wider stops';   vixCol = '#f97316'; }
     else if (vixVal > 0)  { vixRegime = 'HIGH -- reduce size';       vixCol = '#f85149'; }
 
     return '<div class="bt-ta-rr-grid">'
@@ -909,7 +918,8 @@ function _btBuildInstrData(name, shortName, opens, ltps) {
 
     d.vixVal = 0;
     try { d.vixVal = parseFloat((ltps['INDIA VIX'] || {}).ltp) || 0; } catch(e) {}
-    if (!d.vixVal) try { d.vixVal = VIX || 0; } catch(e) {}
+    // NOTE: VIX (config.js) is a manually-entered OVX proxy for the crude commodities
+    // dashboard — never use it as an India VIX fallback here (NSE context).
 
     // Direction
     var t = d.cs.total;

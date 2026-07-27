@@ -685,9 +685,14 @@ function renderOIOBVMaximized(name, tempName, oiData) {
     // Signal row — same solid/faded/ITM-dim + wall marking as the crude panel
     let srHtml = '<div style="display:flex;gap:6px;flex-wrap:wrap;padding:4px 0;font-size:0.5rem;color:var(--gtb-muted);">'
         + '<span><span style="display:inline-block;width:7px;height:7px;background:#fbbf24;border-radius:1px;vertical-align:middle;"></span> ATM</span>'
+        + '<span title="Red/pink = CE (call) side"><span style="display:inline-block;width:7px;height:7px;background:rgba(220,53,69,0.9);border-radius:1px;vertical-align:middle;"></span> Red = CE</span>'
+        + '<span title="Green = PE (put) side"><span style="display:inline-block;width:7px;height:7px;background:rgba(40,167,69,0.9);border-radius:1px;vertical-align:middle;"></span> Green = PE</span>'
+        + '<span title="No clear signal at that strike — OI change was flat or too small to classify"><span style="display:inline-block;width:7px;height:7px;background:rgba(125,133,144,0.4);border-radius:1px;vertical-align:middle;"></span> Grey = Neutral</span>'
+        + '<span title="Fresh positions opening — full-weight signal"><span style="display:inline-block;width:7px;height:7px;background:rgba(125,133,144,0.9);border-radius:1px;vertical-align:middle;"></span> Solid = new (WRITE/BUY)</span>'
+        + '<span title="Existing positions closing — half-weight signal, real but lower conviction"><span style="display:inline-block;width:7px;height:7px;background:rgba(125,133,144,0.35);border-radius:1px;vertical-align:middle;"></span> Faded = closing (COV/UNWIND)</span>'
         + '<span title="Ranked by OTM call/put-writing OBV volume at that strike, not the strike\'s combined CE+PE score — a strike can have a bigger total score and still not be R1/S1 if its own OBV pressure is smaller."><span style="color:#dc3545;font-weight:700;">R1</span>/<span style="color:#28a745;font-weight:700;">S1</span> = primary wall (trust most)</span>' + _ii('sig-oi-walls')
         + '<span><span style="color:#dc3545;opacity:0.75;">R2</span>/<span style="color:#28a745;opacity:0.75;">S2</span> = secondary (real, weaker)</span>'
-        + '<span>Dimmed label = ITM (lower conviction)</span>' + _ii('sig-oi-itm')
+        + '<span title="This strike is in-the-money — lower conviction, often rollover/hedging noise rather than fresh positioning">Dimmed label = ITM (lower conviction)</span>' + _ii('sig-oi-itm')
         + '</div>'
         + '<div style="display:flex;gap:3px;flex-wrap:nowrap;overflow-x:auto;padding:4px 0;">';
     for (let i = 0; i < strikeSignals.length; i++) {
@@ -5642,7 +5647,8 @@ function _gtbRiskPanel(name) {
 
     var vixVal = 0;
     try { vixVal = parseFloat((_btLtps()['INDIA VIX']||{}).ltp||0); } catch(e) {}
-    if (!vixVal) try { vixVal = VIX||0; } catch(e) {}
+    // NOTE: VIX (config.js) is a manually-entered OVX proxy for the crude commodities
+    // dashboard — never use it as an India VIX fallback here (NSE context).
     var vixMult  = vixVal > 25 ? 0.5 : vixVal > 18 ? 0.7 : vixVal > 13 ? 0.85 : 1.0;
     var adjLots  = Math.floor(suggestLots * vixMult);
     var adjRisk  = adjLots * riskPerLot;
@@ -9696,9 +9702,12 @@ function _cmdRenderOI(oiData, oiSel, obvSel, priceChange) {
     var legEl = document.getElementById(oiSel.replace('#','') + '-legend');
     if (legEl) {
         legEl.innerHTML = '<span style="color:var(--gtb-muted);font-size:0.42rem;">'
-            + '<span style="display:inline-block;width:8px;height:8px;background:rgba(125,133,144,0.9);border-radius:1px;vertical-align:middle;"></span> Solid = new positions (WRITE/BUY, full weight)'
-            + '&nbsp;&nbsp;<span style="display:inline-block;width:8px;height:8px;background:rgba(125,133,144,0.35);border-radius:1px;vertical-align:middle;"></span> Faded = closing (COV/UNWIND, half weight)'
-            + '&nbsp;&nbsp;<span style="display:inline-block;width:8px;height:8px;background:rgba(125,133,144,0.15);border-radius:1px;vertical-align:middle;"></span> Extra-dim = ITM strike (lower conviction — often rollover/hedging noise, not fresh positioning)'
+            + '<span title="Red/pink = CE (call) side, at any conviction level"><span style="display:inline-block;width:8px;height:8px;background:rgba(220,53,69,0.9);border-radius:1px;vertical-align:middle;"></span> Red = CE</span>'
+            + '&nbsp;&nbsp;<span title="Green = PE (put) side, at any conviction level"><span style="display:inline-block;width:8px;height:8px;background:rgba(40,167,69,0.9);border-radius:1px;vertical-align:middle;"></span> Green = PE</span>'
+            + '&nbsp;&nbsp;<span title="No clear signal at that strike — OI change was flat or too small to classify as WRITE/BUY/COV/UNWIND"><span style="display:inline-block;width:8px;height:8px;background:rgba(125,133,144,0.4);border-radius:1px;vertical-align:middle;"></span> Grey = Neutral</span>'
+            + '&nbsp;&nbsp;<span title="Fresh positions opening this strike — full-weight signal, the most meaningful reading"><span style="display:inline-block;width:8px;height:8px;background:rgba(125,133,144,0.9);border-radius:1px;vertical-align:middle;"></span> Solid = new positions (WRITE/BUY, full weight)</span>'
+            + '&nbsp;&nbsp;<span title="Existing positions being closed (covered/unwound) — half-weight signal, real but lower conviction than a fresh WRITE/BUY"><span style="display:inline-block;width:8px;height:8px;background:rgba(125,133,144,0.35);border-radius:1px;vertical-align:middle;"></span> Faded = closing (COV/UNWIND, half weight)</span>'
+            + '&nbsp;&nbsp;<span title="This strike is in-the-money (below spot for CE, above spot for PE) — ITM flow is structurally lower-conviction, often rollover/hedging noise rather than fresh directional bets, so it is dimmed further and excluded from wall candidacy"><span style="display:inline-block;width:8px;height:8px;background:rgba(125,133,144,0.15);border-radius:1px;vertical-align:middle;"></span> Extra-dim = ITM strike (lower conviction — often rollover/hedging noise, not fresh positioning)</span>'
             + '&nbsp;&nbsp;<span title="Ranked by OTM call/put-writing OBV volume at that strike, not the strike\'s combined CE+PE score — a strike can have a bigger total score and still not be primary if its own OBV pressure is smaller."><span style="color:#dc3545;font-weight:700;">R1</span>/<span style="color:#28a745;font-weight:700;">S1</span> solid line = primary wall (trust most)</span>' + _ii('sig-oi-walls') + ' &nbsp; <span style="color:#dc3545;">R2</span>/<span style="color:#28a745;">S2</span> dashed line = secondary (real, weaker — shown only if ≥60% as strong as primary)'
             + '</span>';
     }
@@ -9759,8 +9768,9 @@ function _cmdTrendProb(name, fres) {
     else if (name === 'GOLDM'   || name === 'GOLD')       { vix = parseFloat(typeof GVZ   !== 'undefined' ? GVZ   : 0) || 0; vixLabel = 'GVZ'; }
     else if (name === 'SILVERM' || name === 'SILVER')     { vix = parseFloat(typeof VXSLV !== 'undefined' ? VXSLV : 0) || 0; vixLabel = 'VXSLV'; }
     else {
+        // NSE instrument — India VIX only. VIX (config.js) is a manually-entered OVX proxy
+        // for the crude commodities dashboard and must never be used as a fallback here.
         try { vix = parseFloat((_btLtps()['INDIA VIX']||{}).ltp)||0; } catch(e) {}
-        if (!vix) try { vix = VIX||0; } catch(e) {}
     }
     var vixMod = vix<13?1.15:vix<18?1.0:vix<25?0.85:0.65;
     signals.push({ key:'vix', label:vixLabel, icon:'bi-activity', dir:'neutral', weight:0, strength:0, detail:vixLabel+' '+(vix?vix.toFixed(1):'--'), value:vix?vix.toFixed(1):'--', isVix:true, vixMod:vixMod });
