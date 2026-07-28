@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Groot Bot
 // @namespace    Groot Bot
-// @version      26.73
+// @version      26.74
 // @description  Groot Bot
 // @author       Manjunath
 // @match        https://kite.zerodha.com/*
@@ -14,88 +14,88 @@
 // @grant        GM_getClipboard
 // @grant        GM_xmlhttpRequest
 // @connect      www.nseindia.com
-// @resource     BOOTSTRAP_CSS https://manjunatahmmath.github.io/autoTrade-v4/dist/css/bootstrap.css
-// @resource     DATATABLE_CSS https://manjunatahmmath.github.io/autoTrade-v4/global/vendor/datatables/datatables.min.css
-// @resource     BOOTSTRAP_ICON_CSS https://manjunatahmmath.github.io/autoTrade-v4/dist/font/bootstrap-icons.css
-// @resource     FIXED_COLUMN_CSS https://manjunatahmmath.github.io/autoTrade-v4/global/vendor/datatables/fixedColumns.dataTables.min.css
-// @resource     C3_CSS https://manjunatahmmath.github.io/autoTrade-v4/global/vendor/c3/c3.css
+// @resource     BOOTSTRAP_CSS https://manjunathmmath.github.io/autoTrade-v4/dist/css/bootstrap.css
+// @resource     DATATABLE_CSS https://manjunathmmath.github.io/autoTrade-v4/global/vendor/datatables/datatables.min.css
+// @resource     BOOTSTRAP_ICON_CSS https://manjunathmmath.github.io/autoTrade-v4/dist/font/bootstrap-icons.css
+// @resource     FIXED_COLUMN_CSS https://manjunathmmath.github.io/autoTrade-v4/global/vendor/datatables/fixedColumns.dataTables.min.css
+// @resource     C3_CSS https://manjunathmmath.github.io/autoTrade-v4/global/vendor/c3/c3.css
 
-// @resource     POPUP_WINDOW_CSS https://manjunatahmmath.github.io/autoTrade-v4/common/popupwindow/popupwindow.css
-// @require      https://manjunatahmmath.github.io/autoTrade-v4/global/vendor/jquery/jquery.js
-// @require      https://manjunatahmmath.github.io/autoTrade-v4/dist/js/bootstrap.js
-// @require      https://manjunatahmmath.github.io/autoTrade-v4/common/toastify-js.js
+// @resource     POPUP_WINDOW_CSS https://manjunathmmath.github.io/autoTrade-v4/common/popupwindow/popupwindow.css
+// @require      https://manjunathmmath.github.io/autoTrade-v4/global/vendor/jquery/jquery.js
+// @require      https://manjunathmmath.github.io/autoTrade-v4/dist/js/bootstrap.js
+// @require      https://manjunathmmath.github.io/autoTrade-v4/common/toastify-js.js
 
-// @require      https://manjunatahmmath.github.io/autoTrade-v4/common/sha256.js
+// @require      https://manjunathmmath.github.io/autoTrade-v4/common/sha256.js
 
-// @require      https://manjunatahmmath.github.io/autoTrade-v4/common/popupwindow/popupwindow.js
+// @require      https://manjunathmmath.github.io/autoTrade-v4/common/popupwindow/popupwindow.js
 
-// @require      https://manjunatahmmath.github.io/autoTrade-v4/global/vendor/datatables/jquery.dataTables.min.js
-// @require      https://manjunatahmmath.github.io/autoTrade-v4/global/vendor/datatables/dataTables.fixedColumns.min.js
-// @require      https://manjunatahmmath.github.io/autoTrade-v4/global/vendor/datatables/fixedColumns.dataTables.js
+// @require      https://manjunathmmath.github.io/autoTrade-v4/global/vendor/datatables/jquery.dataTables.min.js
+// @require      https://manjunathmmath.github.io/autoTrade-v4/global/vendor/datatables/dataTables.fixedColumns.min.js
+// @require      https://manjunathmmath.github.io/autoTrade-v4/global/vendor/datatables/fixedColumns.dataTables.js
 
-// @require      https://manjunatahmmath.github.io/autoTrade-v4/global/vendor/datatables/dataTables.buttons.min.js
-
-
-// @require      https://manjunatahmmath.github.io/autoTrade-v4/global/vendor/buttons/buttons.html5.min.js
-// @require      https://manjunatahmmath.github.io/autoTrade-v4/global/vendor/buttons/buttons.print.min.js
-// @require      https://manjunatahmmath.github.io/autoTrade-v4//global/vendor/buttons/jszip.min.js
-
-// @require      https://manjunatahmmath.github.io/autoTrade-v4/global/vendor/fusioncharts/fusioncharts.js
-// @require      https://manjunatahmmath.github.io/autoTrade-v4/global/vendor/fusioncharts/fusioncharts.charts.js
-// @require      https://manjunatahmmath.github.io/autoTrade-v4/global/vendor/fusioncharts/fusioncharts.powercharts.js
-// @require      https://manjunatahmmath.github.io/autoTrade-v4/global/vendor/fusioncharts/themes/fusioncharts.theme.fusion.js
-// @require      https://manjunatahmmath.github.io/autoTrade-v4/global/vendor/fusioncharts/themes/fusioncharts.theme.candy.js
-
-// @require      https://manjunatahmmath.github.io/autoTrade-v4/global/vendor/fusioncharts/fusioncharts.jqueryplugin.min.js
-// @require      https://manjunatahmmath.github.io/autoTrade-v4/global/vendor/c3/d3.min.js
-// @require      https://manjunatahmmath.github.io/autoTrade-v4/global/vendor/c3/c3.min.js
-// @require      https://manjunatahmmath.github.io/autoTrade-v4/global/vendor/tradingview/lightweight-charts.js
-// @require      https://manjunatahmmath.github.io/autoTrade-v4/global/vendor/apexcharts/apexcharts.min.js
+// @require      https://manjunathmmath.github.io/autoTrade-v4/global/vendor/datatables/dataTables.buttons.min.js
 
 
-// @require      https://manjunatahmmath.github.io/autoTrade-v4/common/monkeyconfig.js
-// @require      https://manjunatahmmath.github.io/autoTrade-v4/common/axios.min.js
-// @require      https://manjunatahmmath.github.io/autoTrade-v4/common/qs-lite.min.js
-// @require      https://manjunatahmmath.github.io/autoTrade-v4/common/moment.min.js
-// @require      https://manjunatahmmath.github.io/autoTrade-v4/common/popper.min.js
-// @require      https://manjunatahmmath.github.io/autoTrade-v4/common/tippy-bundle.umd.min.js
-// @require      https://manjunatahmmath.github.io/autoTrade-v4/common/sweetalert2@11.js
-// @require      https://manjunatahmmath.github.io/autoTrade-v4/common/toastify-js.js
-// @resource     TOASTIFY_CSS https://manjunatahmmath.github.io/autoTrade-v4/common/toastify.min.css
-// @resource     SACKBAR_CSS https://manjunatahmmath.github.io/autoTrade-v4/common/sackbar/js-snackbar.min.css
-// @require      https://manjunatahmmath.github.io/autoTrade-v4/common/sackbar/js-snackbar.min.js
-// @require      https://manjunatahmmath.github.io/autoTrade-v4/common/moment.min.js
-// @resource     COMMON_CSS https://manjunatahmmath.github.io/autoTrade-v4/common.css
-// @require      https://manjunatahmmath.github.io/autoTrade-v4/common/common.js
-// @require      https://manjunatahmmath.github.io/autoTrade-v4/common/alertSound.js
+// @require      https://manjunathmmath.github.io/autoTrade-v4/global/vendor/buttons/buttons.html5.min.js
+// @require      https://manjunathmmath.github.io/autoTrade-v4/global/vendor/buttons/buttons.print.min.js
+// @require      https://manjunathmmath.github.io/autoTrade-v4//global/vendor/buttons/jszip.min.js
+
+// @require      https://manjunathmmath.github.io/autoTrade-v4/global/vendor/fusioncharts/fusioncharts.js
+// @require      https://manjunathmmath.github.io/autoTrade-v4/global/vendor/fusioncharts/fusioncharts.charts.js
+// @require      https://manjunathmmath.github.io/autoTrade-v4/global/vendor/fusioncharts/fusioncharts.powercharts.js
+// @require      https://manjunathmmath.github.io/autoTrade-v4/global/vendor/fusioncharts/themes/fusioncharts.theme.fusion.js
+// @require      https://manjunathmmath.github.io/autoTrade-v4/global/vendor/fusioncharts/themes/fusioncharts.theme.candy.js
+
+// @require      https://manjunathmmath.github.io/autoTrade-v4/global/vendor/fusioncharts/fusioncharts.jqueryplugin.min.js
+// @require      https://manjunathmmath.github.io/autoTrade-v4/global/vendor/c3/d3.min.js
+// @require      https://manjunathmmath.github.io/autoTrade-v4/global/vendor/c3/c3.min.js
+// @require      https://manjunathmmath.github.io/autoTrade-v4/global/vendor/tradingview/lightweight-charts.js
+// @require      https://manjunathmmath.github.io/autoTrade-v4/global/vendor/apexcharts/apexcharts.min.js
 
 
-// @require      https://manjunatahmmath.github.io/autoTrade-v4/constants.js
+// @require      https://manjunathmmath.github.io/autoTrade-v4/common/monkeyconfig.js
+// @require      https://manjunathmmath.github.io/autoTrade-v4/common/axios.min.js
+// @require      https://manjunathmmath.github.io/autoTrade-v4/common/qs-lite.min.js
+// @require      https://manjunathmmath.github.io/autoTrade-v4/common/moment.min.js
+// @require      https://manjunathmmath.github.io/autoTrade-v4/common/popper.min.js
+// @require      https://manjunathmmath.github.io/autoTrade-v4/common/tippy-bundle.umd.min.js
+// @require      https://manjunathmmath.github.io/autoTrade-v4/common/sweetalert2@11.js
+// @require      https://manjunathmmath.github.io/autoTrade-v4/common/toastify-js.js
+// @resource     TOASTIFY_CSS https://manjunathmmath.github.io/autoTrade-v4/common/toastify.min.css
+// @resource     SACKBAR_CSS https://manjunathmmath.github.io/autoTrade-v4/common/sackbar/js-snackbar.min.css
+// @require      https://manjunathmmath.github.io/autoTrade-v4/common/sackbar/js-snackbar.min.js
+// @require      https://manjunathmmath.github.io/autoTrade-v4/common/moment.min.js
+// @resource     COMMON_CSS https://manjunathmmath.github.io/autoTrade-v4/common.css
+// @require      https://manjunathmmath.github.io/autoTrade-v4/common/common.js
+// @require      https://manjunathmmath.github.io/autoTrade-v4/common/alertSound.js
 
-// @require      https://manjunatahmmath.github.io/autoTrade-v4/commoditiesOptionStrikes.js
-// @require      https://manjunatahmmath.github.io/autoTrade-v4/constants-commodities.js
-// @require      https://manjunatahmmath.github.io/autoTrade-v4/commodities.js
 
-// @require      https://manjunatahmmath.github.io/autoTrade-v4/optionStrike.js
+// @require      https://manjunathmmath.github.io/autoTrade-v4/constants.js
 
-// @require      https://manjunatahmmath.github.io/autoTrade-v4/config.js
-// @require      https://manjunatahmmath.github.io/autoTrade-v4/monkeyStyle.js
-// @require      https://manjunatahmmath.github.io/autoTrade-v4/utils.js
-// @require      https://manjunatahmmath.github.io/autoTrade-v4/script.js
-// @require      https://manjunatahmmath.github.io/autoTrade-v4/oiAnalyzer.js
-// @require      https://manjunatahmmath.github.io/autoTrade-v4/oiViewer.js
-// @require      https://manjunatahmmath.github.io/autoTrade-v4/stockViewer.js
+// @require      https://manjunathmmath.github.io/autoTrade-v4/commoditiesOptionStrikes.js
+// @require      https://manjunathmmath.github.io/autoTrade-v4/constants-commodities.js
+// @require      https://manjunathmmath.github.io/autoTrade-v4/commodities.js
 
-// @require      https://manjunatahmmath.github.io/autoTrade-v4/marketQuotes.js
+// @require      https://manjunathmmath.github.io/autoTrade-v4/optionStrike.js
 
-// @require      https://manjunatahmmath.github.io/autoTrade-v4/help.js
-// @require      https://manjunatahmmath.github.io/autoTrade-v4/grootTradeBot.js
-// @require      https://manjunatahmmath.github.io/autoTrade-v4/bloombergDashboard.js
-// @require      https://manjunatahmmath.github.io/autoTrade-v4/bloombergAnalysis.js
-// @require      https://manjunatahmmath.github.io/autoTrade-v4/bloombergOpportunities.js
-// @require      https://manjunatahmmath.github.io/autoTrade-v4/grootDashboard.js
-// @downloadURL  https://manjunatahmmath.github.io/autoTrade-v4/autotrade.user.js
-// @updateURL    https://manjunatahmmath.github.io/autoTrade-v4/autotrade.meta.js
+// @require      https://manjunathmmath.github.io/autoTrade-v4/config.js
+// @require      https://manjunathmmath.github.io/autoTrade-v4/monkeyStyle.js
+// @require      https://manjunathmmath.github.io/autoTrade-v4/utils.js
+// @require      https://manjunathmmath.github.io/autoTrade-v4/script.js
+// @require      https://manjunathmmath.github.io/autoTrade-v4/oiAnalyzer.js
+// @require      https://manjunathmmath.github.io/autoTrade-v4/oiViewer.js
+// @require      https://manjunathmmath.github.io/autoTrade-v4/stockViewer.js
+
+// @require      https://manjunathmmath.github.io/autoTrade-v4/marketQuotes.js
+
+// @require      https://manjunathmmath.github.io/autoTrade-v4/help.js
+// @require      https://manjunathmmath.github.io/autoTrade-v4/grootTradeBot.js
+// @require      https://manjunathmmath.github.io/autoTrade-v4/bloombergDashboard.js
+// @require      https://manjunathmmath.github.io/autoTrade-v4/bloombergAnalysis.js
+// @require      https://manjunathmmath.github.io/autoTrade-v4/bloombergOpportunities.js
+// @require      https://manjunathmmath.github.io/autoTrade-v4/grootDashboard.js
+// @downloadURL  https://manjunathmmath.github.io/autoTrade-v4/autotrade.user.js
+// @updateURL    https://manjunathmmath.github.io/autoTrade-v4/autotrade.meta.js
 // ==/UserScript==
 
 // This is free and unencumbered software released into the public domain.

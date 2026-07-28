@@ -160,10 +160,8 @@ jQ(document).on("click", "#load-price", function (e) {
 // Also saves India VIX quote (for VIXL/VIXU levels).
 // Before 09:15, today's day-candle doesn't exist yet — those instruments are simply skipped
 // (no more pre-market sidebar DOM scrape); they'll populate on the first refresh after 09:15.
-// Does NOT run the LTP scan itself — that's a separate full ~215-instrument fetch
-// (scanLtpPrice, '5minute' interval) already triggered by the next refresh (manual button or
-// the 5-minute auto-cycle). Running it here too would just double the API calls for data
-// that's about to be re-fetched anyway.
+// Runs the LTP scan (scanLtpPrice) at the end so INSTRUMENT_LTP_PRICE is populated
+// immediately, without waiting for the next manual/auto refresh.
 async function loadOpenPrice() {
     if (typeof _gtbProgress === 'function') _gtbProgress('Fetching VIX quote…');
     await saveVixQuote();
@@ -203,6 +201,7 @@ async function loadOpenPrice() {
     if (typeof _gtbProgress === 'function') _gtbProgress('Prices loaded', 'green');
     setTimeout(function(){ if (typeof _gtbProgressHide === 'function') _gtbProgressHide(); }, 2500);
 
+    await updateStrorageLtpPrice();
     alert("Price loaded successfully.")
 
 }
