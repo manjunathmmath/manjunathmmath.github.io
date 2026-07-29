@@ -530,13 +530,15 @@ function _gtbRefreshGEXChips() {
 }
 
 function _gtbRefreshProbCards() {
-    // Render trend probability gauge into each vertical instrument card
+    // Render trend probability gauge + level probability into each vertical instrument card
     jQ('.gtb-instr-card-v').each(function() {
         var name = jQ(this).data('instr');
         if (!name) return;
         var tid = name.replace(/ /g, '-').replace(/&/g, '-');
         var el  = document.getElementById(tid + '-prob');
         if (el) el.innerHTML = _cmdTrendProb(name, null);
+        var lvlEl = document.getElementById(tid + '-lvlprob');
+        if (lvlEl) { try { lvlEl.innerHTML = _gtbLevelProbHtml(name); } catch(e) {} }
     });
 }
 
@@ -1070,6 +1072,10 @@ function _buildCardStandalone(item) {
     // Panel: prob
     h += '<div class="gtb-ic-panel" data-col="prob"><div class="gtb-ic-panel-hdr"><span class="gtb-ic-panel-title"><i class="bi bi-speedometer2"></i> TREND PROBABILITY' + _ii('dv-prob') + '</span></div>'
        + '<div class="gtb-ic-panel-body" id="' + tid + '-prob"></div></div>';
+
+    // Panel: level probability (ASO/AST/VIXU vs BSO/BST/VIXL)
+    h += '<div class="gtb-ic-panel" data-col="lvlprob"><div class="gtb-ic-panel-hdr"><span class="gtb-ic-panel-title"><i class="bi bi-signpost-split-fill"></i> LEVEL PROBABILITY' + _ii('dv-lvlprob') + '</span></div>'
+       + '<div class="gtb-ic-panel-body" id="' + tid + '-lvlprob"></div></div>';
 
     // Panel: fut
     h += '<div class="gtb-ic-panel" data-col="fut"><div class="gtb-ic-panel-hdr"><span class="gtb-ic-panel-title"><i class="bi bi-graph-up-arrow"></i> FUTURES' + _ii('dv-futures') + '</span>'
@@ -5803,6 +5809,7 @@ async function _dvFetchAndRender(name, tid, sfx, isMcx) {
             INSTRUMENT_SCORE_MAP[name].score = _sc;
         } catch(e) {}
         try { jQ('#' + tid + '-prob' + sfx).html(_cmdTrendProb(name, null)); } catch(e) {}
+        try { jQ('#' + tid + '-lvlprob' + sfx).html(_gtbLevelProbHtml(name)); } catch(e) {}
         try { _gtbUpdateWeightBars(name, sfx); } catch(e) {}
 
         // ── Trade Analysis — render inline after all data is ready ───────────────
@@ -5925,6 +5932,12 @@ async function _gtbLoadInstrDetail(name) {
     h += '<div class="gtb-ic-panel" data-col="prob">';
     h +=   '<div class="gtb-ic-panel-hdr"><span class="gtb-ic-panel-title"><i class="bi bi-speedometer2"></i> TREND PROBABILITY</span></div>';
     h +=   '<div class="gtb-ic-panel-body" id="' + tid + '-prob' + sfx + '"></div>';
+    h += '</div>';
+
+    // ── [5b] Level Probability (ASO/AST/VIXU vs BSO/BST/VIXL) ────────────────
+    h += '<div class="gtb-ic-panel" data-col="lvlprob">';
+    h +=   '<div class="gtb-ic-panel-hdr"><span class="gtb-ic-panel-title"><i class="bi bi-signpost-split-fill"></i> LEVEL PROBABILITY' + _ii('dv-lvlprob') + '</span></div>';
+    h +=   '<div class="gtb-ic-panel-body" id="' + tid + '-lvlprob' + sfx + '"></div>';
     h += '</div>';
 
     // ── [6] Futures ──────────────────────────────────────────────────────────
@@ -6128,6 +6141,11 @@ function _gtbLoadInstrDetailPanel(name) {
     h += '<div class="gtb-ic-panel" data-col="prob">';
     h +=   '<div class="gtb-ic-panel-hdr"><span class="gtb-ic-panel-title"><i class="bi bi-speedometer2"></i> TREND PROBABILITY</span></div>';
     h +=   '<div class="gtb-ic-panel-body" id="' + tid + '-prob' + sfx + '"></div>';
+    h += '</div>';
+
+    h += '<div class="gtb-ic-panel" data-col="lvlprob">';
+    h +=   '<div class="gtb-ic-panel-hdr"><span class="gtb-ic-panel-title"><i class="bi bi-signpost-split-fill"></i> LEVEL PROBABILITY' + _ii('dv-lvlprob') + '</span></div>';
+    h +=   '<div class="gtb-ic-panel-body" id="' + tid + '-lvlprob' + sfx + '"></div>';
     h += '</div>';
 
     h += '<div class="gtb-ic-panel" data-col="weights">';
@@ -8014,6 +8032,12 @@ var GTB_INFO = {
         body:'Where the very first 9:15 candle closed relative to the strike levels: <b style="color:#3fb950">AST/ASO</b> = bullish breakout, <b style="color:#f85149">BSO/BST</b> = bearish breakdown, <b>B/W</b> = inside the range. This is fixed for the day at 9:20 and contributes ±1 to the instrument score.' },
     'dv-prob':    { icon:'bi-speedometer2', title:'Trend Probability',
         body:'A bull/bear probability gauge synthesised from 5 signals: composite score, relative strength, market breadth, strike zone bias, and options flow (CE vs PE net OI). VIX acts as a confidence multiplier — low VIX amplifies, high VIX dampens. The needle angle reflects the bull %, with the table below showing each vote.' },
+    'dv-lvlprob': { icon:'bi-signpost-split-fill', title:'Level Probability',
+        body:'Likelihood of price reaching each strike-derived level <b>today</b>, split upside (ASO/AST/VIXU) vs downside (BSO/BST/VIXL). Deliberately weighted toward <b>live signals</b> rather than a historical backtest base rate:<br><br>'
+           + '• <b>Composite score</b> (50%) — 9:15 + trend + futures + OI + Max Pain + IV Skew<br>'
+           + '• <b>Raw OBV flow</b> (25%) — fast, today-only options-tape read<br>'
+           + '• <b>OI wall pressure</b> (25%) — a strong R1/S1 wall close to spot dampens the side it sits on<br><br>'
+           + 'The outer bands (AST/BST, and especially VIXU/VIXL) require progressively stronger conviction to light up, and VIXU/VIXL are additionally damped by how much of today\'s expected VIX range is already used up. These are <b>reasoned live estimates, not statistically fitted probabilities</b> — use as a likelihood ranking between levels, not a precise %.' },
     'dv-futures': { icon:'bi-graph-up-arrow', title:'Futures',
         body:'Futures positioning for this instrument: <b>Primary chip</b> = OI-based REMARK (Long Buildup / Short Buildup / Short Covering / Long Unwinding etc.) colour-coded green/red. <b>Secondary chip</b> = VWAP direction — amber with ⚠ when the two signals conflict. Also shows: VWAP, PCR, premium/discount vs spot, and 5-min OI trend.' },
     'dv-oimatrix':{ icon:'bi-table', title:'OI Matrix',
@@ -8094,6 +8118,12 @@ var GTB_INFO = {
            + '<b>Important caveat:</b> this table only covers the <b>top 10 constituents by weight</b> — for NIFTY 50 that\'s roughly ~53% of the index\'s total weight (Bank Nifty\'s top 10 is ~86%, much more complete). If the stocks shown here net negative while the actual index is positive (or vice-versa), a <b style="color:var(--gtb-amber)">CAUTION</b> banner replaces the verdict — it means the other stocks not shown in this table (or futures/breadth) are doing the real driving, not these ones.' },
     'sig-oi-cumimpact': { icon:'bi-bar-chart-line-fill', title:'Cumulative Impact Share',
         body:'Running share of total |Index Impact| across this group\'s constituents, in the current sort order. When sorted by Impact, this shows how concentrated the index move is — e.g. if the top 2-3 stocks already reach 70-80%, the rest of the constituents are largely just following, not driving.' },
+    'gdb-nb-div': { icon:'bi-shuffle', title:'NIFTY / BANK NIFTY Divergence',
+        body:'NIFTY 50 and BANK NIFTY are correlated but not locked together — one frequently leads or drags the other. Compares each index\'s own composite score (direction thresholded at ±1 to filter noise) and classifies the pair:<br><br>'
+           + '<b style="color:var(--gtb-green)">ALIGNED</b> — both agree. Highest-conviction setup, no cross-index drag risk.<br>'
+           + '<b>BANK LEADING</b> / <b>NIFTY LEADING</b> — one index has conviction, the other is flat. The leading index typically drags the flat one along.<br>'
+           + '<b style="color:var(--gtb-amber)">FIGHTING</b> — both have conviction but disagree. Historically, <b>Bank Nifty\'s conviction wins more often than not</b> in this scenario — the widget leans its call toward Bank Nifty\'s direction rather than treating it as a coin flip, and flags a pure Nifty-only trade here as lower conviction until Bank flips or Nifty catches up.<br><br>'
+           + 'This is a probabilistic lean, not a mechanical rule — a bank-specific news event or IT/pharma-heavy Nifty move can genuinely decouple the two. Use it to size/confirm, not as a standalone signal.' },
     'sig-oi-walls':  { icon:'bi-bricks', title:'Support / Resistance Walls (R1/R2, S1/S2)',
         body:'Every OTM (not ITM) strike showing a full-weight fresh <b>WRITE</b> (new call or put positions opening, not just closing/covering) is a wall candidate. Candidates are ranked by <b>OBV magnitude</b> — the volume pressure actually behind that writing — not by the strike\'s combined CE+PE score, so the strike with the single biggest negative/positive score is not automatically tagged as the wall.<br><br>'
            + '<b style="color:#dc3545;">R1</b> / <b style="color:#28a745;">S1</b> — the <b>primary</b> wall on each side: the single strongest OTM WRITE candidate. Trust this one most.<br>'
@@ -9837,6 +9867,100 @@ function _cmdTrendProb(name, fres) {
         +'</div>'
         +'<div class="cmd-sig-list">'+sigRows+'</div>'
         +'</div>';
+}
+
+// ── Level Probability (ASO/AST/VIXU upside vs BSO/BST/VIXL downside) ──────────
+// Live-signal-driven likelihood of price reaching each strike-derived level today.
+// Deliberately does NOT blend in a historical backtest base rate — weighted toward TODAY's
+// live signals per explicit instruction: composite score (9:15+trend+futures+OI+MaxPain+
+// IVSkew — already all "today" data), raw OBV flow (fast options-tape read, independent of
+// the IV/price fallback), OI wall pressure (a strong wall close to spot dampens the side it
+// sits on), and how much of today's expected VIX range is already used up (less room left
+// dampens further reach that direction). These are reasoned live estimates, not statistically
+// fitted probabilities — surfaced as "likelihood", not "%", to avoid overstating precision.
+function _gtbLevelProb(name) {
+    var out = { pASO:null, pAST:null, pVIXU:null, pBSO:null, pBST:null, pVIXL:null, netDir:0, ok:false };
+    var tr; try { tr = generateTrend(name); } catch(e) { return out; }
+    if (!tr || !tr.strikeData || !tr.vix) return out;
+
+    var ltp = parseFloat(tr.ltp), open = parseFloat(tr.open || tr.price);
+    var vixRange = parseFloat(tr.vix.vixDDRange) || 0;
+    if (!ltp || !open) return out;
+
+    // 1. Composite score — heaviest live input (9:15 + trend + futures + OI + MaxPain + IVSkew)
+    var sc = 0; try { sc = computeInstrumentScore(name).total; } catch(e) {}
+    var s1 = Math.max(-1, Math.min(1, sc / 8));
+
+    // 2. Raw OBV flow — fast, today-only options-tape read
+    var obvFlow = 0;
+    var sm = INSTRUMENT_SCORE_MAP[name];
+    if (sm && sm.oiData) { try { obvFlow = sm.oiData.obvFlow || 0; } catch(e) {} }
+    var s2 = Math.max(-1, Math.min(1, obvFlow / 4));
+
+    // 3. OI wall pressure — a strong wall close to spot dampens the side it sits on
+    var wallBias = 0;
+    if (sm && sm.oiData && sm.oiData.tableData && sm.oiData.tableData.length) {
+        try {
+            var pc = parseFloat(tr.change) || 0;
+            var walls = _gtbFindWalls(sm.oiData.tableData, pc, ltp);
+            var _pressure = function(w) {
+                if (!w || !w.length) return 0;
+                var p = 0;
+                w.forEach(function(x) {
+                    var distPct = Math.abs(x.strike - ltp) / ltp * 100;
+                    var prox = Math.max(0, 1 - distPct / 2); // fades out beyond ~2% away
+                    var strength = x.tier === 'primary' ? 1 : 0.6;
+                    p = Math.max(p, prox * strength);
+                });
+                return p;
+            };
+            var resP = _pressure(walls.resistance); // dampens upside
+            var supP = _pressure(walls.support);     // dampens downside / supports upside
+            wallBias = supP - resP;
+        } catch(e) {}
+    }
+
+    var netDir = 0.5 * s1 + 0.25 * s2 + 0.25 * wallBias; // -1..1, positive = bullish lean
+    out.netDir = netDir;
+
+    // 4. Room already used toward today's expected VIX range — dampens further reach that way
+    var roomUp   = vixRange ? Math.max(0, (ltp - open) / vixRange) : 0;
+    var roomDown = vixRange ? Math.max(0, (open - ltp) / vixRange) : 0;
+
+    var sig = function(x) { return 1 / (1 + Math.exp(-x)); };
+    var k = 2.6;
+    out.pASO  = Math.round(sig(k * (netDir - 0.0))  * 100);
+    out.pAST  = Math.round(sig(k * (netDir - 0.4))  * 100);
+    out.pVIXU = Math.round(sig(k * (netDir - 0.55)) * (1 - Math.min(1, roomUp) * 0.5)   * 100);
+    out.pBSO  = Math.round(sig(k * (-netDir - 0.0))  * 100);
+    out.pBST  = Math.round(sig(k * (-netDir - 0.4))  * 100);
+    out.pVIXL = Math.round(sig(k * (-netDir - 0.55)) * (1 - Math.min(1, roomDown) * 0.5) * 100);
+    out.ok = true;
+    return out;
+}
+
+function _gtbLevelProbHtml(name) {
+    var p = _gtbLevelProb(name);
+    if (!p.ok) return '<span style="color:var(--gtb-muted);font-size:0.56rem;">No data yet — run a refresh</span>';
+    var _bar = function(label, val, col) {
+        return '<div style="display:flex;align-items:center;gap:4px;margin-bottom:2px;">'
+            + '<span style="width:32px;font-size:0.48rem;color:var(--gtb-muted);">' + label + '</span>'
+            + '<div style="flex:1;height:5px;background:var(--gtb-surface2);border-radius:3px;overflow:hidden;"><div style="width:' + val + '%;height:100%;background:' + col + ';"></div></div>'
+            + '<span style="width:26px;text-align:right;font-size:0.48rem;font-weight:700;color:' + col + ';">' + val + '%</span>'
+            + '</div>';
+    };
+    var up = 'var(--gtb-green)', dn = 'var(--gtb-red)';
+    return '<div style="display:flex;gap:10px;">'
+        + '<div style="flex:1;">'
+        +   '<div style="font-size:0.42rem;font-weight:700;color:var(--gtb-muted);text-transform:uppercase;margin-bottom:3px;">Upside (today)</div>'
+        +   _bar('ASO', p.pASO, up) + _bar('AST', p.pAST, up) + _bar('VIXU', p.pVIXU, up)
+        + '</div>'
+        + '<div style="flex:1;">'
+        +   '<div style="font-size:0.42rem;font-weight:700;color:var(--gtb-muted);text-transform:uppercase;margin-bottom:3px;">Downside (today)</div>'
+        +   _bar('BSO', p.pBSO, dn) + _bar('BST', p.pBST, dn) + _bar('VIXL', p.pVIXL, dn)
+        + '</div>'
+        + '</div>'
+        + '<div style="font-size:0.42rem;color:var(--gtb-muted);margin-top:3px;">Live-signal likelihood (score + OBV flow + OI wall pressure + VIX-range room used) — a reasoned estimate, not a statistically fitted probability.</div>';
 }
 
 function _cmdUpdateStatus() {
@@ -15149,6 +15273,33 @@ function _gtbRenderMetricsPane() {
             + '</div>';
     }).join('');
     h += _section('AVWAP (9:15 FUTURES ANCHOR)', 'bi-bar-chart-line-fill', 0, _avwapRows);
+
+    // ── Level Probability — indices + their top weighted constituents ────────
+    // Live-signal likelihood of reaching ASO/AST/VIXU (up) or BSO/BST/VIXL (down) today.
+    // See _gtbLevelProb() — weighted toward today's live signals, not a historical base rate.
+    (function() {
+        var lvlNames = ['NIFTY 50', 'NIFTY BANK']
+            .concat(Object.keys(NIFTY_50_WEIGHTED_STOCKS || {}))
+            .concat(Object.keys(NIFTY_BANK_WEIGHTED_STOCKS || {}));
+        var seenLvl = {};
+        lvlNames = lvlNames.filter(function(n) { return seenLvl[n] ? false : (seenLvl[n] = true); });
+
+        var lvlRows = lvlNames.map(function(name) {
+            var p; try { p = _gtbLevelProb(name); } catch(e) { p = { ok:false }; }
+            if (!p.ok) return '';
+            var upMax = Math.max(p.pASO, p.pAST, p.pVIXU);
+            var dnMax = Math.max(p.pBSO, p.pBST, p.pVIXL);
+            var lean = upMax >= dnMax ? 'up' : 'down';
+            var leanCol = lean === 'up' ? 'var(--gtb-green)' : 'var(--gtb-red)';
+            return '<div style="display:grid;grid-template-columns:70px 1fr 1fr;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid var(--gtb-border)18;font-size:0.44rem;">'
+                + '<span style="color:var(--gtb-text);font-weight:700;">' + name + '</span>'
+                + '<span style="color:var(--gtb-green);">ASO ' + p.pASO + '% &middot; AST ' + p.pAST + '% &middot; VIXU ' + p.pVIXU + '%</span>'
+                + '<span style="color:var(--gtb-red);">BSO ' + p.pBSO + '% &middot; BST ' + p.pBST + '% &middot; VIXL ' + p.pVIXL + '%</span>'
+                + '</div>';
+        }).join('');
+        h += _section('LEVEL PROBABILITY (LIVE SIGNALS)' + _ii('dv-lvlprob'), 'bi-signpost-split-fill', 0,
+            lvlRows || '<div style="font-size:0.5rem;color:var(--gtb-muted);padding:4px 0;">No data yet — run a refresh</div>');
+    })();
 
     h += '</div></div>';
     } // end else (score view)
