@@ -171,6 +171,16 @@ async function showTopChartMCX(name, chartHeight, bindtoDivId) {
             INSTRUMENT_SCORE_MAP[name].open      = open;
         }
 
+        // Dead zone (same weak-conviction band as showTopChart's NSE charts — see
+        // _gtbDeadZone() in grootTradeBot.js): nearest OI-wall S1/R1, falling back to
+        // BSO/ASO, only drawn while the composite score is inside the weak-conviction range.
+        var _dzMCX = null;
+        try { if (typeof _gtbDeadZone === 'function') _dzMCX = _gtbDeadZone(name); } catch (_dzeMCX) {}
+        if (_dzMCX) {
+            refLines.push({ key: 'DEADLO', value: _dzMCX.lo, text: 'DEAD ' + _dzMCX.lo });
+            refLines.push({ key: 'DEADHI', value: _dzMCX.hi, text: 'DEAD ' + _dzMCX.hi });
+        }
+
         // Use LightweightCharts candlestick (defined in grootTradeBot.js)
         if (typeof _renderLWChart === 'function') {
             var _noYAxis = (name === 'CRUDEOILM' || name === 'USDINR');
@@ -245,7 +255,8 @@ async function showTopChartMCX(name, chartHeight, bindtoDivId) {
             + _lbl('A+',  _sm.ustrikeTwo,  true)
             + _lbl('A',   _sm.ustrikeOne,  true)
             + _lbl('B',   _sm.bstrikeOne,  false)
-            + _lbl('B-',  _sm.bstrikeTwo,  false);
+            + _lbl('B-',  _sm.bstrikeTwo,  false)
+            + (_dzMCX ? '<span style="font-size:0.5rem;white-space:nowrap;color:#8b5cf6;" title="Dead zone — weak-conviction band, wait for a close through it"><b>D↓</b> ' + _dzMCX.lo.toFixed(2) + ' <b>D↑</b> ' + _dzMCX.hi.toFixed(2) + '</span>' : '');
         // Write levels to every known target
         var _ids = [
             tempName + '-chart-levels',

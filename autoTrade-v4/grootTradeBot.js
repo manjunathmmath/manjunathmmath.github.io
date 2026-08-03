@@ -1077,6 +1077,14 @@ function _buildCardStandalone(item) {
     h += '<div class="gtb-ic-panel" data-col="lvlprob"><div class="gtb-ic-panel-hdr"><span class="gtb-ic-panel-title"><i class="bi bi-signpost-split-fill"></i> LEVEL PROBABILITY' + _ii('dv-lvlprob') + '</span></div>'
        + '<div class="gtb-ic-panel-body" id="' + tid + '-lvlprob"></div></div>';
 
+    // Panel: futures REMARK accuracy — how often THIS instrument's own futures REMARK
+    // correctly predicted the next 5-min candle's direction, reconstructed from today's
+    // candles (same engine as the Commodities popup's crude-only accuracy panel, generalised
+    // to any instrument via _gtbFetchFutCandles/_gtbFetchFutCandlesMCX).
+    h += '<div class="gtb-ic-panel" data-col="futacc"><div class="gtb-ic-panel-hdr"><span class="gtb-ic-panel-title"><i class="bi bi-bullseye"></i> FUTURES REMARK ACCURACY' + _ii('dv-futacc') + '</span>'
+       + '<span class="gtb-ic-panel-btns"><button class="gtb-sig-hdr-btn dv-futacc-reload" data-name="' + name + '"><i class="bi bi-arrow-clockwise"></i></button></span></div>'
+       + '<div class="gtb-ic-panel-body" id="' + tid + '-futacc"><div class="cmd-load"><i class="bi bi-hourglass-split"></i> Replaying 5-min candles…</div></div></div>';
+
     // Panel: fut
     h += '<div class="gtb-ic-panel" data-col="fut"><div class="gtb-ic-panel-hdr"><span class="gtb-ic-panel-title"><i class="bi bi-graph-up-arrow"></i> FUTURES' + _ii('dv-futures') + '</span>'
        + '<span class="gtb-ic-panel-btns"><button class="sv-icon-btn maximize-component-btn" data-name="' + name + '" data-type="futures"><i class="bi bi-fullscreen"></i></button></span></div>'
@@ -1157,6 +1165,14 @@ function commonMarkupPlaceHolder() {
         h += '</div>';
     });
     h += '<div class="gtb-vix-badge"><div class="vix-label"><i class="bi bi-activity"></i> VIX</div><div class="vix-val" id="gtb-vix-val">—</div><div class="vix-chg flat" id="gtb-vix-chg">—</div></div>';
+
+    // Funds + day P&L — pulled from /oms/margins + /oms/portfolio/positions (same
+    // enctoken/same-origin pattern as the Notes tab's Kite import, no separate API app).
+    h += '<div class="gtb-vix-badge" id="gtb-funds-badge" title="Click to refresh funds &amp; P&amp;L" style="cursor:pointer;">'
+       + '<div class="vix-label"><i class="bi bi-wallet2"></i> FUNDS</div>'
+       + '<div class="vix-val" id="gtb-funds-val">—</div>'
+       + '<div class="vix-chg flat" id="gtb-funds-pnl">P&amp;L —</div>'
+       + '</div>';
 
     h += '<div id="gtb-master-badge">';
     h += '<span class="gtb-window-pill closed" id="gtb-window-pill">LOADING</span>';
@@ -1294,6 +1310,7 @@ function commonMarkupPlaceHolder() {
     h += '<div id="gtb-tab-strip">'
         // ── Tabs ─────────────────────────────────────────────────────────────
         + '<button class="gtb-tab active" data-tab="metrics"><i class="bi bi-speedometer2"></i> Metrics</button>'
+        + '<button class="gtb-tab" data-tab="lvlprob"><i class="bi bi-signpost-split-fill"></i> Level Prob</button>'
         + '<button class="gtb-tab" data-tab="main"><i class="bi bi-grid"></i> Overview</button>'
         + '<button class="gtb-tab" data-tab="signals"><i class="bi bi-layers-fill"></i> Signals</button>'
         + '<button class="gtb-tab" data-tab="mpgex"><i class="bi bi-bar-chart-steps"></i> Max Pain</button>'
@@ -1301,6 +1318,7 @@ function commonMarkupPlaceHolder() {
         + '<button class="gtb-tab" data-tab="opps"><i class="bi bi-lightning-charge-fill"></i> Opportunities</button>'
         + '<button class="gtb-tab" data-tab="trade"><i class="bi bi-lightning-fill"></i> Trade</button>'
         + '<button class="gtb-tab" data-tab="checklist"><i class="bi bi-clipboard-check"></i> Checklist</button>'
+        + '<button class="gtb-tab" data-tab="notes"><i class="bi bi-journal-text"></i> Notes</button>'
         // ── Spacer ───────────────────────────────────────────────────────────
         + '<span class="gtb-tab-sep"></span>'
         // ── Tool buttons (all 15 — topbar icons + float-menu extras) ─────────
@@ -1321,6 +1339,7 @@ function commonMarkupPlaceHolder() {
         + '<a id="data-load"                 class="gtb-ctrl-link" title="Data Settings"><i class="bi bi-sliders"></i></a>'
         + '</div>';
     h += '<div id="gtb-pane-metrics" class="gtb-tab-pane" style="display:none;overflow-y:auto;padding:0;"></div>';
+    h += '<div id="gtb-pane-lvlprob" class="gtb-tab-pane" style="display:none;overflow:auto;padding:0;"></div>';
     h += '<div id="gtb-pane-main"  class="gtb-tab-pane" style="display:none;">';
 
     // Populate the module-level _allInstruments with custom instruments before rendering
@@ -1687,6 +1706,7 @@ function commonMarkupPlaceHolder() {
     h += '<div id="gtb-pane-opps"       class="gtb-tab-pane" style="display:none;overflow-y:auto;padding:4px;"></div>';
     h += '<div id="gtb-pane-trade"     class="gtb-tab-pane" style="display:none;overflow:hidden;padding:0;"></div>';
     h += '<div id="gtb-pane-checklist" class="gtb-tab-pane" style="display:none;overflow-y:auto;padding:0;"></div>';
+    h += '<div id="gtb-pane-notes" class="gtb-tab-pane" style="display:none;overflow-y:auto;padding:0;"></div>';
 
     h += '</div>'; // end #gtb-right
 
@@ -1819,6 +1839,7 @@ function _gtbActivateTab(tabId) {
 
 var _GTB_PANE_GRIDS = {
     metrics:  function() { return ''; },
+    lvlprob:  function() { return ''; },
     signals:  function() { return _gtbSignalsPaneHtml(); },
     mpgex:    function() { return _gtbMpGexPaneHtml(); },
     // Analysis tab: full bloomberg dashboard rendered by _btRenderInPane
@@ -1829,10 +1850,13 @@ var _GTB_PANE_GRIDS = {
     trade: function() { return null; },
     // Checklist tab: rendered by _gtbRenderChecklistPane
     checklist: function() { return ''; },
+    // Notes tab: rendered by _gtbRenderNotesPane
+    notes: function() { return ''; },
 };
 
 var _GTB_PANE_RENDERS = {
     metrics:  [function(){try{_gtbRenderMetricsPane();}catch(e){}}],
+    lvlprob:  [function(){try{_gtbRenderLevelProbPane();}catch(e){}}],
     signals:  [function(){try{_gtbRenderSignalsPane();}catch(e){}}],
     mpgex:    [function(){try{_gtbRenderMpGexPane();}catch(e){}}],
     analysis: [function(){try{_btRenderInPane('#gtb-pane-analysis');}catch(e){}}],
@@ -1849,7 +1873,8 @@ var _GTB_PANE_RENDERS = {
             }
         }
     }],
-    checklist: [function(){try{_gtbRenderChecklistPane();}catch(e){}}]
+    checklist: [function(){try{_gtbRenderChecklistPane();}catch(e){}}],
+    notes:     [function(){try{_gtbRenderNotesPane();}catch(e){}}]
 };
 
 // ── Signals tab: 3-column layout ─────────────────────────────────────────────
@@ -3008,6 +3033,7 @@ async function commonShowPopupWindow() {
     setScore()
     showStockList([]);
     try { updateTopBarTickers(); } catch(e) {}
+    try { _gtbUpdateFundsBadge(); } catch(e) {}
 
     jQ("#refresh-loader").addClass("hide");
     jQ("#start-auto-refresh").css('opacity', '').css('pointer-events', '');
@@ -3018,6 +3044,10 @@ async function commonShowPopupWindow() {
     try { renderComponentPanel(); } catch(e) { console.warn('renderComponentPanel error', e); }
     try { renderScoreHistory(); } catch(e) { console.warn('renderScoreHistory error', e); }
     try { _gtbApplyChecklistHighlights(); } catch(e) { console.warn('checklist highlight error', e); }
+    try {
+        _gtbSnapshotLevelProb();
+        if (jQ('#gtb-pane-lvlprob').is(':visible')) _gtbRenderLevelProbPane();
+    } catch(e) { console.warn('level prob snapshot error', e); }
 
     var _elapsed = ((Date.now() - _refreshStart) / 1000).toFixed(1);
     var _endTime = moment().format("HH:mm:ss");
@@ -5741,6 +5771,83 @@ function _dvSet915(name, tid, sfx) {
     } catch(e) {}
 }
 
+// Futures REMARK accuracy for a single instrument, in the Instrument Detail View — same
+// engine as the Commodities popup's crude-only accuracy panel (_cmdLoadCrudeAcc), generalised
+// to any NSE or MCX instrument via _gtbFetchFutCandles/_gtbFetchFutCandlesMCX. Fetches its own
+// 5-min candle series (independent of _dvFetchAndRender's other panels) since replaying a full
+// day of candles is slower than everything else on this page — fired async, not blocking.
+async function _dvLoadFutAcc(name, tid, sfx, isMcx) {
+    var elId = tid + '-futacc' + sfx;
+    var el = document.getElementById(elId);
+    if (!el) return;
+    el.innerHTML = '<div class="cmd-load"><i class="bi bi-hourglass-split"></i> Replaying 5-min candles…</div>';
+    try {
+        var vix = 0;
+        try { vix = parseFloat((JSON.parse(localStorage.getItem('INSTRUMENT_LTP_PRICE') || '{}')['INDIA VIX'] || {}).ltp) || 0; } catch(er) {}
+        var cd = isMcx
+            ? await _gtbFetchFutCandlesMCX(name).catch(function() { return null; })
+            : await _gtbFetchFutCandles(name).catch(function() { return null; });
+        if (!cd) { el.innerHTML = '<div class="cmd-load" style="color:var(--gtb-red);">No 5-min candle data for ' + name + '.</div>'; return; }
+
+        var accMap = {};
+        _gtbReconstructFutAccuracy(cd, vix, accMap);
+        // Cache per-REMARK win-rate/avgPts so _btStrategyFor (Trade Analysis) can fold this
+        // instrument's OWN historical accuracy for its CURRENT remark into the recommendation,
+        // instead of treating every REMARK as equally trustworthy.
+        if (!INSTRUMENT_SCORE_MAP[name]) INSTRUMENT_SCORE_MAP[name] = {};
+        INSTRUMENT_SCORE_MAP[name].futAccMap = accMap;
+        var rows = Object.keys(accMap).map(function(key) {
+            var a = accMap[key];
+            return { remark: key, total: a.total, hits: a.hits,
+                     win: a.total ? Math.round(a.hits / a.total * 100) : 0,
+                     avgPts: a.total ? (a.pts / a.total) : 0,
+                     dir: getFuturesTrendScore(key) };
+        }).sort(function(x, y) { return y.total - x.total; });
+
+        if (!rows.length) { el.innerHTML = '<div class="cmd-load" style="color:var(--gtb-red);">No accuracy data reconstructed for ' + name + '.</div>'; return; }
+
+        var body = '<table class="gtb-t915-table"><thead><tr>'
+            + '<th>Remark</th><th>Bias</th><th>Samples</th><th>Win-rate</th><th>Avg pts</th>'
+            + '</tr></thead><tbody>';
+        rows.forEach(function(r) {
+            var bc  = r.dir > 0 ? 'up' : r.dir < 0 ? 'down' : 'flat';
+            var wc  = r.win >= 60 ? 'var(--gtb-green)' : r.win <= 40 ? 'var(--gtb-red)' : 'var(--gtb-amber)';
+            var ptc = r.avgPts >= 0 ? 'var(--gtb-green)' : 'var(--gtb-red)';
+            var dirc = r.dir > 0 ? 'var(--gtb-green)' : r.dir < 0 ? 'var(--gtb-red)' : 'var(--gtb-muted)';
+            var isReliable = r.win >= 60 && r.avgPts > 0 && r.total >= 8;
+            var rowStyle = r.total < 8 ? 'opacity:0.55;' : isReliable ? 'background:var(--gtb-green)18;outline:1px solid var(--gtb-green)44;' : '';
+            body += '<tr' + (rowStyle ? ' style="' + rowStyle + '"' : '') + '>'
+                + '<td><span class="gtb-t915-out ' + bc + '">' + r.remark + '</span>' + (isReliable ? ' <span style="font-size:0.44rem;color:var(--gtb-green);font-weight:800;">★</span>' : '') + '</td>'
+                + '<td style="font-family:var(--gtb-mono);color:' + dirc + ';">' + (r.dir > 0 ? '▲' : r.dir < 0 ? '▼' : '—') + '</td>'
+                + '<td class="gtb-t915-date">' + r.total + '</td>'
+                + '<td style="font-family:var(--gtb-mono);font-weight:800;color:' + wc + ';">' + r.win + '%</td>'
+                + '<td style="font-family:var(--gtb-mono);color:' + ptc + ';">' + (r.avgPts >= 0 ? '+' : '') + r.avgPts.toFixed(1) + '</td>'
+                + '</tr>';
+        });
+        body += '</tbody></table>';
+        el.innerHTML = '<div class="gtb-t915-wrap">' + body + '</div>';
+    } catch(e) {
+        el.innerHTML = '<div class="cmd-load" style="color:var(--gtb-red);">Error loading accuracy data.</div>';
+        console.log('_dvLoadFutAcc', name, e);
+    }
+}
+
+// Delegated reload button for the Futures Remark Accuracy panel — works across all three
+// Instrument Detail View template variants since they all share the same button class.
+jQ(document).off('click.dv-futacc-reload').on('click.dv-futacc-reload', '.dv-futacc-reload', function() {
+    var name = jQ(this).data('name');
+    var $panel = jQ(this).closest('.gtb-ic-panel').find('.gtb-ic-panel-body');
+    if (!name || !$panel.length) return;
+    var elId = $panel.attr('id');
+    // Derive tid/sfx/isMcx back out of the rendered element id (tid + '-futacc' + sfx) and the
+    // instrument's own exchange, rather than threading extra data-attrs through 3 templates.
+    var sfxIdx = elId.indexOf('-futacc');
+    var tid = elId.slice(0, sfxIdx);
+    var sfx = elId.slice(sfxIdx + '-futacc'.length);
+    var isMcx = (typeof _gtbIsMcxFuture === 'function') ? _gtbIsMcxFuture(name) : false;
+    _dvLoadFutAcc(name, tid, sfx, isMcx);
+});
+
 // Fetch live data then render trend probability, OI/OBV, futures, OI matrix,
 // weightage bars, and PCR — all in correct dependency order
 async function _dvFetchAndRender(name, tid, sfx, isMcx) {
@@ -5758,6 +5865,7 @@ async function _dvFetchAndRender(name, tid, sfx, isMcx) {
                 setFutureDetails(name, res, sfx);          // populates futures panel + remark chip
                 if (!INSTRUMENT_SCORE_MAP[name]) INSTRUMENT_SCORE_MAP[name] = {};
                 INSTRUMENT_SCORE_MAP[name].futures_trend = getFuturesTrendScore(res['REMARK']);
+                INSTRUMENT_SCORE_MAP[name].futures_trend_remark = res['REMARK'];
                 INSTRUMENT_SCORE_MAP[name].oi_obv = 0;
                 await showPrictionProbabiltyMCX(name, res);
                 showOIOBVBarChart(name, sfx);
@@ -5797,6 +5905,7 @@ async function _dvFetchAndRender(name, tid, sfx, isMcx) {
                 setFutureDetails(name, fres, sfx);          // populates futures panel + remark chip
                 if (!INSTRUMENT_SCORE_MAP[name]) INSTRUMENT_SCORE_MAP[name] = {};
                 INSTRUMENT_SCORE_MAP[name].futures_trend = getFuturesTrendScore(fres['REMARK']);
+                INSTRUMENT_SCORE_MAP[name].futures_trend_remark = fres['REMARK'];
                 INSTRUMENT_SCORE_MAP[name].avwap = fres['vwapPrice'] || 0;
             }
         }
@@ -5810,6 +5919,9 @@ async function _dvFetchAndRender(name, tid, sfx, isMcx) {
         } catch(e) {}
         try { jQ('#' + tid + '-prob' + sfx).html(_cmdTrendProb(name, null)); } catch(e) {}
         try { jQ('#' + tid + '-lvlprob' + sfx).html(_gtbLevelProbHtml(name)); } catch(e) {}
+        // Fire-and-forget — a full day's candle replay is slower than everything else on this
+        // page, and doesn't block any score-dependent panel above.
+        try { _dvLoadFutAcc(name, tid, sfx, isMcx); } catch(e) {}
         try { _gtbUpdateWeightBars(name, sfx); } catch(e) {}
 
         // ── Trade Analysis — render inline after all data is ready ───────────────
@@ -5938,6 +6050,14 @@ async function _gtbLoadInstrDetail(name) {
     h += '<div class="gtb-ic-panel" data-col="lvlprob">';
     h +=   '<div class="gtb-ic-panel-hdr"><span class="gtb-ic-panel-title"><i class="bi bi-signpost-split-fill"></i> LEVEL PROBABILITY' + _ii('dv-lvlprob') + '</span></div>';
     h +=   '<div class="gtb-ic-panel-body" id="' + tid + '-lvlprob' + sfx + '"></div>';
+    h += '</div>';
+
+    // ── [5c] Futures REMARK Accuracy — how often THIS instrument's own futures REMARK
+    // correctly predicted the next 5-min candle, reconstructed from today's candles. ──
+    h += '<div class="gtb-ic-panel" data-col="futacc">';
+    h +=   '<div class="gtb-ic-panel-hdr"><span class="gtb-ic-panel-title"><i class="bi bi-bullseye"></i> FUTURES REMARK ACCURACY' + _ii('dv-futacc') + '</span>';
+    h +=     '<span class="gtb-ic-panel-btns"><button class="gtb-sig-hdr-btn dv-futacc-reload" data-name="' + name + '"><i class="bi bi-arrow-clockwise"></i></button></span></div>';
+    h +=   '<div class="gtb-ic-panel-body" id="' + tid + '-futacc' + sfx + '"><div class="cmd-load"><i class="bi bi-hourglass-split"></i> Replaying 5-min candles…</div></div>';
     h += '</div>';
 
     // ── [6] Futures ──────────────────────────────────────────────────────────
@@ -6146,6 +6266,12 @@ function _gtbLoadInstrDetailPanel(name) {
     h += '<div class="gtb-ic-panel" data-col="lvlprob">';
     h +=   '<div class="gtb-ic-panel-hdr"><span class="gtb-ic-panel-title"><i class="bi bi-signpost-split-fill"></i> LEVEL PROBABILITY' + _ii('dv-lvlprob') + '</span></div>';
     h +=   '<div class="gtb-ic-panel-body" id="' + tid + '-lvlprob' + sfx + '"></div>';
+    h += '</div>';
+
+    h += '<div class="gtb-ic-panel" data-col="futacc">';
+    h +=   '<div class="gtb-ic-panel-hdr"><span class="gtb-ic-panel-title"><i class="bi bi-bullseye"></i> FUTURES REMARK ACCURACY' + _ii('dv-futacc') + '</span>';
+    h +=     '<span class="gtb-ic-panel-btns"><button class="gtb-sig-hdr-btn dv-futacc-reload" data-name="' + name + '"><i class="bi bi-arrow-clockwise"></i></button></span></div>';
+    h +=   '<div class="gtb-ic-panel-body" id="' + tid + '-futacc' + sfx + '"><div class="cmd-load"><i class="bi bi-hourglass-split"></i> Replaying 5-min candles…</div></div>';
     h += '</div>';
 
     h += '<div class="gtb-ic-panel" data-col="weights">';
@@ -6840,6 +6966,7 @@ function setScore() {
     try { renderTopTradesPanel(); } catch(e) {}
     try { renderExitBanner(); } catch(e) {}
     try { updateTopBarTickers(); } catch(e) {}
+    try { _gtbUpdateFundsBadge(); } catch(e) {}
 
     // trend-scoreboard-outcome is now merged into market-final-signal above
 
@@ -7782,6 +7909,56 @@ function updateTopBarTickers() {
     } catch(e) {}
 }
 
+// ── Funds + day P&L badge ─────────────────────────────────────────────────────
+// /oms/margins is kite.zerodha.com's own internal endpoint (same-origin — enctoken header
+// via jQ.ajax, no CORS/GM_xmlhttpRequest needed, same pattern as _gtbDiaryFetchPositions).
+// Shape: { data: { equity: { available: { live_balance, ... }, utilised: {...} },
+//                   commodity: { available: { live_balance, ... }, utilised: {...} } } }
+function _gtbFetchFundsMargins() {
+    return new Promise(function (resolve) {
+        jQ.ajax({
+            url: BASE_URL + '/oms/margins', type: 'GET', cache: false,
+            headers: _gtbDiaryKiteAuthHeader(),
+            success: function (res) { resolve((res && res.data) || {}); },
+            error: function () { resolve({}); }
+        });
+    });
+}
+
+var _GTB_FUNDS_BADGE_LOADING = false;
+function _gtbUpdateFundsBadge() {
+    if (_GTB_FUNDS_BADGE_LOADING) return;
+    _GTB_FUNDS_BADGE_LOADING = true;
+    jQ('#gtb-funds-val').html('<i class="bi bi-hourglass-split"></i>');
+    Promise.all([_gtbFetchFundsMargins(), _gtbDiaryFetchPositions()]).then(function (results) {
+        var margins = results[0] || {};
+        var positions = results[1] || { net: [], day: [] };
+
+        var eqBal = parseFloat((margins.equity && margins.equity.available && margins.equity.available.live_balance) || 0) || 0;
+        var cmBal = parseFloat((margins.commodity && margins.commodity.available && margins.commodity.available.live_balance) || 0) || 0;
+        var totalBal = eqBal + cmBal;
+
+        // Kite already computes each position's day pnl (realised + unrealised for today's
+        // activity) correctly across partial fills/multiplier — sum it directly rather than
+        // re-deriving, same reasoning as the Notes-tab Kite import.
+        var dayPnl = 0;
+        (positions.day || []).forEach(function (p) { dayPnl += parseFloat(p.pnl || 0) || 0; });
+
+        jQ('#gtb-funds-val').text(totalBal ? '₹' + totalBal.toLocaleString('en-IN', { maximumFractionDigits: 0 }) : '—');
+        var pnlCls = dayPnl > 0 ? 'up' : dayPnl < 0 ? 'down' : 'flat';
+        var pnlSign = dayPnl > 0 ? '+' : '';
+        jQ('#gtb-funds-pnl').text('P&L ' + pnlSign + '₹' + dayPnl.toLocaleString('en-IN', { maximumFractionDigits: 0 }))
+            .removeClass('up down flat').addClass(pnlCls);
+    }).catch(function (e) {
+        console.error('[Groot Bot] Funds/P&L badge fetch failed:', e);
+        jQ('#gtb-funds-val').text('err');
+    }).finally(function () { _GTB_FUNDS_BADGE_LOADING = false; });
+}
+
+jQ(document).off('click.gtb-funds-refresh').on('click.gtb-funds-refresh', '#gtb-funds-badge', function () {
+    _gtbUpdateFundsBadge();
+});
+
 // ── Update top bar master signal pill + window pill ──────────────────────────
 function updateTopBarSignal(signal, window) {
     let pill = jQ('#gtb-signal-pill');
@@ -7957,6 +8134,15 @@ jQ(document).on("click", ".refresh-stock-list", function () {
 // ── Section info popovers ─────────────────────────────────────────────────────
 // Each key maps to a short explanation shown when its (i) icon is clicked.
 var GTB_INFO = {
+    deadzone:     { icon:'bi-dash-circle-dotted', title:'Dead Zone (D&darr; / D&uarr;)',
+        body:'Two dashed purple lines marking a price band where futures + OI/OBV + price-action signals disagree or are too weak for real conviction — price is expected to stay range-bound inside this band until it actually breaks it. Bounded by the nearest OI-wall support/resistance (S1/R1, ranked by OBV pressure) when available, else the 9:15 BSO/ASO band. Only drawn when the instrument\'s composite score (<code>computeInstrumentScore().total</code>) is inside &plusmn;3 — once there\'s real conviction, there\'s no dead zone to mark; trust the breakout normally. Read it as: wait for price to actually close through D&uarr;/D&darr; before trading the move.' },
+    cmdglobal:    { icon:'bi-globe2',           title:'Global Context (Crude)',
+        body:'Cross-checks MCX crude against the global benchmark it is actually priced off, since MCX is thin/closed during the price-discovery window and mostly just imports the overnight WTI move + USD/INR.'
+            + '<br><br><b>Fair Value</b> = WTI price ($) &times; USD/INR — the theoretical INR value if MCX traded at exactly the raw global rate. MCX Crude Oil\'s contract spec settles against NYMEX WTI, not Brent.'
+            + '<br><b>MCX LTP</b> = what MCX crude is actually trading at right now.'
+            + '<br><b>Gap</b> = (MCX LTP &minus; Fair Value) / Fair Value. Positive = MCX trading rich vs global &rarr; <i>reversion risk</i> (downside pull). Negative = MCX trading cheap vs global &rarr; <i>catch-up</i> (upside pull).'
+            + '<br><br><b>A single-digit-% gap is normal and mostly structural</b>, even with fully correct live prices — MCX\'s price already bakes in import duty, GST, and freight/dealer margin that a plain WTI&times;USD/INR formula can\'t capture. Only treat this as a data-quality flag once it clears ~12%; check first whether USD/INR or WTI was stale/mistyped (use <b>Fetch Live (WTI + USD/INR)</b> to rule that out) before treating a large gap as a real signal.'
+            + '<br><br><b>Signal</b> combines this gap with WTI direction, USD/INR direction, and an OVX volatility guard (NO TRADE if OVX &ge; 35) into BUY CE / BUY PE / LEAN LONG / LEAN SHORT / WAIT.' },
     score:        { icon:'bi-speedometer2',     title:'Score Gauge',
         body:'The composite market score on a −40…+40 dial. It sums every signal: 9:15 breakouts, advance/decline breadth, futures trend, OI/OBV, and weighted index constituents. Gauge colour: <b style="color:#f85149">red &lt;0</b>, <b style="color:#d29922">orange 0–4</b>, <b style="color:#fbbf24">yellow 4–8</b>, <b style="color:#3fb950">green ≥8</b>. Below it: live N50 &amp; Bank-Nifty advance/decline counts.<br><br><b>Recalibrated (v26.31):</b> the OI/OBV score was de-biased (per-strike wall + standing PCR removed), deflating the composite by ~5–8 points, so the signal/gauge thresholds were lowered and symmetrised. If it feels too sensitive or too quiet, they may need a further nudge after a few live sessions.' },
     rangesb:      { icon:'bi-bar-chart-line-fill', title:'Range Scoreboard',
@@ -8038,6 +8224,8 @@ var GTB_INFO = {
            + '• <b>Raw OBV flow</b> (25%) — fast, today-only options-tape read<br>'
            + '• <b>OI wall pressure</b> (25%) — a strong R1/S1 wall close to spot dampens the side it sits on<br><br>'
            + 'The outer bands (AST/BST, and especially VIXU/VIXL) require progressively stronger conviction to light up, and VIXU/VIXL are additionally damped by how much of today\'s expected VIX range is already used up. These are <b>reasoned live estimates, not statistically fitted probabilities</b> — use as a likelihood ranking between levels, not a precise %.' },
+    'dv-futacc': { icon:'bi-bullseye', title:'Futures Remark Accuracy',
+        body:'Replays today\'s 5-min futures candles and checks, for each REMARK category this instrument\'s own futures contract produced (LONG/SHORT/SHOT_COVERING/LONG_UNWINDING/etc.), how often the next candle actually moved the direction that REMARK implied. <b>Win-rate</b> = % of times it was right; <b>Avg pts</b> = average next-candle move (signed). Rows with <8 samples are dimmed (not enough data yet); a ★ marks a REMARK that\'s both frequent (≥8 samples) and reliable (≥60% win-rate, positive avg pts) for THIS instrument today — not a guarantee, just today\'s reconstructed track record.' },
     'dv-futures': { icon:'bi-graph-up-arrow', title:'Futures',
         body:'Futures positioning for this instrument: <b>Primary chip</b> = OI-based REMARK (Long Buildup / Short Buildup / Short Covering / Long Unwinding etc.) colour-coded green/red. <b>Secondary chip</b> = VWAP direction — amber with ⚠ when the two signals conflict. Also shows: VWAP, PCR, premium/discount vs spot, and 5-min OI trend.' },
     'dv-oimatrix':{ icon:'bi-table', title:'OI Matrix',
@@ -9634,6 +9822,47 @@ function _gtbDimForITM(rgba, isITM) {
 // Weaker candidates than that (below 25% of the primary) are dropped entirely — showing
 // every WRITE-labelled strike would just be clutter/noise, not useful ranking.
 // Returns { resistance: [ {index,strike,mag,tier}, ... up to 2 ], support: [ ... ] }.
+// "Dead zone" — a price band where futures + OI/OBV + price-action signals disagree or are
+// too weak to give real conviction, so price is expected to stay range-bound until it
+// actually breaks the band ("wait for the price reaction" rather than trading the middle).
+// Bounded by the nearest primary OI-wall support/resistance (S1/R1 — already ranked by OBV
+// pressure in _gtbFindWalls, so this reuses the OI+OBV read directly) when both exist;
+// falls back to the 9:15 BSO/ASO band otherwise. Only returned when the instrument's own
+// composite score (computeInstrumentScore, which folds in futures_trend/oi_obv/9:15/etc.)
+// is inside the weak-conviction range — once there's real conviction, there's no dead zone
+// to mark, breakouts should be trusted normally.
+function _gtbDeadZone(name) {
+    try {
+        var cs = computeInstrumentScore(name);
+        if (!cs || Math.abs(cs.total) >= 3) return null;
+
+        var sm = INSTRUMENT_SCORE_MAP[name] || {};
+        var lo = null, hi = null;
+        try {
+            var oiData = sm.oiData;
+            if (oiData && oiData.tableData) {
+                var spot = 0;
+                oiData.tableData.forEach(function (item) { if (item['ATM_STRIKE']) spot = parseFloat(item['STRIKE']) || 0; });
+                var walls = _gtbFindWalls(oiData.tableData, 0, spot);
+                if (walls.support && walls.support[0])    lo = walls.support[0].strike;
+                if (walls.resistance && walls.resistance[0]) hi = walls.resistance[0].strike;
+            }
+        } catch (_e) {}
+
+        if (lo == null || hi == null) {
+            try {
+                var trend = generateTrend(name);
+                if (trend && trend.strikeData) {
+                    if (lo == null) lo = parseFloat(trend.strikeData.bstrikeOne);
+                    if (hi == null) hi = parseFloat(trend.strikeData.ustrikeOne);
+                }
+            } catch (_e2) {}
+        }
+        if (lo == null || hi == null || isNaN(lo) || isNaN(hi) || lo >= hi) return null;
+        return { lo: lo, hi: hi };
+    } catch (e) { return null; }
+}
+
 function _gtbFindWalls(tableData, priceChange, spot) {
     var resAll = [], supAll = [];
     (tableData || []).forEach(function(item, i) {
@@ -9880,11 +10109,35 @@ function _cmdTrendProb(name, fres) {
 // fitted probabilities — surfaced as "likelihood", not "%", to avoid overstating precision.
 function _gtbLevelProb(name) {
     var out = { pASO:null, pAST:null, pVIXU:null, pBSO:null, pBST:null, pVIXL:null, netDir:0, ok:false };
-    var tr; try { tr = generateTrend(name); } catch(e) { return out; }
-    if (!tr || !tr.strikeData || !tr.vix) return out;
+    var sm = INSTRUMENT_SCORE_MAP[name];
 
-    var ltp = parseFloat(tr.ltp), open = parseFloat(tr.open || tr.price);
-    var vixRange = parseFloat(tr.vix.vixDDRange) || 0;
+    // MCX commodities (CRUDEOILM etc.) have no INSTRUMENT_LTP_PRICE/INSTRUMENT_LIST_GLOBAL
+    // entry, so generateTrend(name) always throws for them — strike levels + OVX-based range
+    // instead come from INSTRUMENT_SCORE_MAP[name].strikeMap/.open (set by showTopChartMCX),
+    // same source the commodities popup's own level labels already use.
+    var isMcx = false; try { isMcx = _gtbIsMcxFuture(name); } catch(e) {}
+    var ltp, open, strikeData, vixRange, pc = 0;
+
+    if (isMcx) {
+        if (!sm || !sm.strikeMap || !sm.open) return out;
+        strikeData = sm.strikeMap;
+        open = parseFloat(sm.open);
+        ltp = null;
+        if (sm.oiData && sm.oiData.tableData) {
+            sm.oiData.tableData.forEach(function(it) { if (it['ATM_STRIKE']) ltp = parseFloat(it['STRIKE']); });
+        }
+        if (!ltp) { try { ltp = parseFloat(stock[0]['LTP']); } catch(e) {} }
+        var vU = parseFloat(sm.strikeMap.vixDDUpper), vL = parseFloat(sm.strikeMap.vixDDLower);
+        vixRange = (isFinite(vU) && isFinite(vL)) ? (vU - vL) / 2 : 0;
+        pc = open ? (ltp - open) / open * 100 : 0;
+    } else {
+        var tr; try { tr = generateTrend(name); } catch(e) { return out; }
+        if (!tr || !tr.strikeData || !tr.vix) return out;
+        ltp = parseFloat(tr.ltp); open = parseFloat(tr.open || tr.price);
+        strikeData = tr.strikeData;
+        vixRange = parseFloat(tr.vix.vixDDRange) || 0;
+        pc = parseFloat(tr.change) || 0;
+    }
     if (!ltp || !open) return out;
 
     // 1. Composite score — heaviest live input (9:15 + trend + futures + OI + MaxPain + IVSkew)
@@ -9893,7 +10146,6 @@ function _gtbLevelProb(name) {
 
     // 2. Raw OBV flow — fast, today-only options-tape read
     var obvFlow = 0;
-    var sm = INSTRUMENT_SCORE_MAP[name];
     if (sm && sm.oiData) { try { obvFlow = sm.oiData.obvFlow || 0; } catch(e) {} }
     var s2 = Math.max(-1, Math.min(1, obvFlow / 4));
 
@@ -9901,7 +10153,6 @@ function _gtbLevelProb(name) {
     var wallBias = 0;
     if (sm && sm.oiData && sm.oiData.tableData && sm.oiData.tableData.length) {
         try {
-            var pc = parseFloat(tr.change) || 0;
             var walls = _gtbFindWalls(sm.oiData.tableData, pc, ltp);
             var _pressure = function(w) {
                 if (!w || !w.length) return 0;
@@ -9961,6 +10212,365 @@ function _gtbLevelProbHtml(name) {
         + '</div>'
         + '</div>'
         + '<div style="font-size:0.42rem;color:var(--gtb-muted);margin-top:3px;">Live-signal likelihood (score + OBV flow + OI wall pressure + VIX-range room used) — a reasoned estimate, not a statistically fitted probability.</div>';
+}
+
+// ── Level Probability history (5-min interval snapshots) ─────────────────────
+// _gtbLevelProb() is a live NOW-snapshot; this builds a growing time series of it by
+// capturing one row per instrument at the end of every refresh cycle — which already runs
+// every 5 minutes (manual button or the auto-refresh timer), so no separate timer is needed.
+// Only accumulates going forward from when this first runs — earlier-in-the-day values
+// weren't captured at 5-min granularity before this existed, so there's no backfill.
+// Stored compactly (up/down = the strongest upside/downside level reading, not all 6 numbers)
+// to keep localStorage small across a full session (~75 buckets/day × ~22 instruments).
+// ── Level Probability — historical reconstruction ("as of" any 5-min time today) ──
+// Rebuilds the SAME live-signal formula (_gtbLevelProb) at a PAST candle time T, reusing the
+// per-candle OI/OBV/spot data already cached for Score History (_gtbStrikeItemAtTime,
+// _gtbPriceChangeAtTime, oiData.spotCandles) — so today's whole session can be backfilled,
+// not just captured going forward from whenever this feature first ran.
+// Composite-score input at T uses only the FIXED 9:15 score + the OI score reconstructed at
+// T — futures_trend/max_pain/iv_skew have no per-candle history anywhere in this app (the
+// same gap renderScoreHistory() already documents for those), so they're left out of the
+// historical version rather than silently substituting today's live (wrong-time) values.
+// Max Pain reconstructed at time T — mirrors _gtbComputeMaxPainGEX/_gtbMaxPainScore exactly,
+// but reads strikes/OI from the already time-sliced tableAtT (built by _gtbStrikeItemAtTime
+// in the caller) instead of the live oiData.tableData. Zero new data needed: max pain only
+// ever looked at the same ATM±N strike window already cached for OI/OBV.
+function _gtbMaxPainScoreAtTime(tableAtT) {
+    if (!tableAtT || !tableAtT.length) return 0;
+    var strikes = tableAtT.map(function(r) { return parseFloat(r.STRIKE); });
+    var oiCE = tableAtT.map(function(r) { return parseFloat(r.OI_CE) || 0; });
+    var oiPE = tableAtT.map(function(r) { return parseFloat(r.OI_PE) || 0; });
+    var spot = 0;
+    for (var i = 0; i < tableAtT.length; i++) { if (tableAtT[i].ATM_STRIKE) { spot = strikes[i]; break; } }
+    if (!spot) spot = strikes[Math.floor(strikes.length / 2)];
+    if (!spot) return 0;
+
+    var maxPainK = strikes[0], minPain = Infinity;
+    strikes.forEach(function(K, ki) {
+        var pain = 0;
+        strikes.forEach(function(S, si) {
+            if (S < K) pain += (K - S) * oiCE[si];
+            if (S > K) pain += (S - K) * oiPE[si];
+        });
+        if (pain < minPain) { minPain = pain; maxPainK = K; }
+    });
+    var maxPainPct = (maxPainK - spot) / spot * 100;
+    if (Math.abs(maxPainPct) < 0.3) return 0;
+    return maxPainPct > 0 ? 1 : -1;
+}
+
+// IV Skew reconstructed at time T — mirrors the ivSkew calc in oiAnalyzer.js's
+// showOITrendingDetails (PE OTM IV @ ATM-2 minus CE OTM IV @ ATM+2), reading from tableAtT's
+// already time-sliced CE_IV/PE_IV arrays (same ones _gtbStrikeItemAtTime slices for OI/OBV) —
+// again zero new data needed.
+function _gtbIVSkewScoreAtTime(tableAtT) {
+    if (!tableAtT || !tableAtT.length) return 0;
+    var atmIdx = -1;
+    for (var i = 0; i < tableAtT.length; i++) { if (tableAtT[i].ATM_STRIKE) { atmIdx = i; break; } }
+    if (atmIdx < 0) atmIdx = Math.floor(tableAtT.length / 2);
+    var peOTM = tableAtT[atmIdx - 2], ceOTM = tableAtT[atmIdx + 2];
+    if (!peOTM || !ceOTM) return 0;
+    var peIV = peOTM.PE_IV && peOTM.PE_IV.length ? peOTM.PE_IV[peOTM.PE_IV.length - 1].iv : null;
+    var ceIV = ceOTM.CE_IV && ceOTM.CE_IV.length ? ceOTM.CE_IV[ceOTM.CE_IV.length - 1].iv : null;
+    if (peIV === null || ceIV === null) return 0;
+    var skew = peIV - ceIV;
+    if (skew > 2) return -1;
+    if (skew < -2) return 1;
+    return 0;
+}
+
+function _gtbLevelProbAtTime(name, hhmm, futScoreAtT) {
+    var out = { pASO:null, pAST:null, pVIXU:null, pBSO:null, pBST:null, pVIXL:null, ok:false };
+    var sm = INSTRUMENT_SCORE_MAP[name];
+    if (!sm || !sm.oiData || !sm.oiData.tableData || !sm.oiData.tableData.length) return out;
+    var oiData = sm.oiData;
+    var spotC = oiData.spotCandles || [];
+    if (!spotC.length) return out;
+
+    var priceChangeT = _gtbPriceChangeAtTime(spotC, hhmm);
+    var lastDay = moment(spotC[spotC.length - 1][0]).format('YYYY-MM-DD');
+    var dayOpen = null;
+    for (var k = 0; k < spotC.length; k++) {
+        if (moment(spotC[k][0]).format('YYYY-MM-DD') === lastDay) { dayOpen = parseFloat(spotC[k][1]); break; }
+    }
+    if (!dayOpen) return out;
+    var ltpT = dayOpen * (1 + priceChangeT / 100);
+
+    // Spot anchored to the ATM row's own strike (same convention used live) + the
+    // time-sliced strike table (each strike's OI/OBV/IV reconstructed as of T).
+    var spotT = 0;
+    oiData.tableData.forEach(function(item) { if (item['ATM_STRIKE']) spotT = parseFloat(item['STRIKE']) || 0; });
+    var tableAtT = [];
+    oiData.tableData.forEach(function(item) {
+        var at = _gtbStrikeItemAtTime(item, hhmm);
+        if (!at) return;
+        at.STRIKE = item['STRIKE'];
+        tableAtT.push(at);
+    });
+    if (!tableAtT.length) return out;
+
+    var oiScoreT = 0, obvFlowT = 0;
+    tableAtT.forEach(function(at) {
+        var r = scoreOIStrikeForSignal(at, !!at.ATM_STRIKE, priceChangeT, spotT);
+        oiScoreT += r.score;
+        obvFlowT += r.obvFlow;
+    });
+
+    var maxPainT = _gtbMaxPainScoreAtTime(tableAtT);
+    var ivSkewT  = _gtbIVSkewScoreAtTime(tableAtT);
+    // futures_trend has no per-candle cache of its own (unlike OI/spot) — the caller
+    // (_gtbBuildLevelProbHistoryToday) optionally prefetches futures candles once per
+    // instrument and passes the time-sliced score in; live single-instrument calls
+    // (_gtbLevelProb) that don't prefetch simply omit it (treated as 0 = neutral).
+    var futT = (typeof futScoreAtT === 'number') ? futScoreAtT : 0;
+
+    var b915 = {}; try { b915 = JSON.parse(localStorage.getItem('VALID_BREAKOUT_NINE_FIFTEEN') || '{}'); } catch (e) {}
+    var c915 = (b915[name] || {}).CLOSE_9_15;
+    var s915 = c915 === 'AST' ? 2 : c915 === 'ASO' ? 1 : c915 === 'BST' ? -2 : c915 === 'BSO' ? -1 : 0;
+
+    var s1 = Math.max(-1, Math.min(1, (s915 + oiScoreT + maxPainT + ivSkewT + futT) / 8));
+    var s2 = Math.max(-1, Math.min(1, obvFlowT / 4));
+
+    var wallBias = 0;
+    try {
+        var walls = _gtbFindWalls(tableAtT, priceChangeT, spotT);
+        var _pressure = function(w) {
+            if (!w || !w.length) return 0;
+            var p = 0;
+            w.forEach(function(x) {
+                var distPct = Math.abs(x.strike - spotT) / spotT * 100;
+                var prox = Math.max(0, 1 - distPct / 2);
+                var strength = x.tier === 'primary' ? 1 : 0.6;
+                p = Math.max(p, prox * strength);
+            });
+            return p;
+        };
+        wallBias = _pressure(walls.support) - _pressure(walls.resistance);
+    } catch (e) {}
+
+    var netDir = 0.5 * s1 + 0.25 * s2 + 0.25 * wallBias;
+
+    // VIX range is a fixed daily constant (derived from prevClose), so no time-slicing
+    // needed — reuse the same live lookup as _gtbLevelProb.
+    var vixRange = 0;
+    try {
+        var isMcx = _gtbIsMcxFuture(name);
+        if (isMcx) {
+            var vU = parseFloat(sm.strikeMap && sm.strikeMap.vixDDUpper), vL = parseFloat(sm.strikeMap && sm.strikeMap.vixDDLower);
+            vixRange = (isFinite(vU) && isFinite(vL)) ? (vU - vL) / 2 : 0;
+        } else {
+            vixRange = parseFloat(generateTrend(name).vix.vixDDRange) || 0;
+        }
+    } catch (e) {}
+
+    var roomUp   = vixRange ? Math.max(0, (ltpT - dayOpen) / vixRange) : 0;
+    var roomDown = vixRange ? Math.max(0, (dayOpen - ltpT) / vixRange) : 0;
+
+    var sig = function(x) { return 1 / (1 + Math.exp(-x)); };
+    var k = 2.6;
+    out.pASO  = Math.round(sig(k * (netDir - 0.0))  * 100);
+    out.pAST  = Math.round(sig(k * (netDir - 0.4))  * 100);
+    out.pVIXU = Math.round(sig(k * (netDir - 0.55)) * (1 - Math.min(1, roomUp) * 0.5)   * 100);
+    out.pBSO  = Math.round(sig(k * (-netDir - 0.0))  * 100);
+    out.pBST  = Math.round(sig(k * (-netDir - 0.4))  * 100);
+    out.pVIXL = Math.round(sig(k * (-netDir - 0.55)) * (1 - Math.min(1, roomDown) * 0.5) * 100);
+    out.ok = true;
+    return out;
+}
+
+// Futures REMARK/score has no per-candle cache anywhere in the app (unlike spot/OI candles,
+// which are already retained on INSTRUMENT_SCORE_MAP[name].oiData). Unlike max_pain/iv_skew
+// (which reuse already-cached OI/IV arrays for free), reconstructing futures_trend needs one
+// fresh historical fetch per instrument — cheap (same '5minute' call the live futures panel
+// already makes) but not free, so it's only done on-demand here, not on every render.
+// Returns { 'HH:MM': score } for every 5-min bucket today, or null if no futures token/data.
+async function _gtbFetchFuturesScoreSeries(name) {
+    var futInfo = _gtbFutTokenFor(name);
+    if (!futInfo) return null;
+    var curDay  = (typeof _msCurrDay === 'function')   ? _msCurrDay(name)   : CURRENT_DAY;
+    var toDay   = (typeof _msCurrDayTo === 'function')  ? _msCurrDayTo(name) : _gtbCurrDayTo();
+    var fromDay = (typeof _msPrevDay === 'function')    ? _msPrevDay(name)  : PREVIOUS_DAY;
+    var res = await getHistoricalDataUsingPromise(futInfo.token, fromDay, toDay, '5minute').catch(function() { return null; });
+    var all = (res && res.data && res.data.candles) ? res.data.candles : [];
+    if (!all.length) return null;
+
+    var todayStr = moment(all[all.length - 1][0]).format('YYYY-MM-DD');
+    var todayFut = all.filter(function(c) { return moment(c[0]).format('YYYY-MM-DD') === todayStr; });
+    var prevFut  = all.filter(function(c) { return moment(c[0]).format('YYYY-MM-DD') !== todayStr; });
+    if (!todayFut.length || !prevFut.length) return null;
+
+    var norm = function(c) { return { open: c[1], high: c[2], low: c[3], close: c[4], volume: c[5], oi: c[6] }; };
+    var prevQuote = norm(prevFut[prevFut.length - 1]);
+
+    var series = {};
+    for (var k = 0; k < todayFut.length; k++) {
+        var m = moment(todayFut[k][0]);
+        var bucket = m.format('HH:') + ('0' + (Math.floor(m.minutes() / 5) * 5)).slice(-2);
+        var slice = todayFut.slice(0, k + 1).map(norm);
+        try {
+            var result = _gtbClassifyFutures(slice[slice.length - 1], prevQuote, futInfo.lot, slice, {});
+            series[bucket] = getFuturesTrendScore(result.remark);
+        } catch (e) {}
+    }
+    return series;
+}
+
+// Rebuilds GTB_LVLPROB_HISTORY for the WHOLE session so far, from cached 5-min candles —
+// instead of only what's been captured live going forward. Time axis = every 5-min bucket
+// present in any instrument's cached spotCandles today. Call on-demand (button in the Level
+// Prob tab) since it recomputes every instrument × every bucket — cheap per call (pure
+// arithmetic over already-cached arrays, no network) but no need to run it automatically
+// on every render.
+// includeFutures: pass true to also fetch+reconstruct futures_trend per instrument (one extra
+// historical call each — see _gtbFetchFuturesScoreSeries). Default false keeps the rebuild
+// instant (max_pain/iv_skew are always included — they're free, reusing cached OI/IV data).
+async function _gtbBuildLevelProbHistoryToday(includeFutures) {
+    var names = ['NIFTY 50', 'NIFTY BANK']
+        .concat(Object.keys(NIFTY_50_WEIGHTED_STOCKS || {}))
+        .concat(Object.keys(NIFTY_BANK_WEIGHTED_STOCKS || {}));
+    var seen = {}; names = names.filter(function(n) { return seen[n] ? false : (seen[n] = true); });
+
+    var bucketSet = {};
+    names.forEach(function(name) {
+        var sm = INSTRUMENT_SCORE_MAP[name];
+        var sc = sm && sm.oiData && sm.oiData.spotCandles;
+        if (!sc || !sc.length) return;
+        var lastDay = moment(sc[sc.length - 1][0]).format('YYYY-MM-DD');
+        sc.forEach(function(c) {
+            var m = moment(c[0]);
+            if (m.format('YYYY-MM-DD') !== lastDay) return;
+            var mins = Math.floor(m.minutes() / 5) * 5;
+            bucketSet[m.format('HH:') + ('0' + mins).slice(-2)] = true;
+        });
+    });
+    var buckets = Object.keys(bucketSet).sort();
+    if (!buckets.length) return false;
+
+    var futSeriesByName = {};
+    if (includeFutures) {
+        await Promise.all(names.map(function(name) {
+            return _gtbFetchFuturesScoreSeries(name).then(function(series) {
+                if (series) futSeriesByName[name] = series;
+            }).catch(function() {});
+        }));
+    }
+
+    var hist = buckets.map(function(t) {
+        var row = {};
+        names.forEach(function(name) {
+            try {
+                var futSeries = futSeriesByName[name];
+                var futAtT = futSeries ? futSeries[t] : undefined;
+                var p = _gtbLevelProbAtTime(name, t, futAtT);
+                if (p.ok) row[name] = { aso: p.pASO, ast: p.pAST, vixu: p.pVIXU, bso: p.pBSO, bst: p.pBST, vixl: p.pVIXL,
+                                         u: Math.max(p.pASO, p.pAST, p.pVIXU), d: Math.max(p.pBSO, p.pBST, p.pVIXL) };
+            } catch (e) {}
+        });
+        return { t: t, row: row };
+    });
+    localStorage.setItem('GTB_LVLPROB_HISTORY', JSON.stringify(hist));
+    return true;
+}
+
+function _gtbSnapshotLevelProb() {
+    var now = moment();
+    var bucket = now.format('HH:') + ('0' + (Math.floor(now.minutes() / 5) * 5)).slice(-2);
+
+    var names = ['NIFTY 50', 'NIFTY BANK']
+        .concat(Object.keys(NIFTY_50_WEIGHTED_STOCKS || {}))
+        .concat(Object.keys(NIFTY_BANK_WEIGHTED_STOCKS || {}));
+    var seen = {}; names = names.filter(function(n) { return seen[n] ? false : (seen[n] = true); });
+
+    var row = {};
+    names.forEach(function(n) {
+        try {
+            var p = _gtbLevelProb(n);
+            if (p.ok) row[n] = { aso: p.pASO, ast: p.pAST, vixu: p.pVIXU, bso: p.pBSO, bst: p.pBST, vixl: p.pVIXL,
+                                  u: Math.max(p.pASO, p.pAST, p.pVIXU), d: Math.max(p.pBSO, p.pBST, p.pVIXL) };
+        } catch (e) {}
+    });
+    if (!Object.keys(row).length) return;
+
+    var hist = [];
+    try { hist = JSON.parse(localStorage.getItem('GTB_LVLPROB_HISTORY') || '[]'); } catch (e) {}
+    // Replace the entry for this 5-min bucket if a refresh already ran within it (avoids
+    // duplicate columns when the manual button and auto-refresh land in the same bucket).
+    if (hist.length && hist[hist.length - 1].t === bucket) hist.pop();
+    hist.push({ t: bucket, row: row });
+    if (hist.length > 80) hist.shift(); // ~1 trading day of 5-min buckets, plus headroom
+    localStorage.setItem('GTB_LVLPROB_HISTORY', JSON.stringify(hist));
+}
+
+// Renders the "Level Prob" tab: rows = instruments, columns = every captured 5-min bucket
+// today, cell = strongest upside% (green) / downside% (red) reading at that time.
+function _gtbRenderLevelProbPane() {
+    var $p = jQ('#gtb-pane-lvlprob');
+    if (!$p.length) return;
+
+    var hist = [];
+    try { hist = JSON.parse(localStorage.getItem('GTB_LVLPROB_HISTORY') || '[]'); } catch (e) {}
+
+    var rebuildBtn = '<label style="display:flex;align-items:center;gap:3px;font-size:0.55rem;color:var(--gtb-muted);margin-left:auto;cursor:pointer;" '
+        + 'title="Also reconstruct futures_trend per instrument — needs one extra historical fetch per instrument (futures candles aren\'t cached the way spot/OI candles are), so it\'s opt-in rather than always-on.">'
+        + '<input type="checkbox" id="gtb-lvlprob-incl-fut" style="margin:0;"> incl. futures</label>'
+        + '<button id="gtb-lvlprob-rebuild" class="gtb-win-btn" style="font-size:0.5rem;padding:2px 8px;" '
+        + 'title="Reconstruct every 5-min bucket from today\'s cached candles (OI/OBV/spot/max-pain/IV-skew — all free/cached; futures_trend only if \'incl. futures\' is checked) instead of only what\'s been captured live so far">'
+        + '<i class="bi bi-arrow-repeat"></i> Rebuild from today\'s candles</button>';
+
+    if (!hist.length) {
+        $p.html('<div style="padding:20px;color:var(--gtb-muted);font-size:0.7rem;">'
+            + 'No data yet. New columns are captured automatically every 5-minute refresh, or click below to reconstruct the whole session so far from already-cached candles (requires OI data to have been fetched for at least one instrument this session).<br><br>'
+            + rebuildBtn + '</div>');
+        return;
+    }
+
+    var names = ['NIFTY 50', 'NIFTY BANK']
+        .concat(Object.keys(NIFTY_50_WEIGHTED_STOCKS || {}))
+        .concat(Object.keys(NIFTY_BANK_WEIGHTED_STOCKS || {}));
+    var seen = {}; names = names.filter(function(n) { return seen[n] ? false : (seen[n] = true); });
+
+    var h = '<div style="display:flex;align-items:center;gap:6px;padding:8px 10px;font-size:0.6rem;color:var(--gtb-muted);border-bottom:1px solid var(--gtb-border);">'
+        + '<i class="bi bi-signpost-split-fill"></i> LEVEL PROBABILITY (LIVE SIGNALS) — 5-minute history' + _ii('dv-lvlprob')
+        + rebuildBtn
+        + '</div>';
+    // Instruments across the top (columns), time buckets down the side (rows) — a stock's
+    // reading over the day reads as a vertical scan instead of a wide horizontal scroll.
+    // NIFTY 50 / NIFTY BANK always shown even with no data yet (rather than silently
+    // disappearing) — only weighted-stock columns are dropped when they've never fired.
+    var activeNames = names.filter(function(name) {
+        return name === 'NIFTY 50' || name === 'NIFTY BANK' || hist.some(function(col) { return col.row[name]; });
+    });
+
+    h += '<div style="overflow:auto;"><table class="oic-matrix"><thead><tr><th class="oic-sticky">Time</th>';
+    activeNames.forEach(function(name) { h += '<th>' + name + '</th>'; });
+    h += '</tr></thead><tbody>';
+
+    // Per-level abbreviations — same convention as the commodities popup's level chips.
+    var _lvlFmt = function(v) { return (v === null || v === undefined) ? '—' : v + '%'; };
+
+    // Most recent time bucket first — that's the reading you actually want at a glance.
+    var histDesc = hist.slice().reverse();
+    histDesc.forEach(function(col) {
+        h += '<tr><td class="oic-sticky"><b>' + col.t + '</b></td>';
+        activeNames.forEach(function(name) {
+            var c = col.row[name];
+            if (!c) { h += '<td style="text-align:center;color:var(--gtb-muted);">—</td>'; return; }
+            if (c.aso === undefined) {
+                // Older cached history (pre-per-level breakdown) — fall back to the collapsed u/d cell.
+                h += '<td style="text-align:center;font-family:var(--gtb-mono);font-size:0.68rem;font-weight:700;white-space:nowrap;">'
+                    + '<span style="color:var(--gtb-green);">▲' + c.u + '%</span> <span style="color:var(--gtb-red);">▼' + c.d + '%</span>'
+                    + '</td>';
+                return;
+            }
+            h += '<td style="text-align:center;font-family:var(--gtb-mono);font-size:0.6rem;font-weight:700;white-space:nowrap;line-height:1.35;">'
+                + '<div style="color:var(--gtb-green);">A ' + _lvlFmt(c.aso) + ' &nbsp; A+ ' + _lvlFmt(c.ast) + ' &nbsp; V↑ ' + _lvlFmt(c.vixu) + '</div>'
+                + '<div style="color:var(--gtb-red);">B ' + _lvlFmt(c.bso) + ' &nbsp; B- ' + _lvlFmt(c.bst) + ' &nbsp; V↓ ' + _lvlFmt(c.vixl) + '</div>'
+                + '</td>';
+        });
+        h += '</tr>';
+    });
+    h += '</tbody></table></div>';
+    $p.html(h);
 }
 
 function _cmdUpdateStatus() {
@@ -10032,6 +10642,9 @@ jQ(document).on('click', '#show-commodities', function (e) {
         // Combined verdict — synthesises vol gate, direction, wall proximity, Max Pain
         +     '<div class="cmd-st" style="margin-top:8px;display:flex;align-items:center;gap:6px;"><i class="bi bi-flag-fill"></i> VERDICT ' + _ii('cmd-crude-verdict') + '</div>'
         +     '<div id="cmd-crude-verdict"><div class="cmd-load"><i class="bi bi-hourglass-split"></i> Loading after OI fetch…</div></div>'
+        // Level Probability — live-signal likelihood of reaching ASO/AST/VIXU vs BSO/BST/VIXL
+        +     '<div class="cmd-st" style="margin-top:8px;display:flex;align-items:center;gap:6px;"><i class="bi bi-signpost-split-fill"></i> LEVEL PROBABILITY (LIVE SIGNALS) ' + _ii('dv-lvlprob') + '</div>'
+        +     '<div id="cmd-crude-lvlprob"><div class="cmd-load"><i class="bi bi-hourglass-split"></i> Loading after OI fetch…</div></div>'
         // OI + OBV full width
         +     '<div class="cmd-st" style="margin-top:8px;">OI Change (CE/PE)</div>'
         +     '<div id="cmd-crude-oi" style="height:130px;"></div>'
@@ -10160,6 +10773,42 @@ jQ(document).on('click', '#show-commodities', function (e) {
     }
 
     // ── Feature 5: WTI global context + fair value signal ────────────────────
+    // Live quote fetch via GM_xmlhttpRequest (bypasses CORS, same pattern as quoteWs.js's
+    // _qwFetchQuote) — Yahoo Finance's chart endpoint needs no auth/API key.
+    function _cmdFetchYahooQuote(symbol) {
+        return new Promise(function (resolve, reject) {
+            if (typeof GM_xmlhttpRequest === 'undefined') { reject('GM_xmlhttpRequest unavailable'); return; }
+            GM_xmlhttpRequest({
+                method: 'GET',
+                url: 'https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(symbol) + '?interval=1d&range=5d',
+                onload: function (res) {
+                    try {
+                        var j = JSON.parse(res.responseText);
+                        var meta = j.chart.result[0].meta;
+                        var cur  = parseFloat(meta.regularMarketPrice);
+                        var prev = parseFloat(meta.previousClose || meta.chartPreviousClose);
+                        if (!cur || !prev) { reject('Yahoo Finance returned no price for ' + symbol); return; }
+                        resolve({ cur: cur, prev: prev });
+                    } catch (e) { reject('Failed to parse Yahoo Finance response for ' + symbol + ': ' + e.message); }
+                },
+                onerror: function () { reject('Request failed for ' + symbol + ' (network error)'); }
+            });
+        });
+    }
+
+    // CL=F (NYMEX WTI) — MCX Crude Oil's contract spec settles against WTI, not Brent, and
+    // WTI trades at a persistent discount to Brent (landlocked US supply). Confirmed by real
+    // data: user-verified genuine live Brent ($90.12) + USD/INR (95.15) still produced a
+    // ~9% gap vs MCX LTP — too large/persistent to be a data error, and consistent with
+    // this being the wrong global benchmark plus MCX's price also carrying import duty,
+    // GST, and freight/dealer margin that a naive price×FX formula never captures.
+    function _cmdFetchLiveOil() { return _cmdFetchYahooQuote('CL=F'); }
+    // USDINR=X — USD/INR has no INSTRUMENT_TOKENS entry anywhere in this app (only a
+    // hardcoded 4.85% VIX-proxy in commodities.js for its strike-range math), so
+    // INSTRUMENT_LTP_PRICE['USDINR'] is never actually populated by the LTP scan — the
+    // "live" branch below was dead in practice and always fell through to manual entry.
+    function _cmdFetchLiveUsdInr() { return _cmdFetchYahooQuote('USDINR=X'); }
+
     function _cmdRenderGlobalContext() {
         var wtiCur  = parseFloat(localStorage.getItem('CMD_WTI_CUR')  || '0') || 0;
         var wtiPrev = parseFloat(localStorage.getItem('CMD_WTI_PREV') || '0') || 0;
@@ -10178,10 +10827,20 @@ jQ(document).on('click', '#show-commodities', function (e) {
         var usdInrManual = !usdInrLive;
         var usdInrStale = false; // no range guard — INR/USD can move significantly
 
-        // MCX LTP — try multiple sources (async data may not be ready at static render time)
+        // MCX LTP — CRUDEOILM has no INSTRUMENT_TOKENS entry (that list is NSE-only), so
+        // scanLtpPrice()'s scan never populates INSTRUMENT_LTP_PRICE['CRUDEOILM'], and
+        // generateTrend('CRUDEOILM') reads that same missing key and throws. The real live
+        // LTP is fetched by showFutureDetailsMCX('CRUDEOILM') below in _cmdLoadAll, which
+        // caches it to INSTRUMENT_SCORE_MAP['CRUDEOILM'].mcxLtp right after fetching — check
+        // that FIRST. The remaining fallbacks only matter on the very first paint, before
+        // that fetch has completed once this popup session: INSTRUMENT_LTP_PRICE/generateTrend
+        // are dead for MCX (kept only in case this ever gets an NSE-style token), and
+        // `.open` is the session's OPENING price, not LTP — a last-resort approximation only,
+        // not the intraday LTP (using it as if it were LTP is what caused this to look stale).
         var mcxLtp = 0;
-        try { mcxLtp = parseFloat(((JSON.parse(localStorage.getItem('INSTRUMENT_LTP_PRICE') || '{}'))['CRUDEOILM'] || {}).ltp) || 0; } catch(_e) {}
-        if (!mcxLtp) { try { mcxLtp = parseFloat(generateTrend('CRUDEOILM').close) || 0; } catch(_e) {} }
+        try { mcxLtp = parseFloat((INSTRUMENT_SCORE_MAP['CRUDEOILM'] || {}).mcxLtp) || 0; } catch(_e) {}
+        if (!mcxLtp) { try { mcxLtp = parseFloat(((JSON.parse(localStorage.getItem('INSTRUMENT_LTP_PRICE') || '{}'))['CRUDEOILM'] || {}).ltp) || 0; } catch(_e) {} }
+        if (!mcxLtp) { try { mcxLtp = parseFloat(generateTrend('CRUDEOILM').ltp) || 0; } catch(_e) {} }
         if (!mcxLtp) { try { mcxLtp = parseFloat((INSTRUMENT_SCORE_MAP['CRUDEOILM'] || {}).open) || 0; } catch(_e) {} }
         var fairVal = (wtiCur && usdInr) ? Math.round(wtiCur * usdInr) : 0;
         var gap     = (fairVal && mcxLtp) ? ((mcxLtp - fairVal) / fairVal * 100) : null;
@@ -10242,18 +10901,20 @@ jQ(document).on('click', '#show-commodities', function (e) {
             // Header
             + '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">'
             +   '<i class="bi bi-globe2" style="color:var(--gtb-blue);"></i>'
-            +   '<span style="font-weight:800;letter-spacing:0.04em;color:var(--gtb-muted);font-size:0.42rem;">GLOBAL CONTEXT</span>'
+            +   '<span style="font-weight:800;letter-spacing:0.04em;color:var(--gtb-muted);font-size:0.42rem;">GLOBAL CONTEXT' + _ii('cmdglobal') + '</span>'
+            +   '<button id="cmd-wti-fetch-live" style="margin-left:auto;background:var(--gtb-bg);border:1px solid var(--gtb-border);color:var(--gtb-text);'
+            +     'padding:2px 6px;font-size:0.4rem;cursor:pointer;"><i class="bi bi-cloud-download"></i> Fetch Live (WTI + USD/INR)</button>'
             + '</div>'
             // Inputs row
             + '<div style="display:grid;grid-template-columns:1fr 1fr' + (usdInrManual ? ' 1fr' : '') + ';gap:6px;margin-bottom:8px;">'
             +   '<div>'
-            +     '<div style="color:var(--gtb-muted);font-size:0.4rem;margin-bottom:2px;">BRENT/WTI CURRENT ($) <span style="color:var(--gtb-blue);" title="MCX crude is Brent-linked — use Brent price">ℹ</span></div>'
-            +     '<input id="cmd-wti-cur" type="number" step="0.01" value="' + (wtiCur || '') + '" placeholder="Brent e.g. 88.10"'
+            +     '<div style="color:var(--gtb-muted);font-size:0.4rem;margin-bottom:2px;">WTI CURRENT ($) <span style="color:var(--gtb-blue);" title="MCX Crude Oil settles against NYMEX WTI per its contract spec, not Brent">ℹ</span></div>'
+            +     '<input id="cmd-wti-cur" type="number" step="0.01" value="' + (wtiCur || '') + '" placeholder="WTI e.g. 85.10"'
             +       ' style="width:100%;background:var(--gtb-bg);border:1px solid var(--gtb-border);color:var(--gtb-text);'
             +       'padding:3px 5px;font-size:0.48rem;font-family:var(--gtb-mono);">'
             +   '</div>'
             +   '<div>'
-            +     '<div style="color:var(--gtb-muted);font-size:0.4rem;margin-bottom:2px;">BRENT/WTI PREV CLOSE ($)</div>'
+            +     '<div style="color:var(--gtb-muted);font-size:0.4rem;margin-bottom:2px;">WTI PREV CLOSE ($)</div>'
             +     '<input id="cmd-wti-prev" type="number" step="0.01" value="' + (wtiPrev || '') + '" placeholder="e.g. 84.23"'
             +       ' style="width:100%;background:var(--gtb-bg);border:1px solid var(--gtb-border);color:var(--gtb-text);'
             +       'padding:3px 5px;font-size:0.48rem;font-family:var(--gtb-mono);">'
@@ -10267,15 +10928,38 @@ jQ(document).on('click', '#show-commodities', function (e) {
             +   '</div>'
             : '')
             + '</div>'
-            // Metrics row
-            + '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;padding:5px;background:var(--gtb-bg);border:1px solid var(--gtb-border);">'
-            +   '<span>USD/INR <b style="font-family:var(--gtb-mono);color:' + (usdInrStale ? 'var(--gtb-red)' : 'var(--gtb-text)') + ';">' + (usdInr ? _fmtRate(usdInr) : '—') + '</b>'
-            +     (usdInrLive ? ' <span style="color:var(--gtb-green);font-size:0.4rem;">live</span>' : usdInrStale ? ' <span style="color:var(--gtb-red);font-size:0.4rem;">⚠ stale — update below</span>' : ' <span style="color:var(--gtb-muted);font-size:0.4rem;">manual</span>') + '</span>'
-            +   '<span>Fair Value <b style="font-family:var(--gtb-mono);">' + (fairVal ? '₹' + fairVal.toLocaleString('en-IN') : '—') + '</b></span>'
-            +   '<span>MCX LTP <b style="font-family:var(--gtb-mono);">' + (mcxLtp ? '₹' + mcxLtp.toLocaleString('en-IN') : '—') + '</b></span>'
-            +   '<span>Gap <b style="font-family:var(--gtb-mono);color:' + gapCol + ';">' + _fmtPct(gap) + '</b>'
-            +     (gap !== null && Math.abs(gap) > 1 ? '<span style="color:' + gapCol + ';"> ' + (gap > 0 ? '↓ reversion risk' : '↑ catch-up') + '</span>' : '') + '</span>'
+            // Metrics row — stat tiles (bigger, high-contrast; the plain inline-text row this
+            // replaced was easy to miss next to the bordered/colored session-alert chips above it)
+            + '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:8px;">'
+            +   '<div style="padding:6px 8px;background:var(--gtb-bg);border:1px solid var(--gtb-border);">'
+            +     '<div style="color:var(--gtb-muted);font-size:0.42rem;letter-spacing:0.04em;text-transform:uppercase;margin-bottom:2px;">USD/INR</div>'
+            +     '<div style="font-family:var(--gtb-mono);font-size:0.85rem;font-weight:800;color:' + (usdInrStale ? 'var(--gtb-red)' : 'var(--gtb-text)') + ';line-height:1.1;">' + (usdInr ? _fmtRate(usdInr) : '—') + '</div>'
+            +     (usdInrLive ? '<div style="color:var(--gtb-green);font-size:0.42rem;margin-top:1px;">● live</div>' : usdInrStale ? '<div style="color:var(--gtb-red);font-size:0.42rem;margin-top:1px;">⚠ stale — update below</div>' : '<div style="color:var(--gtb-muted);font-size:0.42rem;margin-top:1px;">manual</div>')
+            +   '</div>'
+            +   '<div style="padding:6px 8px;background:var(--gtb-bg);border:1px solid var(--gtb-border);">'
+            +     '<div style="color:var(--gtb-muted);font-size:0.42rem;letter-spacing:0.04em;text-transform:uppercase;margin-bottom:2px;">Fair Value</div>'
+            +     '<div style="font-family:var(--gtb-mono);font-size:0.85rem;font-weight:800;color:var(--gtb-text);line-height:1.1;">' + (fairVal ? '₹' + fairVal.toLocaleString('en-IN') : '—') + '</div>'
+            +   '</div>'
+            +   '<div style="padding:6px 8px;background:var(--gtb-bg);border:1px solid var(--gtb-border);">'
+            +     '<div style="color:var(--gtb-muted);font-size:0.42rem;letter-spacing:0.04em;text-transform:uppercase;margin-bottom:2px;">MCX LTP</div>'
+            +     '<div style="font-family:var(--gtb-mono);font-size:0.85rem;font-weight:800;color:var(--gtb-text);line-height:1.1;">' + (mcxLtp ? '₹' + mcxLtp.toLocaleString('en-IN') : '—') + '</div>'
+            +   '</div>'
+            +   '<div style="padding:6px 8px;background:var(--gtb-bg);border:1px solid ' + gapCol + ';border-left-width:3px;">'
+            +     '<div style="color:var(--gtb-muted);font-size:0.42rem;letter-spacing:0.04em;text-transform:uppercase;margin-bottom:2px;">Gap</div>'
+            +     '<div style="font-family:var(--gtb-mono);font-size:0.85rem;font-weight:800;color:' + gapCol + ';line-height:1.1;">' + _fmtPct(gap) + '</div>'
+            +     (gap !== null && Math.abs(gap) > 1 ? '<div style="color:' + gapCol + ';font-size:0.42rem;margin-top:1px;">' + (gap > 0 ? '↓ reversion risk' : '↑ catch-up') + '</div>' : '')
+            +   '</div>'
             + '</div>'
+            + (gap !== null && Math.abs(gap) > 12
+            ?   '<div style="padding:4px 5px;margin:-4px 0 8px;color:var(--gtb-amber);font-size:0.4rem;">'
+            +     '⚠ Gap &gt;12% — wider than the usual WTI-vs-MCX basis (import duty + GST + freight/dealer margin typically add up to a persistent single-digit-% gap even with correct live prices). '
+            +     'A gap this large points at a stale/wrong WTI or USD/INR entry rather than the normal basis — use Fetch Live to rule it out before trusting this.'
+            +   '</div>'
+            : gap !== null && Math.abs(gap) > 4
+            ?   '<div style="padding:4px 5px;margin:-4px 0 8px;color:var(--gtb-muted);font-size:0.4rem;">'
+            +     'ℹ A single-digit-% gap here is normal and mostly structural — MCX price already bakes in import duty, GST, and freight/dealer margin that a plain WTI&times;USD/INR formula doesn\'t capture. Don\'t read this as an arb signal by itself.'
+            +   '</div>'
+            : '')
             // Signal card
             + '<div style="display:flex;align-items:flex-start;gap:8px;padding:6px;background:var(--gtb-bg);border-left:3px solid ' + sigCol + ';">'
             +   '<b style="font-size:0.7rem;color:' + sigCol + ';white-space:nowrap;line-height:1;">' + signal + '</b>'
@@ -10297,6 +10981,28 @@ jQ(document).on('click', '#show-commodities', function (e) {
         jQ('#cmd-usdinr-inp').off('change.wti').on('change.wti', function() {
             localStorage.setItem('CMD_USDINR', jQ(this).val());
             _cmdRenderGlobalContext();
+        });
+        jQ('#cmd-wti-fetch-live').off('click.wti').on('click.wti', function() {
+            var $btn = jQ(this);
+            var _resetBtn = function() { $btn.prop('disabled', false).html('<i class="bi bi-cloud-download"></i> Fetch Live (WTI + USD/INR)'); };
+            $btn.prop('disabled', true).html('<i class="bi bi-hourglass-split"></i> Fetching…');
+            Promise.allSettled([_cmdFetchLiveOil(), _cmdFetchLiveUsdInr()]).then(function (results) {
+                var oilRes = results[0], fxRes = results[1];
+                var errs = [];
+                if (oilRes.status === 'fulfilled') {
+                    localStorage.setItem('CMD_WTI_CUR', oilRes.value.cur);
+                    localStorage.setItem('CMD_WTI_PREV', oilRes.value.prev);
+                } else { errs.push('WTI: ' + oilRes.reason); }
+                if (fxRes.status === 'fulfilled') {
+                    localStorage.setItem('CMD_USDINR', fxRes.value.cur);
+                } else { errs.push('USD/INR: ' + fxRes.reason); }
+                _resetBtn();
+                _cmdRenderGlobalContext();
+                if (errs.length) {
+                    console.error('[Groot Bot] Global Context live fetch partial failure:', errs);
+                    try { Toastify({ text: errs.join(' · '), duration: 4000, style: { background: 'var(--gtb-red)' } }).showToast(); } catch (_e) {}
+                }
+            });
         });
     }
 
@@ -10365,6 +11071,13 @@ jQ(document).on('click', '#show-commodities', function (e) {
             fres = await showFutureDetailsMCX('CRUDEOILM');
             if (!INSTRUMENT_SCORE_MAP['CRUDEOILM']) INSTRUMENT_SCORE_MAP['CRUDEOILM']={};
             INSTRUMENT_SCORE_MAP['CRUDEOILM'].futures_trend = getFuturesTrendScore(fres['REMARK']);
+            // CRUDEOILM has no INSTRUMENT_TOKENS entry (that list is NSE-only), so
+            // scanLtpPrice()'s scan never populates INSTRUMENT_LTP_PRICE['CRUDEOILM'] — this
+            // fetch above is the only place that actually reads MCX crude's live LTP. Cache
+            // it here so _cmdRenderGlobalContext() (re-rendered right after this block, in
+            // _cmdLoadAll) picks up the fresh value instead of falling through to stale/dead
+            // fallback sources.
+            INSTRUMENT_SCORE_MAP['CRUDEOILM'].mcxLtp = parseFloat(fres['ltp']) || 0;
             // Also update main dashboard elements if they exist
             try { setFutureDetails('CRUDEOILM', fres); } catch(_e) {}
         } catch(e3) {}
@@ -10380,6 +11093,20 @@ jQ(document).on('click', '#show-commodities', function (e) {
             var _cMeta = _gtbRemarkChip(fres['REMARK']) + ' ' + _gtbVwapChip(fres['trend'], fres['REMARK'])
                        + ' <span style="font-size:0.48rem;color:var(--gtb-muted);">' + (fres['vwap'] || '') + '</span>';
             jQ('#cmd-crude-fut').html('<div class="cmd-fut-meta" style="margin-bottom:4px;">' + _cMeta + '</div>' + _cFut);
+
+            // LTP chip — prepended to the levels strip above the chart, same convention as
+            // the ASO/AST/BSO/BST/OPEN/VIXU/VIXL chips (_cLvHtml built just above).
+            try {
+                var _cLtp = parseFloat(fres['ltp']);
+                var _cOpenLtp = parseFloat(fres['open']);
+                var _cChgCol = (_cLtp > _cOpenLtp) ? 'var(--gtb-green)' : (_cLtp < _cOpenLtp) ? 'var(--gtb-red)' : 'var(--gtb-muted)';
+                var _cLtpChip = '<span style="display:inline-flex;align-items:center;gap:2px;white-space:nowrap;">'
+                    + '<span style="font-size:0.58rem;font-weight:800;color:var(--gtb-accent);letter-spacing:0.02em;">LTP</span>'
+                    + '<span style="font-size:0.6rem;font-weight:800;color:' + _cChgCol + ';font-family:var(--gtb-mono);">' + _cLtp.toFixed(1) + '</span></span>'
+                    + '<span style="color:#30363d;font-size:0.5rem;padding:0 2px;">·</span>';
+                var _cLvEl2 = document.getElementById('cmd-crude-levels');
+                if (_cLvEl2) _cLvEl2.innerHTML = _cLtpChip + _cLvEl2.innerHTML;
+            } catch(_eLtp) {}
         } else {
             jQ('#cmd-crude-fut').html('<div class="cmd-load" style="color:var(--gtb-red);">Futures unavailable.</div>');
         }
@@ -10423,10 +11150,12 @@ jQ(document).on('click', '#show-commodities', function (e) {
                 }
             } catch(e7) { jQ('#cmd-crude-mpgex').html('<div class="cmd-load" style="color:var(--gtb-red);">Max Pain error.</div>'); }
             try { _cmdRenderVerdict('cmd-crude-verdict', 'CRUDEOILM', oiData, pc, _mpd); } catch(e8) { jQ('#cmd-crude-verdict').html('<div class="cmd-load" style="color:var(--gtb-red);">Verdict error.</div>'); }
+            try { jQ('#cmd-crude-lvlprob').html(_gtbLevelProbHtml('CRUDEOILM')); } catch(e9) { jQ('#cmd-crude-lvlprob').html('<div class="cmd-load" style="color:var(--gtb-red);">Level probability error.</div>'); }
         } else {
             jQ('#cmd-crude-oi-table').html('<div class="cmd-load" style="color:var(--gtb-red);">CRUDEOILM OI unavailable.</div>');
             jQ('#cmd-crude-mpgex').html('<div class="cmd-load" style="color:var(--gtb-muted);">OI unavailable — Max Pain requires OI data.</div>');
             jQ('#cmd-crude-verdict').html('<div class="cmd-load" style="color:var(--gtb-muted);">OI unavailable — verdict requires OI data.</div>');
+            jQ('#cmd-crude-lvlprob').html('<div class="cmd-load" style="color:var(--gtb-muted);">OI unavailable — level probability requires OI data.</div>');
         }
         // CRUDEOILM Futures Remark Accuracy
         _cmdLoadCrudeAcc();
@@ -11237,15 +11966,17 @@ function _renderLWChart(containerId, candles, refLines, chartHeight, opts) {
     let lineColors = {
         'OPEN': '#ffbe0b', 'VIXL': '#38bdf8', 'VIXU': '#38bdf8',
         'ASO': '#00e5a0', 'AST': '#00e5a0', 'BSO': '#ff4d6a', 'BST': '#ff4d6a',
+        'DEADLO': '#8b5cf6', 'DEADHI': '#8b5cf6',
     };
-    var _shortLabel = { 'OPEN':'O', 'VIXL':'V↓', 'VIXU':'V↑', 'AST':'A+', 'ASO':'A', 'BSO':'B', 'BST':'B-' };
+    var _shortLabel = { 'OPEN':'O', 'VIXL':'V↓', 'VIXU':'V↑', 'AST':'A+', 'ASO':'A', 'BSO':'B', 'BST':'B-', 'DEADLO':'D↓', 'DEADHI':'D↑' };
     (refLines || []).forEach(function(rl) {
         let key = rl.key || rl.text.split(':')[0].trim();
+        let isDeadZone = (key === 'DEADLO' || key === 'DEADHI');
         candleSeries.createPriceLine({
             price: parseFloat(rl.value),
             color: lineColors[key] || '#7d8590',
             lineWidth: 1,
-            lineStyle: LightweightCharts.LineStyle.Solid,
+            lineStyle: isDeadZone ? LightweightCharts.LineStyle.Dashed : LightweightCharts.LineStyle.Solid,
             axisLabelVisible: false,
             title: '',
         });
@@ -11477,6 +12208,14 @@ async function showTopChart(name, bindtoDivId, chartHeight, idSuffix) {
             { key: 'BST',  value: scriptData['strikeData'].bstrikeTwo,        text: 'BST '  + scriptData['strikeData'].bstrikeTwo },
         ];
 
+        try {
+            var _dz = _gtbDeadZone(name);
+            if (_dz) {
+                refLines.push({ key: 'DEADLO', value: _dz.lo, text: 'DEAD ' + _dz.lo });
+                refLines.push({ key: 'DEADHI', value: _dz.hi, text: 'DEAD ' + _dz.hi });
+            }
+        } catch (_dze) {}
+
         let containerId = (bindtoDivId || ('#' + tempName + '-chart')).replace('#', '');
 
         // Derive ID suffix for side-effect DOM writes so they land in the right
@@ -11493,7 +12232,8 @@ async function showTopChart(name, bindtoDivId, chartHeight, idSuffix) {
 
         // Populate levels strip
         var _lMeta = { OPEN:{s:'O',c:'#ffbe0b'}, VIXU:{s:'V↑',c:'#38bdf8'}, VIXL:{s:'V↓',c:'#38bdf8'},
-                       AST:{s:'A+',c:'#3fb950'}, ASO:{s:'A',c:'#3fb950'}, BSO:{s:'B',c:'#f85149'}, BST:{s:'B-',c:'#f85149'} };
+                       AST:{s:'A+',c:'#3fb950'}, ASO:{s:'A',c:'#3fb950'}, BSO:{s:'B',c:'#f85149'}, BST:{s:'B-',c:'#f85149'},
+                       DEADLO:{s:'D↓',c:'#8b5cf6'}, DEADHI:{s:'D↑',c:'#8b5cf6'} };
         var _fmt = function(v) { v=parseFloat(v); return v>=1000?v.toLocaleString('en-IN',{maximumFractionDigits:1}):v.toFixed(1); };
         var _levelsHtml = refLines.map(function(rl) {
             var m = _lMeta[rl.key] || {s:rl.key,c:'#7d8590'};
@@ -15313,6 +16053,22 @@ jQ(document).on('click', '#gtb-metrics-refresh', function() {
     _gtbRenderMetricsPane();
 });
 
+jQ(document).on('click', '#gtb-lvlprob-rebuild', async function() {
+    var $btn = jQ(this).prop('disabled', true);
+    var _origHtml = $btn.html();
+    var inclFut = jQ('#gtb-lvlprob-incl-fut').is(':checked');
+    $btn.html('<i class="bi bi-hourglass-split"></i> ' + (inclFut ? 'Fetching futures…' : 'Rebuilding…'));
+    try {
+        var ok = await _gtbBuildLevelProbHistoryToday(inclFut);
+        _gtbRenderLevelProbPane();
+        if (!ok) callSackBarInfo('No cached OI/candle data yet — run a refresh first, then rebuild.');
+    } catch (e) {
+        console.error('[Level Prob] rebuild failed:', e);
+        callSackBar('Rebuild failed: ' + (e && e.message ? e.message : e));
+        $btn.prop('disabled', false).html(_origHtml);
+    }
+});
+
 // Sub-view toggle inside Metrics pane
 jQ(document).on('click', '.gtb-mv-btn', function() {
     var mv = jQ(this).data('mv');
@@ -15351,6 +16107,498 @@ function _gtbShowTradeChecklist() {
     hideNativePopupButtons(_tcClass);
     jQ('.' + _tcClass).find('.popupwindow_titlebar').removeClass('popupwindow_titlebar_draggable');
 }
+
+// ═════════════════════════════════════════════════════════════════════════════
+// NOTES TAB — End-of-day trading diary
+// ═════════════════════════════════════════════════════════════════════════════
+// Three parts, all keyed per calendar day so the diary accumulates across sessions:
+//   1. Auto Market Summary — 9:15 combo + recommendation, key scores, breadth,
+//      futures/OI/max-pain/IV-skew for the main instruments. Pure read of already-
+//      cached globals/localStorage, nothing new to fetch.
+//   2. Trade Journal — the app has no broker order/position feed (placeOrder() fires
+//      orders but nothing reads them back), so trades taken can't be auto-captured.
+//      This is a manual entry table (instrument/exchange/side/qty/entry/exit → P&L
+//      auto-computed), persisted per day, with an ASO/BSO-compliance flag computed
+//      against that instrument's actual levels at the time.
+//   3. Notes/Mistakes/Suggestions — free text, autosaved per day.
+// "Copy Markdown" / "Download .md" produce a Jekyll-postable file (front matter +
+// body) for the user's own GitHub Pages repo — this script has no GitHub credentials
+// and never will; committing/pushing is a manual step the user does themselves.
+
+function _gtbDiaryDateKey() { return moment().format('YYYY-MM-DD'); }
+function _gtbDiaryJournalKey(d) { return 'GTB_TRADE_JOURNAL_' + (d || _gtbDiaryDateKey()); }
+function _gtbDiaryNotesKey(d)   { return 'GTB_DIARY_NOTES_'   + (d || _gtbDiaryDateKey()); }
+
+function _gtbDiaryLoadJournal(d) {
+    try { return JSON.parse(localStorage.getItem(_gtbDiaryJournalKey(d)) || '[]'); } catch (e) { return []; }
+}
+function _gtbDiarySaveJournal(rows, d) {
+    try { localStorage.setItem(_gtbDiaryJournalKey(d), JSON.stringify(rows)); } catch (e) {}
+}
+function _gtbDiaryLoadNotes(d) {
+    try { return localStorage.getItem(_gtbDiaryNotesKey(d)) || ''; } catch (e) { return ''; }
+}
+function _gtbDiarySaveNotes(text, d) {
+    try { localStorage.setItem(_gtbDiaryNotesKey(d), text); } catch (e) {}
+}
+
+// Same NFO/BFO/MCX routing convention used elsewhere (_exch() in the analyzer, ~L16306).
+var _GTB_DIARY_MCX_NAMES = { 'CRUDEOILM': 1, 'CRUDEOIL': 1, 'GOLD': 1, 'SILVER': 1, 'NATURALGAS': 1 };
+function _gtbDiaryExchangeGuess(name) {
+    var n = (name || '').toUpperCase();
+    if (_GTB_DIARY_MCX_NAMES[n]) return 'MCX';
+    if (n === 'SENSEX' || n === 'BANKEX') return 'BFO';
+    return 'NFO';
+}
+
+// ── Part 1: Auto Market Summary ─────────────────────────────────────────────
+function _gtbDiaryBuildSummary() {
+    var b915 = {}; try { b915 = JSON.parse(localStorage.getItem('VALID_BREAKOUT_NINE_FIFTEEN') || '{}'); } catch (e) {}
+    var n915 = (b915['NIFTY 50']   && b915['NIFTY 50']['CLOSE_9_15'])   || 'B/W';
+    var s915 = (b915['SENSEX']     && b915['SENSEX']['CLOSE_9_15'])     || 'B/W';
+    var k915 = (b915['NIFTY BANK'] && b915['NIFTY BANK']['CLOSE_9_15']) || 'B/W';
+    var g915 = (b915['GIFT NIFTY'] && b915['GIFT NIFTY']['CLOSE_9_15']) || 'B/W';
+    var comboKey = _gtbNorm915(n915) + '-' + _gtbNorm915(s915) + '-' + _gtbNorm915(k915);
+    var strat = GTB_STRAT_LOOKUP[comboKey] || { outcome: 'Sideways', level: 'No trade' };
+
+    function scoreOf(name) {
+        try { return computeInstrumentScore(name); } catch (e) { return null; }
+    }
+    var n50 = scoreOf('NIFTY 50'), bn = scoreOf('NIFTY BANK'), sx = scoreOf('SENSEX');
+
+    var composite = 0;
+    try {
+        composite = (ALL_9_15_CLOSE_SCORE || 0) + (NIFTY_50_9_15_CLOSE_SCORE || 0) + (NIFTY_BANK_9_15_CLOSE_SCORE || 0)
+            + (GIFT_NIFTY_9_15_CLOSE_SCORE || 0) + (SENSEX_9_15_CLOSE_SCORE || 0) + (RELIANCE_9_15_CLOSE_SCORE || 0) + (HDFCBANK_9_15_CLOSE_SCORE || 0)
+            + (ALL_ADVANCE_DECLINE_SCORE || 0) + (NIFTY_50_ADVANCE_DECLINE_SCORE || 0) + (NIFTY_BANK_ADVANCE_DECLINE_SCORE || 0)
+            + (ALL_FUTURES_TREND_SCORE || 0) + (NIFTY_50_FUTURES_TREND_SCORE || 0) + (NIFTY_BANK_FUTURES_TREND_SCORE || 0)
+            + (NIFTY_50_OI_OBV_SCORE || 0) + (NIFTY_BANK_OI_OBV_SCORE || 0) + (RELIANCE_OI_OBV_SCORE || 0) + (HDFCBANK_OI_OBV_SCORE || 0) + (ICICIBANK_OI_OBV_SCORE || 0)
+            + (NIFTY_50_MAX_PAIN_SCORE || 0) + (NIFTY_BANK_MAX_PAIN_SCORE || 0)
+            + (NIFTY_50_IV_SKEW_SCORE || 0) + (NIFTY_BANK_IV_SKEW_SCORE || 0);
+    } catch (e) {}
+
+    var signal = null;
+    try { signal = getMarketSignal(composite, b915); } catch (e) {}
+
+    return {
+        date: _gtbDiaryDateKey(),
+        combo: { n915: n915, s915: s915, k915: k915, g915: g915, comboKey: comboKey, strat: strat },
+        composite: composite,
+        signal: signal,
+        instruments: { 'NIFTY 50': n50, 'NIFTY BANK': bn, 'SENSEX': sx }
+    };
+}
+
+function _gtbDiarySummaryHtml() {
+    var s = _gtbDiaryBuildSummary();
+    var sigColor = s.signal ? s.signal.color : 'var(--gtb-muted)';
+    var sigText  = s.signal ? s.signal.signal : 'N/A';
+
+    function fmtSub(name, sc) {
+        if (!sc) return '<tr><td>' + name + '</td><td colspan="7" style="color:var(--gtb-muted);">no data</td></tr>';
+        var t = function(v) { return (v > 0 ? '+' : '') + v; };
+        var col = function(v) { return v > 0 ? 'var(--gtb-green)' : v < 0 ? 'var(--gtb-red)' : 'var(--gtb-muted)'; };
+        return '<tr><td>' + name + '</td>'
+            + '<td style="color:' + col(sc.nine_fifteen) + '">' + t(sc.nine_fifteen) + '</td>'
+            + '<td style="color:' + col(sc.current_trend) + '">' + t(sc.current_trend) + '</td>'
+            + '<td style="color:' + col(sc.futures_trend) + '">' + t(sc.futures_trend) + '</td>'
+            + '<td style="color:' + col(sc.oi_obv) + '">' + t(sc.oi_obv.toFixed ? sc.oi_obv.toFixed(1) : sc.oi_obv) + '</td>'
+            + '<td style="color:' + col(sc.max_pain) + '">' + t(sc.max_pain) + '</td>'
+            + '<td style="color:' + col(sc.iv_skew) + '">' + t(sc.iv_skew) + '</td>'
+            + '<td style="font-weight:800;color:' + col(sc.total) + '">' + t(sc.total.toFixed ? sc.total.toFixed(1) : sc.total) + '</td></tr>';
+    }
+
+    var h = '<div class="gtb-diary-card">';
+    h += '<div class="gtb-diary-card-hdr"><i class="bi bi-calendar-event"></i> ' + s.date + ' — AUTO MARKET SUMMARY</div>';
+    h += '<div style="padding:8px 10px;font-size:0.62rem;">';
+    h += '<div style="margin-bottom:6px;"><b>9:15 combo:</b> NIFTY ' + s.combo.n915 + ' / SENSEX ' + s.combo.s915 + ' / BANK ' + s.combo.k915
+        + ' / GIFT ' + s.combo.g915 + ' &nbsp;→&nbsp; <b style="color:var(--gtb-accent);">' + s.combo.strat.outcome + '</b>'
+        + ' <span style="color:var(--gtb-muted);">(' + s.combo.strat.level + ')</span></div>';
+    h += '<div style="margin-bottom:8px;"><b>Composite score:</b> ' + (s.composite > 0 ? '+' : '') + s.composite
+        + ' &nbsp; <b>Signal:</b> <span style="color:' + sigColor + ';font-weight:800;">' + sigText + '</span>'
+        + (s.signal && s.signal.reason ? ' <span style="color:var(--gtb-muted);">— ' + s.signal.reason + '</span>' : '') + '</div>';
+    h += '<div style="overflow-x:auto;"><table class="gtb-diary-table"><thead><tr>'
+        + '<th>Instrument</th><th>9:15</th><th>Trend</th><th>Fut</th><th>OI/OBV</th><th>MaxPain</th><th>IVSkew</th><th>Total</th>'
+        + '</tr></thead><tbody>'
+        + fmtSub('NIFTY 50', s.instruments['NIFTY 50'])
+        + fmtSub('NIFTY BANK', s.instruments['NIFTY BANK'])
+        + fmtSub('SENSEX', s.instruments['SENSEX'])
+        + '</tbody></table></div>';
+    h += '</div></div>';
+    return h;
+}
+
+// ── Part 2: Trade Journal ───────────────────────────────────────────────────
+// ASO/BSO compliance: best-effort — only checked for instruments with a real
+// strike-level formula (getStrikeDetails needs a day-open price); anything else
+// (custom tickers, equities) is skipped with "n/a" rather than guessed at.
+function _gtbDiaryComplianceCheck(row) {
+    try {
+        var opens = JSON.parse(localStorage.getItem('INSTRUMENT_LIST_GLOBAL') || '{}');
+        var openDetail = opens[row.instrument];
+        if (!openDetail || !openDetail.price) return { ok: null, label: 'n/a (no open price cached)' };
+        var sd = getStrikeDetails({ price: openDetail.price }, row.instrument);
+        var aso = parseFloat(sd.ustrikeOne), ast = parseFloat(sd.ustrikeTwo);
+        var bso = parseFloat(sd.bstrikeOne), bst = parseFloat(sd.bstrikeTwo);
+        var entry = parseFloat(row.entry);
+        var isLong = /buy|ce|long/i.test(row.side);
+        if (isLong) {
+            if (entry >= aso) return { ok: true,  label: 'Entered at/above ASO (' + aso.toFixed(0) + ') — compliant' };
+            return { ok: false, label: 'Entered below ASO (' + aso.toFixed(0) + ') — early/off-plan' };
+        } else {
+            if (entry <= bso) return { ok: true,  label: 'Entered at/below BSO (' + bso.toFixed(0) + ') — compliant' };
+            return { ok: false, label: 'Entered above BSO (' + bso.toFixed(0) + ') — early/off-plan' };
+        }
+    } catch (e) { return { ok: null, label: 'n/a' }; }
+}
+
+function _gtbDiaryComputePnl(row) {
+    // Kite-imported rows carry Kite's own authoritative pnl (from /oms/portfolio/positions,
+    // which accounts for partial fills/multiplier correctly) — trust it over recomputing.
+    if (row.source === 'kite' && typeof row.kitePnl === 'number') return row.kitePnl;
+    var qty = parseFloat(row.qty) || 0;
+    var entry = parseFloat(row.entry), exit = parseFloat(row.exit);
+    if (isNaN(entry) || isNaN(exit) || !qty) return null;
+    var isLong = /buy|ce|long/i.test(row.side);
+    var pnl = (exit - entry) * qty * (isLong ? 1 : -1);
+    return pnl;
+}
+
+function _gtbDiaryJournalHtml() {
+    var rows = _gtbDiaryLoadJournal();
+    var h = '<div class="gtb-diary-card">';
+    h += '<div class="gtb-diary-card-hdr"><i class="bi bi-journal-plus"></i> TRADE JOURNAL — today'
+        + '<button id="gtb-diary-add-row" class="gtb-win-btn" style="margin-left:auto;width:auto;font-size:0.5rem;padding:2px 8px;"><i class="bi bi-plus-lg"></i> Add trade</button>'
+        + '</div>';
+    h += '<div style="overflow-x:auto;"><table class="gtb-diary-table" id="gtb-diary-journal-table"><thead><tr>'
+        + '<th>Time</th><th>Instrument</th><th>Exch</th><th>Side</th><th>Qty</th><th>Entry</th><th>Exit</th><th>P&amp;L</th><th>ASO/BSO Plan</th><th>Notes</th><th></th>'
+        + '</tr></thead><tbody>';
+    if (!rows.length) {
+        h += '<tr><td colspan="11" style="color:var(--gtb-muted);text-align:center;padding:10px;">No trades logged yet — click "Add trade".</td></tr>';
+    } else {
+        rows.forEach(function(r, i) {
+            var pnl = _gtbDiaryComputePnl(r);
+            var pnlCol = pnl === null ? 'var(--gtb-muted)' : pnl > 0 ? 'var(--gtb-green)' : pnl < 0 ? 'var(--gtb-red)' : 'var(--gtb-muted)';
+            var pnlTxt = pnl === null ? '—' : (pnl > 0 ? '+' : '') + pnl.toFixed(0);
+            var comp = _gtbDiaryComplianceCheck(r);
+            var compCol = comp.ok === true ? 'var(--gtb-green)' : comp.ok === false ? 'var(--gtb-amber)' : 'var(--gtb-muted)';
+            h += '<tr data-idx="' + i + '">'
+                + '<td><input class="gtb-diary-inp" data-f="time" value="' + (r.time || '') + '" style="width:52px;"></td>'
+                + '<td><input class="gtb-diary-inp" data-f="instrument" value="' + (r.instrument || '') + '" style="width:90px;"></td>'
+                + '<td><input class="gtb-diary-inp" data-f="exchange" value="' + (r.exchange || _gtbDiaryExchangeGuess(r.instrument)) + '" style="width:44px;"></td>'
+                + '<td><select class="gtb-diary-inp" data-f="side" style="width:56px;">'
+                +   ['Buy CE','Buy PE','Long Fut','Short Fut'].map(function(o){ return '<option' + (r.side === o ? ' selected' : '') + '>' + o + '</option>'; }).join('')
+                + '</select></td>'
+                + '<td><input class="gtb-diary-inp" data-f="qty" value="' + (r.qty || '') + '" style="width:50px;"></td>'
+                + '<td><input class="gtb-diary-inp" data-f="entry" value="' + (r.entry || '') + '" style="width:60px;"></td>'
+                + '<td><input class="gtb-diary-inp" data-f="exit" value="' + (r.exit || '') + '" style="width:60px;"></td>'
+                + '<td style="color:' + pnlCol + ';font-weight:700;">' + pnlTxt + '</td>'
+                + '<td style="color:' + compCol + ';font-size:0.5rem;max-width:140px;">' + comp.label + '</td>'
+                + '<td><input class="gtb-diary-inp" data-f="notes" value="' + (r.notes || '') + '" style="width:120px;"></td>'
+                + '<td><button class="gtb-diary-del-row" style="background:transparent;border:none;color:var(--gtb-red);cursor:pointer;"><i class="bi bi-trash"></i></button></td>'
+                + '</tr>';
+        });
+    }
+    h += '</tbody></table></div></div>';
+    return h;
+}
+
+// ── Part 3: P&L Summary by exchange ─────────────────────────────────────────
+function _gtbDiaryPnlSummaryHtml() {
+    var rows = _gtbDiaryLoadJournal();
+    var byExch = {};
+    var total = 0, wins = 0, losses = 0;
+    rows.forEach(function(r) {
+        var pnl = _gtbDiaryComputePnl(r);
+        if (pnl === null) return;
+        var ex = r.exchange || _gtbDiaryExchangeGuess(r.instrument) || 'OTHER';
+        byExch[ex] = (byExch[ex] || 0) + pnl;
+        total += pnl;
+        if (pnl > 0) wins++; else if (pnl < 0) losses++;
+    });
+    var exchKeys = Object.keys(byExch);
+    var h = '<div class="gtb-diary-card">';
+    h += '<div class="gtb-diary-card-hdr"><i class="bi bi-cash-stack"></i> P&amp;L SUMMARY</div>';
+    h += '<div style="padding:8px 10px;font-size:0.62rem;">';
+    if (!exchKeys.length) {
+        h += '<span style="color:var(--gtb-muted);">No closed trades logged yet.</span>';
+    } else {
+        h += '<div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:6px;">';
+        exchKeys.forEach(function(ex) {
+            var v = byExch[ex];
+            h += '<div><b>' + ex + ':</b> <span style="color:' + (v > 0 ? 'var(--gtb-green)' : v < 0 ? 'var(--gtb-red)' : 'var(--gtb-muted)') + ';font-weight:800;">'
+                + (v > 0 ? '+' : '') + v.toFixed(0) + '</span></div>';
+        });
+        h += '</div>';
+        h += '<div><b>Total P&amp;L:</b> <span style="font-weight:800;color:' + (total > 0 ? 'var(--gtb-green)' : total < 0 ? 'var(--gtb-red)' : 'var(--gtb-muted)') + ';">'
+            + (total > 0 ? '+' : '') + total.toFixed(0) + '</span>'
+            + ' &nbsp; <b>Win/Loss:</b> ' + wins + 'W / ' + losses + 'L</div>';
+    }
+    h += '</div></div>';
+    return h;
+}
+
+// ── Part 4: Notes / Mistakes / Suggestions (free text, autosaved) ──────────
+function _gtbDiaryNotesFormHtml() {
+    var text = _gtbDiaryLoadNotes();
+    return '<div class="gtb-diary-card">'
+        + '<div class="gtb-diary-card-hdr"><i class="bi bi-pencil-square"></i> NOTES / MISTAKES / SUGGESTIONS</div>'
+        + '<div style="padding:8px 10px;">'
+        + '<textarea id="gtb-diary-notes-text" placeholder="What went right, what went wrong, what to avoid tomorrow…" '
+        + 'style="width:100%;min-height:100px;background:var(--gtb-surface2);color:var(--gtb-text);border:1px solid var(--gtb-border);padding:6px;font-size:0.65rem;font-family:inherit;resize:vertical;">'
+        + text.replace(/</g, '&lt;') + '</textarea>'
+        + '<div style="font-size:0.5rem;color:var(--gtb-muted);margin-top:2px;">Autosaves on blur.</div>'
+        + '</div></div>';
+}
+
+// ── Markdown export (Jekyll-postable) ───────────────────────────────────────
+function _gtbDiaryBuildMarkdown() {
+    var s = _gtbDiaryBuildSummary();
+    var rows = _gtbDiaryLoadJournal();
+    var notes = _gtbDiaryLoadNotes();
+    var md = '---\n';
+    md += 'layout: post\n';
+    md += 'title: "Trading Notes — ' + s.date + '"\n';
+    md += 'date: ' + s.date + '\n';
+    md += 'categories: trading-diary\n';
+    md += '---\n\n';
+
+    md += '## Market Summary\n\n';
+    md += '- **9:15 combo:** NIFTY ' + s.combo.n915 + ' / SENSEX ' + s.combo.s915 + ' / BANK ' + s.combo.k915 + ' / GIFT ' + s.combo.g915 + '\n';
+    md += '- **Recommendation:** ' + s.combo.strat.outcome + ' (' + s.combo.strat.level + ')\n';
+    md += '- **Composite score:** ' + (s.composite > 0 ? '+' : '') + s.composite + '\n';
+    md += '- **Signal:** ' + (s.signal ? s.signal.signal : 'N/A') + (s.signal && s.signal.reason ? ' — ' + s.signal.reason : '') + '\n\n';
+
+    md += '| Instrument | 9:15 | Trend | Fut | OI/OBV | MaxPain | IVSkew | Total |\n';
+    md += '|---|---|---|---|---|---|---|---|\n';
+    ['NIFTY 50', 'NIFTY BANK', 'SENSEX'].forEach(function(name) {
+        var sc = s.instruments[name];
+        if (!sc) { md += '| ' + name + ' | n/a | | | | | | |\n'; return; }
+        md += '| ' + name + ' | ' + sc.nine_fifteen + ' | ' + sc.current_trend + ' | ' + sc.futures_trend + ' | '
+            + (sc.oi_obv.toFixed ? sc.oi_obv.toFixed(1) : sc.oi_obv) + ' | ' + sc.max_pain + ' | ' + sc.iv_skew + ' | '
+            + (sc.total.toFixed ? sc.total.toFixed(1) : sc.total) + ' |\n';
+    });
+
+    md += '\n## Trades Taken\n\n';
+    if (!rows.length) {
+        md += '_No trades logged._\n';
+    } else {
+        md += '| Time | Instrument | Exch | Side | Qty | Entry | Exit | P&L | ASO/BSO Plan | Notes |\n';
+        md += '|---|---|---|---|---|---|---|---|---|---|\n';
+        rows.forEach(function(r) {
+            var pnl = _gtbDiaryComputePnl(r);
+            var comp = _gtbDiaryComplianceCheck(r);
+            md += '| ' + (r.time || '') + ' | ' + (r.instrument || '') + ' | ' + (r.exchange || _gtbDiaryExchangeGuess(r.instrument)) + ' | '
+                + (r.side || '') + ' | ' + (r.qty || '') + ' | ' + (r.entry || '') + ' | ' + (r.exit || '') + ' | '
+                + (pnl === null ? '—' : (pnl > 0 ? '+' : '') + pnl.toFixed(0)) + ' | ' + comp.label + ' | ' + (r.notes || '') + ' |\n';
+        });
+
+        var byExch = {}, total = 0;
+        rows.forEach(function(r) { var p = _gtbDiaryComputePnl(r); if (p === null) return; var ex = r.exchange || _gtbDiaryExchangeGuess(r.instrument) || 'OTHER'; byExch[ex] = (byExch[ex] || 0) + p; total += p; });
+        md += '\n**P&L by exchange:** ' + Object.keys(byExch).map(function(ex) { return ex + ': ' + (byExch[ex] > 0 ? '+' : '') + byExch[ex].toFixed(0); }).join(', ') + '\n';
+        md += '\n**Total P&L:** ' + (total > 0 ? '+' : '') + total.toFixed(0) + '\n';
+    }
+
+    md += '\n## Notes / Mistakes / Suggestions\n\n';
+    md += (notes && notes.trim()) ? notes.trim() + '\n' : '_(none recorded)_\n';
+
+    return md;
+}
+
+// ── Kite import — real orders/positions instead of manual entry ────────────
+// Uses the same enctoken-header GET pattern as getHistoricalData()/_gtbHistAjax() in
+// utils.js. /oms/orders gives today's individual fills (used only for entry TIME per
+// tradingsymbol); /oms/portfolio/positions' `day` array is the authoritative source for
+// qty/avg-price/realized-P&L per instrument (already correctly weighted across partial
+// fills and multiplier — recomputing that from raw orders would just re-derive what
+// Kite already computed, with more room to get it wrong).
+function _gtbDiaryKiteAuthHeader() {
+    return { 'Authorization': 'enctoken ' + getCookie('enctoken') };
+}
+
+function _gtbDiaryFetchOrders() {
+    return new Promise(function(resolve) {
+        jQ.ajax({
+            url: BASE_URL + '/oms/orders', type: 'GET', cache: false,
+            headers: _gtbDiaryKiteAuthHeader(),
+            success: function(res) { resolve((res && res.data) || []); },
+            error: function() { resolve([]); }
+        });
+    });
+}
+
+function _gtbDiaryFetchPositions() {
+    return new Promise(function(resolve) {
+        jQ.ajax({
+            url: BASE_URL + '/oms/portfolio/positions', type: 'GET', cache: false,
+            headers: _gtbDiaryKiteAuthHeader(),
+            success: function(res) { resolve((res && res.data) || { net: [], day: [] }); },
+            error: function() { resolve({ net: [], day: [] }); }
+        });
+    });
+}
+
+// Options are unambiguous from the trading symbol suffix; futures/equity direction is
+// inferred from which side had more activity today (bought-first = long, sold-first = short).
+function _gtbDiaryGuessSide(tradingsymbol, pos) {
+    var s = (tradingsymbol || '').toUpperCase();
+    if (/CE$/.test(s)) return 'Buy CE';
+    if (/PE$/.test(s)) return 'Buy PE';
+    return (pos.day_buy_quantity || 0) >= (pos.day_sell_quantity || 0) ? 'Long Fut' : 'Short Fut';
+}
+
+// Pulls today's /oms/portfolio/positions (day book) into the journal as rows tagged
+// source:'kite', replacing any previously Kite-imported rows (so re-importing mid-day
+// refreshes rather than duplicates) while leaving manually-added rows untouched.
+async function _gtbDiaryImportFromKite() {
+    var orders = await _gtbDiaryFetchOrders();
+    var positions = await _gtbDiaryFetchPositions();
+    var dayPositions = (positions && positions.day) || [];
+    var todayStr = _gtbDiaryDateKey();
+
+    var firstTimeBySymbol = {};
+    orders.forEach(function(o) {
+        if (o.status !== 'COMPLETE') return;
+        var t = o.order_timestamp || o.exchange_timestamp;
+        if (!t) return;
+        var m = moment(t);
+        if (m.format('YYYY-MM-DD') !== todayStr) return;
+        if (!firstTimeBySymbol[o.tradingsymbol] || m.isBefore(moment(firstTimeBySymbol[o.tradingsymbol]))) {
+            firstTimeBySymbol[o.tradingsymbol] = t;
+        }
+    });
+
+    var rows = _gtbDiaryLoadJournal().filter(function(r) { return r.source !== 'kite'; });
+    var imported = 0;
+    dayPositions.forEach(function(p) {
+        var activity = (p.day_buy_quantity || 0) + (p.day_sell_quantity || 0);
+        if (!activity) return; // position exists but nothing traded today (carried overnight)
+        rows.push({
+            time: firstTimeBySymbol[p.tradingsymbol] ? moment(firstTimeBySymbol[p.tradingsymbol]).format('HH:mm') : '',
+            instrument: p.tradingsymbol,
+            exchange: p.exchange,
+            side: _gtbDiaryGuessSide(p.tradingsymbol, p),
+            qty: activity,
+            entry: p.buy_price || p.average_price || '',
+            exit: p.sell_price || p.last_price || '',
+            notes: 'Imported from Kite positions',
+            source: 'kite',
+            kitePnl: p.pnl
+        });
+        imported++;
+    });
+
+    _gtbDiarySaveJournal(rows);
+    return imported;
+}
+
+function _gtbRenderNotesPane() {
+    var $pane = jQ('#gtb-pane-notes');
+    if (!$pane.length) return;
+    var header = '<div style="display:flex;align-items:center;gap:8px;padding:6px 12px;border-bottom:1px solid var(--gtb-border);background:var(--gtb-surface);flex-shrink:0;">'
+        + '<span style="font-size:0.55rem;font-weight:800;color:var(--gtb-muted);text-transform:uppercase;letter-spacing:0.08em;"><i class="bi bi-journal-text"></i> END OF DAY NOTES — ' + _gtbDiaryDateKey() + '</span>'
+        + '<span style="margin-left:auto;display:flex;gap:6px;">'
+        + '<button id="gtb-diary-refresh" class="gtb-win-btn" style="width:auto;font-size:0.5rem;padding:2px 8px;" title="Recompute the auto market summary from current data"><i class="bi bi-arrow-clockwise"></i> Refresh</button>'
+        + '<button id="gtb-diary-import-kite" class="gtb-win-btn" style="width:auto;font-size:0.5rem;padding:2px 8px;" title="Pull today\'s actual fills from /oms/portfolio/positions (qty/avg price/realized P&amp;L) — replaces previously imported rows, keeps manually-added ones"><i class="bi bi-cloud-download"></i> Import from Kite</button>'
+        + '<button id="gtb-diary-copy-md" class="gtb-win-btn" style="width:auto;font-size:0.5rem;padding:2px 8px;" title="Copy the whole day as Markdown, ready to paste into a GitHub Pages _posts file"><i class="bi bi-clipboard"></i> Copy Markdown</button>'
+        + '<button id="gtb-diary-dl-md" class="gtb-win-btn" style="width:auto;font-size:0.5rem;padding:2px 8px;" title="Download as a dated .md file"><i class="bi bi-download"></i> Download .md</button>'
+        + '</span></div>';
+    var body = '<div style="padding:8px;display:flex;flex-direction:column;gap:8px;">'
+        + _gtbDiarySummaryHtml()
+        + _gtbDiaryJournalHtml()
+        + _gtbDiaryPnlSummaryHtml()
+        + _gtbDiaryNotesFormHtml()
+        + '<div style="font-size:0.5rem;color:var(--gtb-muted);padding:4px 2px;">'
+        + 'Note: "Import from Kite" pulls today\'s actual positions (qty/avg price/realized P&amp;L) from /oms/portfolio/positions — '
+        + 'Side and futures/equity direction are best-effort guesses (options are unambiguous from CE/PE, futures/equity direction is inferred '
+        + 'from which side traded first), and ASO/BSO compliance only resolves for symbols matching this app\'s own instrument names — review imported rows before trusting them. '
+        + 'Pushing to GitHub Pages is a manual step: download/copy the markdown, then commit it into your Pages repo\'s <code>_posts/</code> folder '
+        + '(e.g. <code>_posts/' + _gtbDiaryDateKey() + '-trading-notes.md</code>) — this script never has your GitHub credentials.'
+        + '</div>'
+        + '</div>';
+    $pane.html('<div style="display:flex;flex-direction:column;height:100%;overflow:hidden;">' + header + '<div style="flex:1;overflow-y:auto;">' + body + '</div></div>');
+}
+
+// Add-trade row
+jQ(document).on('click', '#gtb-diary-add-row', function() {
+    var rows = _gtbDiaryLoadJournal();
+    rows.push({ time: moment().format('HH:mm'), instrument: 'NIFTY 50', exchange: 'NFO', side: 'Buy CE', qty: '', entry: '', exit: '', notes: '' });
+    _gtbDiarySaveJournal(rows);
+    jQ('#gtb-diary-journal-table').closest('.gtb-diary-card').replaceWith(_gtbDiaryJournalHtml());
+});
+
+// Delete-trade row
+jQ(document).on('click', '.gtb-diary-del-row', function() {
+    var idx = parseInt(jQ(this).closest('tr').data('idx'));
+    var rows = _gtbDiaryLoadJournal();
+    rows.splice(idx, 1);
+    _gtbDiarySaveJournal(rows);
+    jQ('#gtb-diary-journal-table').closest('.gtb-diary-card').replaceWith(_gtbDiaryJournalHtml());
+    jQ('#gtb-diary-journal-table').closest('.gtb-diary-card').siblings('.gtb-diary-card').eq(0).replaceWith(_gtbDiaryPnlSummaryHtml());
+});
+
+// Field edits within the journal table — save on change/blur, re-render P&L summary
+jQ(document).on('change', '#gtb-diary-journal-table .gtb-diary-inp', function() {
+    var idx = parseInt(jQ(this).closest('tr').data('idx'));
+    var field = jQ(this).data('f');
+    var rows = _gtbDiaryLoadJournal();
+    if (!rows[idx]) return;
+    rows[idx][field] = jQ(this).val();
+    _gtbDiarySaveJournal(rows);
+    jQ('#gtb-diary-journal-table').closest('.gtb-diary-card').replaceWith(_gtbDiaryJournalHtml());
+    jQ('.gtb-diary-card').filter(function() { return jQ(this).find('.gtb-diary-card-hdr').text().indexOf('P&L SUMMARY') >= 0; }).replaceWith(_gtbDiaryPnlSummaryHtml());
+});
+
+// Notes textarea autosave
+jQ(document).on('blur', '#gtb-diary-notes-text', function() {
+    _gtbDiarySaveNotes(jQ(this).val());
+});
+
+// Refresh button — recompute auto summary (in case scores changed since pane opened)
+jQ(document).on('click', '#gtb-diary-refresh', function() {
+    _gtbRenderNotesPane();
+});
+
+// Import from Kite — pulls today's positions.day into the journal
+jQ(document).on('click', '#gtb-diary-import-kite', async function() {
+    var $btn = jQ(this).prop('disabled', true);
+    var _origHtml = $btn.html();
+    $btn.html('<i class="bi bi-hourglass-split"></i> Importing…');
+    try {
+        var n = await _gtbDiaryImportFromKite();
+        _gtbRenderNotesPane();
+        callSackBarInfo(n ? ('Imported ' + n + ' position(s) from Kite — review Side/ASO-BSO before trusting the summary.') : 'No trading activity found in today\'s Kite positions.');
+    } catch (e) {
+        console.error('[Diary] Kite import failed:', e);
+        callSackBar('Kite import failed: ' + (e && e.message ? e.message : e));
+        $btn.prop('disabled', false).html(_origHtml);
+    }
+});
+
+// Copy as Markdown
+jQ(document).on('click', '#gtb-diary-copy-md', function() {
+    var md = _gtbDiaryBuildMarkdown();
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(md).then(function() { callSackBarInfo('Markdown copied — paste into your GitHub Pages repo.'); })
+            .catch(function() { callSackBar('Clipboard write failed — try Download .md instead.'); });
+    } else {
+        callSackBar('Clipboard API unavailable — try Download .md instead.');
+    }
+});
+
+// Download as .md
+jQ(document).on('click', '#gtb-diary-dl-md', function() {
+    var md = _gtbDiaryBuildMarkdown();
+    var blob = new Blob([md], { type: 'text/markdown' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = _gtbDiaryDateKey() + '-trading-notes.md';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
+});
 
 jQ(document).on('click', '#show-trade-checklist', function() {
     _gtbShowTradeChecklist();
@@ -19757,6 +21005,8 @@ function _gtbCreateFloatingBar() {
         { id: 'show-carry-scanner',          icon: 'bi-moon-stars-fill',      title: 'Overnight Carry Scanner' },
         { id: 'show-vol-profile',            icon: 'bi-align-start',          title: 'Volume Profile / POC' },
         { id: 'show-liq-scanner',            icon: 'bi-water',          title: 'Liquidity / SL-Hunt Scanner' },
+        { id: 'show-quote-fetch',            icon: 'bi-search',               title: 'Quote Fetch' },
+        { id: 'show-ws-subscribe',           icon: 'bi-broadcast',            title: 'WebSocket Subscribe' },
         { id: 'show-help',                   icon: 'bi-question-circle-fill', title: 'Help' },
         { id: 'data-load',                   icon: 'bi-sliders',              title: 'Data Settings' },
     ];
@@ -19795,6 +21045,8 @@ function _gtbCreateFloatingBar() {
             if (id === 'show-vol-profile')       { _gtbShowVolumeProfile(); return; }
             if (id === 'show-liq-scanner')       { _gtbShowLiquidityScanner(); return; }
             if (id === 'show-master-scanner')    { _gtbShowMasterScanner(); return; }
+            if (id === 'show-quote-fetch')       { showQuotePopup(); return; }
+            if (id === 'show-ws-subscribe')      { showWebSocketPopup(); return; }
             var $el = jQ('#' + id);
             if ($el.length) {
                 $el[0].click();

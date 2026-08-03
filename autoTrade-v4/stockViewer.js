@@ -183,8 +183,22 @@ function _svRenderScoreConfidence(name, sc, suffix) {
     var bears  = scores.filter(function(v){ return v < 0; }).length;
     var total  = sc.total || 0;
 
+    // If price action (9:15 + current trend) actually disagrees with the direction the
+    // total implies, the total's sign is being carried by a MINORITY of the 4 sub-signals
+    // — almost always a single large OI/OBV swing outweighing the rest (OI/OBV is noisier/
+    // lower-liquidity per-stock than index options, see [[trade-signal-priority]]-style
+    // reasoning). The confidence number below (bulls or bears / 4) already reflects this,
+    // but a bold "STRONG SHORT/LONG" banner reads as confident regardless of that number —
+    // demote to a plain WAIT with an explicit conflict note instead of showing a strong
+    // directional call that the majority of independent signals don't actually support.
+    var conflict = (total > 0 && bears > bulls) || (total < 0 && bulls > bears);
+
     var direction, conf, color, bg, icon;
-    if      (total >= 4)  { direction = 'STRONG LONG';  conf = Math.round(bulls/4*100); color = '#3fb950'; bg = 'rgba(63,185,80,0.12)';  icon = 'bi-arrow-up-circle-fill'; }
+    if (conflict) {
+        direction = 'WAIT'; conf = Math.round(Math.min(bulls, bears) / 4 * 100);
+        color = '#d29922'; bg = 'rgba(210,153,34,0.08)'; icon = 'bi-exclamation-triangle-fill';
+    }
+    else if (total >= 4)  { direction = 'STRONG LONG';  conf = Math.round(bulls/4*100); color = '#3fb950'; bg = 'rgba(63,185,80,0.12)';  icon = 'bi-arrow-up-circle-fill'; }
     else if (total > 0)   { direction = 'LONG';          conf = Math.round(bulls/4*100); color = '#3fb950'; bg = 'rgba(63,185,80,0.08)';  icon = 'bi-arrow-up-circle'; }
     else if (total <= -4) { direction = 'STRONG SHORT'; conf = Math.round(bears/4*100); color = '#f85149'; bg = 'rgba(248,81,73,0.12)';  icon = 'bi-arrow-down-circle-fill'; }
     else if (total < 0)   { direction = 'SHORT';         conf = Math.round(bears/4*100); color = '#f85149'; bg = 'rgba(248,81,73,0.08)';  icon = 'bi-arrow-down-circle'; }
@@ -294,6 +308,9 @@ function _svRenderScoreConfidence(name, sc, suffix) {
         +   '<span style="font-size:0.56rem;font-weight:900;color:' + color + ';background:' + bg
         +     ';padding:2px 7px;border-radius:4px;border:1px solid ' + color + '44;letter-spacing:0.06em;">' + direction + '</span>'
         + '</div>'
+        + (conflict ? '<div style="font-size:0.42rem;color:' + color + ';line-height:1.4;margin-bottom:5px;">'
+            + '⚠ Price action (9:15' + (bulls > bears ? '+Trend bullish' : '+Trend bearish') + ') disagrees with the OI-driven score — demoted from a ' + (total > 0 ? 'LONG' : 'SHORT') + ' call, wait for signals to agree.'
+            + '</div>' : '')
         + '<div style="display:flex;align-items:center;gap:5px;margin-bottom:4px;">'
         +   '<span style="font-size:0.44rem;color:var(--gtb-muted);min-width:50px;">Confidence</span>'
         +   '<div style="flex:1;height:4px;background:var(--gtb-surface2);border-radius:3px;overflow:hidden;">'
