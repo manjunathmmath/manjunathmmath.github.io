@@ -104,6 +104,8 @@ function buildHelpHTML() {
           <tr><td><i class="bi bi-moon-stars-fill"></i></td><td>Overnight Carry Scanner</td><td>Fresh per-stock Kite fetch (spot + futures + OI) → LONG / SHORT / AVOID carry verdict</td></tr>
           <tr><td><i class="bi bi-align-start"></i></td><td>Volume Profile / POC</td><td>Volume-by-price histogram: POC, Value Area (VAH/VAL), low-volume nodes + trade setup</td></tr>
           <tr><td><i class="bi bi-water"></i></td><td>Liquidity / SL-Hunt Scanner</td><td>Detects stop runs: sweep + reclaim + volume spike + OI non-confirmation → reversal setup</td></tr>
+          <tr><td><i class="bi bi-search"></i></td><td>Quote Fetch</td><td>Search + fetch a live quote via the official Kite Connect Quote API (needs a matching api_key/access_token pair in Settings, separate from the enctoken used elsewhere)</td></tr>
+          <tr><td><i class="bi bi-broadcast"></i></td><td>WebSocket Subscribe</td><td>Live ticker table (LTP/Chg/OHLC/Vol) over Kite's WebSocket; auto-subscribes indices + top-10 N50/BankNifty constituents</td></tr>
           <tr><td><i class="bi bi-gear-fill"></i></td><td>Settings</td><td>Theme, row height, refresh interval, display options</td></tr>
           <tr><td><i class="bi bi-question-circle-fill"></i></td><td>Help</td><td>This popup</td></tr>
           <tr><td><i class="bi bi-sliders"></i></td><td>Data Settings</td><td>Trading dates, load prices, clear storage, external links</td></tr>

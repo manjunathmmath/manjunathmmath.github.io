@@ -747,7 +747,11 @@ async function maximizeChart(name) {
             + 'border:1px solid var(--gtb-border2,#30363d);border-radius:6px;margin-bottom:8px;min-height:28px;">'
             + '<span style="font-size:0.52rem;color:var(--gtb-muted);">Loading levels…</span>'
             + '</div>';
-        b += '<div id="max-' + tempName + '-chart" style="width:100%;min-width:0;height:500px;border-radius:8px;overflow:hidden;display:block;"></div>';
+        // Height must match the 520 passed to showTopChart/showTopChartMCX below — a
+        // mismatch here (was 500 vs 520) meant the container's overflow:hidden clipped the
+        // bottom 20px of the LightweightCharts instance, which is exactly where the time
+        // axis (x-axis) labels are drawn, hiding them in the maximized view.
+        b += '<div id="max-' + tempName + '-chart" style="width:100%;min-width:0;height:520px;border-radius:8px;overflow:hidden;display:block;"></div>';
         b += '<div id="max-' + tempName + '-atr-sl" style="margin-top:8px;"></div>';
         return b;
     }
@@ -8136,6 +8140,8 @@ jQ(document).on("click", ".refresh-stock-list", function () {
 var GTB_INFO = {
     deadzone:     { icon:'bi-dash-circle-dotted', title:'Dead Zone (D&darr; / D&uarr;)',
         body:'Two dashed purple lines marking a price band where futures + OI/OBV + price-action signals disagree or are too weak for real conviction — price is expected to stay range-bound inside this band until it actually breaks it. Bounded by the nearest OI-wall support/resistance (S1/R1, ranked by OBV pressure) when available, else the 9:15 BSO/ASO band. Only drawn when the instrument\'s composite score (<code>computeInstrumentScore().total</code>) is inside &plusmn;3 — once there\'s real conviction, there\'s no dead zone to mark; trust the breakout normally. Read it as: wait for price to actually close through D&uarr;/D&darr; before trading the move.' },
+    'cmd-crude-score': { icon:'bi-speedometer2', title:'Crude Score Gauge',
+        body:'Same gauge widget as the main dashboard\'s SCORE card, scoped to CRUDEOILM alone via <code>computeInstrumentScore(\'CRUDEOILM\')</code>. Split into <b>Leading</b> (9:15 candle + current trend + futures — always counted) and <b>Lagging</b> (OI/OBV + Max Pain + IV Skew — dropped when Settings &rarr; &ldquo;Include lagging signals&rdquo; is off), the same grouping the main composite SCORE uses. Scale is &plusmn;10 (a single instrument, not the market-wide &plusmn;40 composite) — colour bands follow the same convention: red &lt;0, amber 0&ndash;5, yellow 5&ndash;8, green &ge;8.' },
     cmdglobal:    { icon:'bi-globe2',           title:'Global Context (Crude)',
         body:'Cross-checks MCX crude against the global benchmark it is actually priced off, since MCX is thin/closed during the price-discovery window and mostly just imports the overnight WTI move + USD/INR.'
             + '<br><br><b>Fair Value</b> = WTI price ($) &times; USD/INR — the theoretical INR value if MCX traded at exactly the raw global rate. MCX Crude Oil\'s contract spec settles against NYMEX WTI, not Brent.'
@@ -10629,6 +10635,12 @@ jQ(document).on('click', '#show-commodities', function (e) {
         +   '<div class="cmd-twin-col">'
         +     '<div class="cmd-col-hdr"><i class="bi bi-droplet-fill"></i> CRUDEOILM</div>'
         +     '<div id="cmd-crude-meta" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:4px 0;margin-bottom:4px;border-bottom:1px solid var(--gtb-border);font-size:0.48rem;"></div>'
+        // Score gauge — same widget/scale convention as the main dashboard's SCORE
+        // card, built from computeInstrumentScore('CRUDEOILM') split into leading
+        // (9:15 + trend + futures) vs lagging (OI/OBV + Max Pain + IV Skew).
+        +     '<div class="cmd-st" style="display:flex;align-items:center;gap:6px;">SCORE' + _ii('cmd-crude-score') + '</div>'
+        +     '<div id="cmd-crude-score-gauge" style="height:110px;"></div>'
+        +     '<div id="cmd-crude-score-breakdown" style="display:flex;justify-content:center;gap:14px;margin:-6px 0 6px;font-size:0.46rem;color:var(--gtb-muted);"></div>'
         +     '<div id="cmd-crude-usdinr-div" style="margin-bottom:4px;"></div>'
         +     '<div id="cmd-crude-session" style="margin-bottom:4px;"></div>'
         +     '<div id="cmd-crude-global" style="margin-bottom:6px;"></div>'
@@ -10775,6 +10787,34 @@ jQ(document).on('click', '#show-commodities', function (e) {
     // ── Feature 5: WTI global context + fair value signal ────────────────────
     // Live quote fetch via GM_xmlhttpRequest (bypasses CORS, same pattern as quoteWs.js's
     // _qwFetchQuote) — Yahoo Finance's chart endpoint needs no auth/API key.
+    // Crude Score gauge — same _renderGauge widget the main dashboard's SCORE card uses,
+    // but scoped to CRUDEOILM alone and scaled for a single instrument instead of the
+    // market-wide -40..40 composite. Split into the same leading/lagging grouping setScore()
+    // uses for the main SCORE: leading = 9:15 + current trend + futures (always counted),
+    // lagging = OI/OBV + Max Pain + IV Skew (dropped when Settings → "Include lagging
+    // signals" is off, mirroring GTB_INCLUDE_LAGGING for the main composite).
+    function _cmdRenderCrudeScoreGauge() {
+        var el = document.getElementById('cmd-crude-score-gauge');
+        if (!el) return;
+        var cs;
+        try { cs = computeInstrumentScore('CRUDEOILM'); } catch (e) { return; }
+        if (!cs) return;
+
+        var leading = (cs.nine_fifteen || 0) + (cs.current_trend || 0) + (cs.futures_trend || 0);
+        var lagging = (cs.oi_obv || 0) + (cs.max_pain || 0) + (cs.iv_skew || 0);
+        var includeLagging = localStorage.getItem('GTB_INCLUDE_LAGGING') !== '0';
+        var total = includeLagging ? (leading + lagging) : leading;
+
+        _renderGauge('#cmd-crude-score-gauge', parseFloat(total.toFixed(1)), -10, 10);
+
+        var leadCol = leading > 0 ? 'var(--gtb-green)' : leading < 0 ? 'var(--gtb-red)' : 'var(--gtb-muted)';
+        var lagCol  = lagging > 0 ? 'var(--gtb-green)' : lagging < 0 ? 'var(--gtb-red)' : 'var(--gtb-muted)';
+        jQ('#cmd-crude-score-breakdown').html(
+            '<span>Leading <b style="color:' + leadCol + ';font-family:var(--gtb-mono);">' + (leading > 0 ? '+' : '') + leading.toFixed(1) + '</b></span>'
+            + '<span>Lagging <b style="color:' + (includeLagging ? lagCol : 'var(--gtb-muted)') + ';font-family:var(--gtb-mono);">' + (includeLagging ? ((lagging > 0 ? '+' : '') + lagging.toFixed(1)) : 'off') + '</b></span>'
+        );
+    }
+
     function _cmdFetchYahooQuote(symbol) {
         return new Promise(function (resolve, reject) {
             if (typeof GM_xmlhttpRequest === 'undefined') { reject('GM_xmlhttpRequest unavailable'); return; }
@@ -11157,6 +11197,7 @@ jQ(document).on('click', '#show-commodities', function (e) {
             jQ('#cmd-crude-verdict').html('<div class="cmd-load" style="color:var(--gtb-muted);">OI unavailable — verdict requires OI data.</div>');
             jQ('#cmd-crude-lvlprob').html('<div class="cmd-load" style="color:var(--gtb-muted);">OI unavailable — level probability requires OI data.</div>');
         }
+        try { _cmdRenderCrudeScoreGauge(); } catch(e10) {}
         // CRUDEOILM Futures Remark Accuracy
         _cmdLoadCrudeAcc();
 
@@ -12068,6 +12109,49 @@ function _renderLWChart(containerId, candles, refLines, chartHeight, opts) {
             var half   = (span * factor) / 2;
             ts.setVisibleLogicalRange({ from: mid - half, to: mid + half });
         }
+    });
+
+    // ── OHLC tooltip on hover ──────────────────────────────────────────────────
+    var _ohlcTip = document.createElement('div');
+    _ohlcTip.className = 'lw-ohlc-tooltip';
+    _ohlcTip.style.display = 'none';
+    container.appendChild(_ohlcTip);
+
+    chart.subscribeCrosshairMove(function (param) {
+        if (!param || !param.time || !param.point || param.point.x < 0 || param.point.y < 0) {
+            _ohlcTip.style.display = 'none';
+            return;
+        }
+        var d = param.seriesData && param.seriesData.get(candleSeries);
+        if (!d) { _ohlcTip.style.display = 'none'; return; }
+
+        var o = d.open, h = d.high, l = d.low, c = d.close;
+        var chg = c - o;
+        var chgPct = o ? (chg / o * 100) : 0;
+        var col = c >= o ? '#3fb950' : '#f85149';
+
+        // Timestamps are pre-shifted by +IST_OFFSET so reading UTC fields gives IST time —
+        // same convention as the chart's own localization.timeFormatter above.
+        var dt = new Date(param.time * 1000);
+        var hh = ('0' + dt.getUTCHours()).slice(-2), mm = ('0' + dt.getUTCMinutes()).slice(-2);
+        var _fmtP = function (v) { return v >= 1000 ? v.toLocaleString('en-IN', { maximumFractionDigits: 2 }) : v.toFixed(2); };
+
+        _ohlcTip.innerHTML = '<div class="lw-ohlc-time">' + hh + ':' + mm + '</div>'
+            + '<div class="lw-ohlc-row"><span>O</span><b>' + _fmtP(o) + '</b></div>'
+            + '<div class="lw-ohlc-row"><span>H</span><b>' + _fmtP(h) + '</b></div>'
+            + '<div class="lw-ohlc-row"><span>L</span><b>' + _fmtP(l) + '</b></div>'
+            + '<div class="lw-ohlc-row"><span>C</span><b style="color:' + col + ';">' + _fmtP(c) + '</b></div>'
+            + '<div class="lw-ohlc-row"><span>Chg</span><b style="color:' + col + ';">' + (chg >= 0 ? '+' : '') + _fmtP(chg) + ' (' + (chgPct >= 0 ? '+' : '') + chgPct.toFixed(2) + '%)</b></div>';
+
+        // Keep the tooltip inside the container — flip to the left of the cursor
+        // once it would overflow the right edge.
+        var cw = container.clientWidth || 300;
+        var tipW = 110;
+        var x = param.point.x + 12;
+        if (x + tipW > cw) x = param.point.x - tipW - 12;
+        _ohlcTip.style.left = Math.max(2, x) + 'px';
+        _ohlcTip.style.top  = '4px';
+        _ohlcTip.style.display = 'block';
     });
 
     // Responsive resize — guard against zero-width during collapse transitions

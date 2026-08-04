@@ -3382,6 +3382,38 @@ td.details-control {
   font-variant-numeric: tabular-nums;
   color: var(--gtb-muted);
 }
+
+/* ── OHLC crosshair-hover tooltip (LightweightCharts price panels) ────── */
+.lw-ohlc-tooltip {
+  position: absolute;
+  z-index: 10;
+  background: rgba(13,17,23,0.9);
+  border: 1px solid rgba(48,54,61,0.7);
+  border-radius: 3px;
+  padding: 4px 6px;
+  pointer-events: none;
+  min-width: 96px;
+  font-variant-numeric: tabular-nums;
+}
+.gtb-light .lw-ohlc-tooltip {
+  background: rgba(255,255,255,0.92);
+  border-color: rgba(208,215,222,0.8);
+}
+.lw-ohlc-time {
+  font-size: 0.5rem; font-weight: 800;
+  color: var(--gtb-muted, #7d8590);
+  margin-bottom: 2px; letter-spacing: 0.03em;
+}
+.lw-ohlc-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; line-height: 1.4;
+}
+.lw-ohlc-row span {
+  font-size: 0.48rem; color: var(--gtb-muted, #7d8590); font-weight: 700;
+}
+.lw-ohlc-row b {
+  font-size: 0.5rem; color: var(--gtb-text, #c9d1d9);
+}
 .gtb-chart-oi   { height: 110px; }
 .gtb-chart-ad   { height: 80px; }
 .gtb-atr-row {
