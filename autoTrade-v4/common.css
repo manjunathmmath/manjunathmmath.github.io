@@ -2607,7 +2607,9 @@ td.details-control {
 /* ══════════════════════════════════════════════════════════════════════
    OVERVIEW BANNER — top-level "what is the dashboard saying" summary
    ══════════════════════════════════════════════════════════════════════ */
-#gtb-overview {
+/* #gtb-overview-dash is the Dashboard tab's mirror of this same banner
+   (see _gtbDashboardOverviewHtml / _renderGtbOverview's _both() helper) */
+#gtb-overview, #gtb-overview-dash {
   flex-shrink: 0;
   min-height: 76px;
   display: grid;
@@ -5194,6 +5196,32 @@ td.details-control {
 .gtb-sig-wait {
     padding: 16px; text-align: center;
     font-size: 0.56rem; color: var(--gtb-muted); font-style: italic;
+}
+
+/* ── Dashboard tab — 3/4-column grid layout ─────────────────────────────
+   Page-flow (natural height, scrolls with the pane) variants of the fixed-
+   height Signals-tab layout above — Dashboard isn't a flex:0 0 55% panel,
+   it's a normal scrolling page, so these use CSS grid instead. */
+.gtb-dash-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+    gap: 8px;
+    /* Grid items default to align-items:stretch — every cell in a row matches the
+       TALLEST cell (Predict, with far more content than a short OI/OBV mini-chart
+       card), leaving huge empty space under every other card. align-items:start lets
+       each cell size to its own content instead. */
+    align-items: start;
+}
+.gtb-dash-cell { margin: 0 !important; }
+.gtb-dash-sig-cols {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+}
+.gtb-dash-sig-col { margin: 0 !important; }
+.gtb-dash-sig-col .gtb-card-body { max-height: 320px; }
+@media (max-width: 900px) {
+    .gtb-dash-sig-cols { grid-template-columns: 1fr; }
 }
 
 /* Tab grid for non-main panes */

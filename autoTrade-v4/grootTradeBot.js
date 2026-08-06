@@ -625,8 +625,9 @@ function maximizeOI(name) {
 function renderOIOBVMaximized(name, tempName, oiData) {
     let priceChange = 0;
     try { priceChange = parseFloat(generateTrend(name).change) || 0; } catch(e) {
-        if (INSTRUMENT_SCORE_MAP[name] && stock[0] && stock[0]['LTP'] && stock[0]['OPEN']) {
-            let l = parseFloat(stock[0]['LTP']), o = parseFloat(stock[0]['OPEN']);
+        let se = INSTRUMENT_SCORE_MAP[name] && INSTRUMENT_SCORE_MAP[name].stockEntry;
+        if (se && se['LTP'] && se['OPEN']) {
+            let l = parseFloat(se['LTP']), o = parseFloat(se['OPEN']);
             priceChange = o > 0 ? (l - o) / o * 100 : 0;
         }
     }
@@ -727,7 +728,10 @@ function renderOIOBVMaximized(name, tempName, oiData) {
         // Stock viewer path: render directly into the max div
         var _origTarget = jQ('<div id="' + tempName + '-component-oi-list-table" style="display:none;"></div>').appendTo('body');
         try {
-            if (stock[0] && stock[0]['DATA']) showComponentOITable(name, '');
+            // showComponentOITable() itself reads INSTRUMENT_SCORE_MAP[name].oiData (fixed
+            // in v26.59) — gate on that same source instead of the shared stock[0] global.
+            var _hasOi = INSTRUMENT_SCORE_MAP[name] && INSTRUMENT_SCORE_MAP[name].oiData && INSTRUMENT_SCORE_MAP[name].oiData.tableData;
+            if (_hasOi) showComponentOITable(name, '');
             jQ('#max-' + tempName + '-oi-table').html(_origTarget.html());
         } catch(e) {}
         _origTarget.remove();
@@ -1313,7 +1317,8 @@ function commonMarkupPlaceHolder() {
     h += '<div id="gtb-right">';
     h += '<div id="gtb-tab-strip">'
         // ── Tabs ─────────────────────────────────────────────────────────────
-        + '<button class="gtb-tab active" data-tab="metrics"><i class="bi bi-speedometer2"></i> Metrics</button>'
+        + '<button class="gtb-tab active" data-tab="dashboard"><i class="bi bi-columns-gap"></i> Dashboard</button>'
+        + '<button class="gtb-tab" data-tab="metrics"><i class="bi bi-speedometer2"></i> Metrics</button>'
         + '<button class="gtb-tab" data-tab="lvlprob"><i class="bi bi-signpost-split-fill"></i> Level Prob</button>'
         + '<button class="gtb-tab" data-tab="main"><i class="bi bi-grid"></i> Overview</button>'
         + '<button class="gtb-tab" data-tab="signals"><i class="bi bi-layers-fill"></i> Signals</button>'
@@ -1342,6 +1347,7 @@ function commonMarkupPlaceHolder() {
         + '<a id="gtb-settings-toggle"       class="gtb-ctrl-link" title="Settings"><i class="bi bi-gear-fill"></i></a>'
         + '<a id="data-load"                 class="gtb-ctrl-link" title="Data Settings"><i class="bi bi-sliders"></i></a>'
         + '</div>';
+    h += '<div id="gtb-pane-dashboard" class="gtb-tab-pane" style="display:none;overflow-y:auto;padding:0;"></div>';
     h += '<div id="gtb-pane-metrics" class="gtb-tab-pane" style="display:none;overflow-y:auto;padding:0;"></div>';
     h += '<div id="gtb-pane-lvlprob" class="gtb-tab-pane" style="display:none;overflow:auto;padding:0;"></div>';
     h += '<div id="gtb-pane-main"  class="gtb-tab-pane" style="display:none;">';
@@ -1811,8 +1817,16 @@ function _gtbInitTabs() {
         _gtbActivateTab(jQ(this).data('tab'));
     });
 
-    // Render default tab (Metrics) on init
-    try { _gtbRenderMetricsPane(); } catch(e) {}
+    // Render default tab (Dashboard) on init. Building the pane's content isn't enough —
+    // every .gtb-tab-pane starts display:none (both inline and via CSS) and only ever
+    // becomes visible through _gtbActivateTab(), which previously only ran from a tab-strip
+    // click. Since Dashboard is now the default landing tab (not something the user clicks
+    // into), it needs an explicit activation call here or its content renders into a hidden
+    // div — exactly the "nothing is displayed" symptom.
+    // Split so a render error can't also block activation, and so any real error is
+    // visible in console instead of being silently swallowed by one shared catch.
+    try { _gtbRenderDashboardPane(); } catch(e) { console.error('[Dashboard] render error:', e); }
+    try { _gtbActivateTab('dashboard'); } catch(e) { console.error('[Dashboard] activate error:', e); }
 
 
     // Drawer close
@@ -1832,7 +1846,15 @@ function _gtbInitTabs() {
     // at line ~329 that opens showMaximizeOverlay for chart/OI/futures panels.
 }
 
+// Tracks whichever tab is currently active so commonShowPopupWindow() (which rebuilds the
+// ENTIRE popup markup from scratch every refresh cycle) can restore it afterwards — see
+// the restore call there. Without this, every refresh reset every tab pane back to its
+// default hidden state (nothing re-ran _gtbActivateTab post-rebuild), so ANY tab — not just
+// Dashboard — went blank after a refresh until the user clicked a tab again.
+var _gtbCurrentActiveTab = 'dashboard';
+
 function _gtbActivateTab(tabId) {
+    _gtbCurrentActiveTab = tabId;
     jQ('.gtb-tab-pane').each(function() {
         jQ(this).toggle(jQ(this).attr('id') === 'gtb-pane-' + tabId);
     });
@@ -1842,6 +1864,13 @@ function _gtbActivateTab(tabId) {
 }
 
 var _GTB_PANE_GRIDS = {
+    // Dashboard tab manages its own DOM (builds its skeleton once, then just repopulates
+    // containers on every call) — return null so _gtbRenderPane skips wiping it, same
+    // pattern 'trade' uses below. Without an entry here at all, _gtbRenderPane('dashboard')
+    // returned early (gridFn undefined) and never reached the _GTB_PANE_RENDERS['dashboard']
+    // call that actually invokes _gtbRenderDashboardPane() — meaning switching tabs away
+    // from and back to Dashboard never refreshed it.
+    dashboard: function() { return null; },
     metrics:  function() { return ''; },
     lvlprob:  function() { return ''; },
     signals:  function() { return _gtbSignalsPaneHtml(); },
@@ -1859,6 +1888,7 @@ var _GTB_PANE_GRIDS = {
 };
 
 var _GTB_PANE_RENDERS = {
+    dashboard: [function(){try{_gtbRenderDashboardPane();}catch(e){}}],
     metrics:  [function(){try{_gtbRenderMetricsPane();}catch(e){}}],
     lvlprob:  [function(){try{_gtbRenderLevelProbPane();}catch(e){}}],
     signals:  [function(){try{_gtbRenderSignalsPane();}catch(e){}}],
@@ -2356,14 +2386,14 @@ function _gtbSigOiWtdColHtml(containerId) {
             + verdictBanner
             + '<table class="oic-matrix"><thead><tr>'
             + '<th class="oic-sticky">Instrument</th>'
+            + '<th>OI Score ' + _ii('sig-oi-score') + '</th>'
+            + '<th>PCR ' + _ii('sig-oi-pcr') + '</th>'
+            + OFFS.map(function(o){ return '<th>' + (o===0?'ATM★':'ATM'+(o>0?'+'+o:o)) + '</th>'; }).join('')
             + '<th>Wt% ' + _ii('sig-oi-weight') + '</th>'
             + '<th>Chg% ' + _ii('sig-oi-chg') + '</th>'
             + '<th>Index Impact ' + _ii('sig-oi-impact') + '</th>'
             + '<th>Cum% ' + _ii('sig-oi-cumimpact') + '</th>'
             + '<th>Verdict ' + _ii('sig-oi-verdict') + '</th>'
-            + '<th>OI Score ' + _ii('sig-oi-score') + '</th>'
-            + '<th>PCR ' + _ii('sig-oi-pcr') + '</th>'
-            + OFFS.map(function(o){ return '<th>' + (o===0?'ATM★':'ATM'+(o>0?'+'+o:o)) + '</th>'; }).join('')
             + '</tr></thead><tbody>';
 
         rows.forEach(function(row) {
@@ -2400,17 +2430,17 @@ function _gtbSigOiWtdColHtml(containerId) {
             var vHtml = '<span title="' + vTitle + '" style="display:inline-block;padding:1px 5px;border-radius:3px;background:' + vBg + ';color:' + vColor + ';font-weight:700;white-space:nowrap;">' + vLabel + '</span>';
 
             h += '<tr><td class="oic-sticky"><b>' + name + '</b></td>'
-                + '<td style="font-family:var(--gtb-mono);">' + row.weight.toFixed(2) + '</td>'
-                + '<td style="color:' + pcColor + ';font-family:var(--gtb-mono);">' + (pc > 0 ? '+' : '') + pc.toFixed(2) + '</td>'
-                + '<td style="color:' + impColor + ';font-weight:700;font-family:var(--gtb-mono);" title="Weight% × price change% — approximate contribution to the index move">' + (row.impact > 0 ? '+' : '') + row.impact.toFixed(3) + '</td>'
-                + '<td style="font-family:var(--gtb-mono);color:var(--gtb-muted);" title="Cumulative share of total |impact| in this group, current sort order">' + cumPct + '%</td>'
-                + '<td>' + vHtml + '</td>'
                 + '<td style="color:' + scColor + ';font-weight:700;font-family:var(--gtb-mono);">' + (oiScore > 0 ? '+' : '') + (typeof oiScore === 'number' ? oiScore.toFixed(1) : oiScore) + '</td>'
                 + '<td style="font-family:var(--gtb-mono);">' + (oiData.pcr != null ? oiData.pcr : '—') + '</td>';
             OFFS.forEach(function(off) {
                 var idx = atmIdx + off;
                 h += _gtbOICellCompact((idx >= 0 && idx < td.length) ? td[idx] : null, pc, off === 0, undefined, undefined, undefined, spot);
             });
+            h += '<td style="font-family:var(--gtb-mono);">' + row.weight.toFixed(2) + '</td>'
+                + '<td style="color:' + pcColor + ';font-family:var(--gtb-mono);">' + (pc > 0 ? '+' : '') + pc.toFixed(2) + '</td>'
+                + '<td style="color:' + impColor + ';font-weight:700;font-family:var(--gtb-mono);" title="Weight% × price change% — approximate contribution to the index move">' + (row.impact > 0 ? '+' : '') + row.impact.toFixed(3) + '</td>'
+                + '<td style="font-family:var(--gtb-mono);color:var(--gtb-muted);" title="Cumulative share of total |impact| in this group, current sort order">' + cumPct + '%</td>'
+                + '<td>' + vHtml + '</td>';
             h += '</tr>';
         });
         h += '</tbody></table></div>';
@@ -2430,7 +2460,14 @@ function _gtbSigOiWtdColHtml(containerId) {
 
 jQ(document).on('click', '.gtb-wtd-sort-btn', function() {
     _GTB_WTD_SORT_MODE = jQ(this).data('mode');
-    if (_GTB_WTD_CONTAINER_ID) _gtbSigOiWtdColHtml(_GTB_WTD_CONTAINER_ID);
+    // Re-render whichever container this button actually lives in — now that this section
+    // can be rendered into more than one pane at once (Signals tab + Dashboard tab), the
+    // single shared _GTB_WTD_CONTAINER_ID would silently re-render the WRONG pane if the
+    // other one had rendered more recently. Falls back to the tracked id for any caller
+    // that isn't wrapped in one of the known containers.
+    var $container = jQ(this).closest('#gtb-sig-oi-wtd, #gtb-dash-sig-oi-wtd');
+    if ($container.length) { _gtbSigOiWtdColHtml('#' + $container.attr('id')); }
+    else if (_GTB_WTD_CONTAINER_ID) { _gtbSigOiWtdColHtml(_GTB_WTD_CONTAINER_ID); }
 });
 
 function _gtbSigOiColHtml(list, containerId) {
@@ -2735,7 +2772,8 @@ function _gtbRenderSignalsPane() {
     });
 }
 
-async function _gtbLoadFutAccInPane() {
+async function _gtbLoadFutAccInPane(targetIds) {
+    var _targets = (targetIds || ['gtb-sig-fut-body']).map(function (id) { return '#' + id; }).join(', ');
     try {
         var instruments = ['NIFTY 50', 'NIFTY BANK', 'RELIANCE', 'HDFCBANK', 'ICICIBANK'];
         var vix = 0;
@@ -2781,9 +2819,9 @@ async function _gtbLoadFutAccInPane() {
             });
             body += '</tbody></table>';
         }
-        jQ('#gtb-sig-fut-body').html('<div class="gtb-t915-wrap">' + body + '</div>');
+        jQ(_targets).html('<div class="gtb-t915-wrap">' + body + '</div>');
     } catch(e) {
-        jQ('#gtb-sig-fut-body').html('<div class="gtb-sig-wait" style="color:var(--gtb-red);">Error loading futures data.</div>');
+        jQ(_targets).html('<div class="gtb-sig-wait" style="color:var(--gtb-red);">Error loading futures data.</div>');
     }
 }
 
@@ -2943,6 +2981,10 @@ async function commonShowPopupWindow() {
     _gtbApplyCardW(parseInt(localStorage.getItem('GTB_CARD_W') || '300'));
     _gtbApplyColsCfg();
     _gtbApplyInstrsCfg();
+    // Restore whichever tab was active before this refresh rebuilt the markup — every
+    // .gtb-tab-pane defaults to hidden until _gtbActivateTab() runs, and this is the only
+    // place that does so after a refresh (see _gtbCurrentActiveTab's definition for why).
+    try { _gtbActivateTab(_gtbCurrentActiveTab || 'dashboard'); } catch (e) {}
 
     await callSleepForAWhile(200)
 
@@ -2987,7 +3029,11 @@ async function commonShowPopupWindow() {
                     await showPrictionProbabiltyMCX(name, res);
                     showOIOBVBarChart(name);
                     try {
-                        var _mcxOiData = (typeof stock !== 'undefined' && stock.length && stock[0]['DATA']) ? stock[0]['DATA'] : null;
+                        // Per-instrument cache showPrictionProbabiltyMCX just wrote — never the
+                        // shared stock[0] global (showPrictionProbabiltyMCX no longer touches it
+                        // for its own fetch, so stock[0] can't be trusted here at all anymore).
+                        var _mcxCached = INSTRUMENT_SCORE_MAP[name] && INSTRUMENT_SCORE_MAP[name].stockEntry;
+                        var _mcxOiData = _mcxCached && _mcxCached['DATA'];
                         if (_mcxOiData && _mcxOiData.tableData && _mcxOiData.tableData.length) {
                             INSTRUMENT_SCORE_MAP[name].oiData = _mcxOiData;
                             _gtbRenderOIMatrix(name);
@@ -5873,10 +5919,12 @@ async function _dvFetchAndRender(name, tid, sfx, isMcx) {
                 INSTRUMENT_SCORE_MAP[name].oi_obv = 0;
                 await showPrictionProbabiltyMCX(name, res);
                 showOIOBVBarChart(name, sfx);
-                // After showPrictionProbabiltyMCX, the global stock[0].DATA holds MCX OI tableData.
-                // Store it in INSTRUMENT_SCORE_MAP so _gtbRenderOIMatrix can render the matrix.
+                // Per-instrument cache showPrictionProbabiltyMCX just wrote — never the shared
+                // stock[0] global (showPrictionProbabiltyMCX no longer touches it for its own
+                // fetch, so stock[0] can't be trusted here at all anymore).
                 try {
-                    var _mcxOiData = (typeof stock !== 'undefined' && stock.length && stock[0]['DATA']) ? stock[0]['DATA'] : null;
+                    var _mcxCached2 = INSTRUMENT_SCORE_MAP[name] && INSTRUMENT_SCORE_MAP[name].stockEntry;
+                    var _mcxOiData = _mcxCached2 && _mcxCached2['DATA'];
                     if (_mcxOiData && _mcxOiData.tableData && _mcxOiData.tableData.length) {
                         INSTRUMENT_SCORE_MAP[name].oiData = _mcxOiData;
                         _gtbRenderOIMatrix(name, sfx);
@@ -6613,6 +6661,11 @@ function computeComponentScores() {
 // Populates #gtb-overview from the composite SCORE + marketSignal + score map.
 // Non-critical: wrapped in try/catch by the caller.
 function _renderGtbOverview(score, marketSignal) {
+    // Every element this function touches also has a '-dash' twin on the new Dashboard
+    // tab (see _gtbDashboardOverviewHtml) — _both() targets both in one jQuery call so
+    // this stays a single source of truth instead of duplicating every line below.
+    function _both(id) { return jQ('#' + id + ', #' + id + '-dash'); }
+
     var sig = (marketSignal && marketSignal.signal) || 'WAIT';
 
     // Verdict colour class by signal
@@ -6622,13 +6675,12 @@ function _renderGtbOverview(score, marketSignal) {
     else if (sig.indexOf('STRONG SELL') >= 0) verdictCls = 'strong-sell';
     else if (sig.indexOf('SELL') >= 0)   verdictCls = 'sell';
 
-    var ov = jQ('#gtb-ov-verdict');
-    ov.text(sig).attr('class', 'gtb-ov-verdict ' + verdictCls);
-    jQ('#gtb-ov-verdict-sub').text((marketSignal && marketSignal.reason) || '');
+    _both('gtb-ov-verdict').text(sig).attr('class', 'gtb-ov-verdict ' + verdictCls);
+    _both('gtb-ov-verdict-sub').text((marketSignal && marketSignal.reason) || '');
 
     // Composite score number + colour band
     var scoreCls = score < 0 ? 'red' : score < 5 ? 'orange' : score < 8 ? 'yellow' : 'green';
-    jQ('#gtb-ov-score').text((score > 0 ? '+' : '') + parseFloat(score).toFixed(1))
+    _both('gtb-ov-score').text((score > 0 ? '+' : '') + parseFloat(score).toFixed(1))
         .attr('class', 'gtb-ov-score ' + scoreCls);
 
     // Instrument breadth — bullish vs bearish per score.total
@@ -6640,18 +6692,18 @@ function _renderGtbOverview(score, marketSignal) {
         if (t > 0) bull++; else if (t < 0) bear++;
     });
     var total = bull + bear || 1;
-    jQ('#gtb-ov-breadth-bull').css('width', (bull / total * 100) + '%');
-    jQ('#gtb-ov-breadth-bear').css('width', (bear / total * 100) + '%');
-    jQ('#gtb-ov-breadth-bull-n').text(bull + ' ▲');
-    jQ('#gtb-ov-breadth-bear-n').text(bear + ' ▼');
+    _both('gtb-ov-breadth-bull').css('width', (bull / total * 100) + '%');
+    _both('gtb-ov-breadth-bear').css('width', (bear / total * 100) + '%');
+    _both('gtb-ov-breadth-bull-n').text(bull + ' ▲');
+    _both('gtb-ov-breadth-bear-n').text(bear + ' ▼');
 
     // Mirror A/D + VIX from existing widgets (already populated elsewhere)
     var n50ad = jQ('#gtb-adr-n50').text().replace('N50 A/D', '').replace('N50', '').trim();
     var bnad  = jQ('#gtb-adr-bn').text().replace('BN A/D', '').replace('BN', '').trim();
     var vix   = jQ('#gtb-vix-val').text().trim();
-    jQ('#gtb-ov-n50ad').text(n50ad || '—');
-    jQ('#gtb-ov-bnad').text(bnad || '—');
-    jQ('#gtb-ov-vix').text(vix || '—');
+    _both('gtb-ov-n50ad').text(n50ad || '—');
+    _both('gtb-ov-bnad').text(bnad || '—');
+    _both('gtb-ov-vix').text(vix || '—');
 
     // 9:15 breakout counts — ASO/AST (above) vs BSO/BST (below) across constituents
     try {
@@ -6672,9 +6724,9 @@ function _renderGtbOverview(score, marketSignal) {
         }
         var _n50list = (typeof NIFTY_50_LIST   !== 'undefined') ? NIFTY_50_LIST   : [];
         var _bnlist  = (typeof NIFTY_BANK_LIST !== 'undefined') ? NIFTY_BANK_LIST : [];
-        jQ('#gtb-ov-915-n50').html(_fmt915(_count915(_n50list)));
-        jQ('#gtb-ov-915-bn').html(_fmt915(_count915(_bnlist)));
-        jQ('#gtb-ov-915-all').html(_fmt915(_count915(Object.keys(b915))));
+        _both('gtb-ov-915-n50').html(_fmt915(_count915(_n50list)));
+        _both('gtb-ov-915-bn').html(_fmt915(_count915(_bnlist)));
+        _both('gtb-ov-915-all').html(_fmt915(_count915(Object.keys(b915))));
     } catch (e) {}
 }
 
@@ -6786,6 +6838,7 @@ function setScore() {
     HDFCBANK_IV_SKEW_SCORE    = _gtbIVSkewScore('HDFCBANK');
     ICICIBANK_IV_SKEW_SCORE   = _gtbIVSkewScore('ICICIBANK');
     try { if (jQ('#gtb-pane-metrics').is(':visible')) _gtbRenderMetricsPane(); } catch(e) {}
+    try { if (jQ('#gtb-pane-dashboard').is(':visible')) _gtbRenderDashboardPane(); } catch(e) {}
 
     var _includeLagging = localStorage.getItem('GTB_INCLUDE_LAGGING') !== '0';
 
@@ -7770,12 +7823,18 @@ jQ(document).on("click", ".popup-win-minimize", function () {
         content.hide();
         btn.find('i').removeClass('bi-dash').addClass('bi-chevron-up');
         btn.attr('title', 'Restore').addClass('is-active');
-        popEl.css({ 'min-height': '0' });
+        // min-height alone doesn't shrink the window — the PopupWindow library sets an
+        // explicit inline `height` (px) on the popup at init/resize time, which still
+        // forces the old size even with content hidden and min-height cleared. That's
+        // why minimize only ever hid the content while the window itself stayed the same
+        // size (the reported bug). Clearing height too lets it collapse to the titlebar's
+        // own natural height once .popupwindow_content is display:none.
+        popEl.css({ height: 'auto', 'min-height': '0', overflow: 'hidden' });
     } else {
         content.show();
         btn.find('i').removeClass('bi-chevron-up').addClass('bi-dash');
         btn.attr('title', 'Minimize').removeClass('is-active');
-        popEl.css({ 'min-height': '' });
+        popEl.css({ height: '', 'min-height': '', overflow: '' });
     }
 });
 
@@ -8141,7 +8200,7 @@ var GTB_INFO = {
     deadzone:     { icon:'bi-dash-circle-dotted', title:'Dead Zone (D&darr; / D&uarr;)',
         body:'Two dashed purple lines marking a price band where futures + OI/OBV + price-action signals disagree or are too weak for real conviction — price is expected to stay range-bound inside this band until it actually breaks it. Bounded by the nearest OI-wall support/resistance (S1/R1, ranked by OBV pressure) when available, else the 9:15 BSO/ASO band. Only drawn when the instrument\'s composite score (<code>computeInstrumentScore().total</code>) is inside &plusmn;3 — once there\'s real conviction, there\'s no dead zone to mark; trust the breakout normally. Read it as: wait for price to actually close through D&uarr;/D&darr; before trading the move.' },
     'cmd-crude-score': { icon:'bi-speedometer2', title:'Crude Score Gauge',
-        body:'Same gauge widget as the main dashboard\'s SCORE card, scoped to CRUDEOILM alone via <code>computeInstrumentScore(\'CRUDEOILM\')</code>. Split into <b>Leading</b> (9:15 candle + current trend + futures — always counted) and <b>Lagging</b> (OI/OBV + Max Pain + IV Skew — dropped when Settings &rarr; &ldquo;Include lagging signals&rdquo; is off), the same grouping the main composite SCORE uses. Scale is &plusmn;10 (a single instrument, not the market-wide &plusmn;40 composite) — colour bands follow the same convention: red &lt;0, amber 0&ndash;5, yellow 5&ndash;8, green &ge;8.' },
+        body:'Same gauge widget as the main dashboard\'s SCORE card, scoped to CRUDEOILM alone via <code>computeInstrumentScore(\'CRUDEOILM\')</code>. Split into <b>Leading</b> (9:15 candle + current trend + futures) and <b>Lagging</b> (OI/OBV + Max Pain + IV Skew), the same grouping the main composite SCORE uses — but unlike the main SCORE, both are <b>always</b> included here regardless of the Settings &rarr; &ldquo;Include lagging signals&rdquo; toggle (that toggle only affects the main NSE composite). Below the gauge: a line chart reconstructing this score at every 5-min interval from 09:00 to the last cached candle today. Scale is &plusmn;10 (a single instrument, not the market-wide &plusmn;40 composite) — colour bands follow the same convention: red &lt;0, amber 0&ndash;5, yellow 5&ndash;8, green &ge;8.' },
     cmdglobal:    { icon:'bi-globe2',           title:'Global Context (Crude)',
         body:'Cross-checks MCX crude against the global benchmark it is actually priced off, since MCX is thin/closed during the price-discovery window and mostly just imports the overnight WTI move + USD/INR.'
             + '<br><br><b>Fair Value</b> = WTI price ($) &times; USD/INR — the theoretical INR value if MCX traded at exactly the raw global rate. MCX Crude Oil\'s contract spec settles against NYMEX WTI, not Brent.'
@@ -10132,7 +10191,7 @@ function _gtbLevelProb(name) {
         if (sm.oiData && sm.oiData.tableData) {
             sm.oiData.tableData.forEach(function(it) { if (it['ATM_STRIKE']) ltp = parseFloat(it['STRIKE']); });
         }
-        if (!ltp) { try { ltp = parseFloat(stock[0]['LTP']); } catch(e) {} }
+        if (!ltp) { try { ltp = parseFloat(sm.mcxLtp) || parseFloat((sm.stockEntry || {})['LTP']); } catch(e) {} }
         var vU = parseFloat(sm.strikeMap.vixDDUpper), vL = parseFloat(sm.strikeMap.vixDDLower);
         vixRange = (isFinite(vU) && isFinite(vL)) ? (vU - vL) / 2 : 0;
         pc = open ? (ltp - open) / open * 100 : 0;
@@ -10639,8 +10698,14 @@ jQ(document).on('click', '#show-commodities', function (e) {
         // card, built from computeInstrumentScore('CRUDEOILM') split into leading
         // (9:15 + trend + futures) vs lagging (OI/OBV + Max Pain + IV Skew).
         +     '<div class="cmd-st" style="display:flex;align-items:center;gap:6px;">SCORE' + _ii('cmd-crude-score') + '</div>'
-        +     '<div id="cmd-crude-score-gauge" style="height:110px;"></div>'
-        +     '<div id="cmd-crude-score-breakdown" style="display:flex;justify-content:center;gap:14px;margin:-6px 0 6px;font-size:0.46rem;color:var(--gtb-muted);"></div>'
+        +     '<div style="display:flex;align-items:stretch;gap:4px;">'
+        +       '<div id="cmd-crude-score-gauge" style="height:110px;width:130px;flex-shrink:0;"></div>'
+        +       '<div style="flex:1;min-width:0;display:flex;flex-direction:column;">'
+        +         '<div id="cmd-crude-score-chart" style="height:108px;"></div>'
+        +         '<div style="font-size:0.4rem;color:var(--gtb-muted);text-align:center;">5-min score history (09:00 onwards, today)</div>'
+        +       '</div>'
+        +     '</div>'
+        +     '<div id="cmd-crude-score-breakdown" style="display:flex;justify-content:center;gap:14px;margin:2px 0 6px;font-size:0.46rem;color:var(--gtb-muted);"></div>'
         +     '<div id="cmd-crude-usdinr-div" style="margin-bottom:4px;"></div>'
         +     '<div id="cmd-crude-session" style="margin-bottom:4px;"></div>'
         +     '<div id="cmd-crude-global" style="margin-bottom:6px;"></div>'
@@ -10802,8 +10867,9 @@ jQ(document).on('click', '#show-commodities', function (e) {
 
         var leading = (cs.nine_fifteen || 0) + (cs.current_trend || 0) + (cs.futures_trend || 0);
         var lagging = (cs.oi_obv || 0) + (cs.max_pain || 0) + (cs.iv_skew || 0);
-        var includeLagging = localStorage.getItem('GTB_INCLUDE_LAGGING') !== '0';
-        var total = includeLagging ? (leading + lagging) : leading;
+        // Unlike the main composite SCORE, the crude gauge always includes both — no
+        // GTB_INCLUDE_LAGGING toggle here, per explicit request (commodities-only override).
+        var total = leading + lagging;
 
         _renderGauge('#cmd-crude-score-gauge', parseFloat(total.toFixed(1)), -10, 10);
 
@@ -10811,8 +10877,152 @@ jQ(document).on('click', '#show-commodities', function (e) {
         var lagCol  = lagging > 0 ? 'var(--gtb-green)' : lagging < 0 ? 'var(--gtb-red)' : 'var(--gtb-muted)';
         jQ('#cmd-crude-score-breakdown').html(
             '<span>Leading <b style="color:' + leadCol + ';font-family:var(--gtb-mono);">' + (leading > 0 ? '+' : '') + leading.toFixed(1) + '</b></span>'
-            + '<span>Lagging <b style="color:' + (includeLagging ? lagCol : 'var(--gtb-muted)') + ';font-family:var(--gtb-mono);">' + (includeLagging ? ((lagging > 0 ? '+' : '') + lagging.toFixed(1)) : 'off') + '</b></span>'
+            + '<span>Lagging <b style="color:' + lagCol + ';font-family:var(--gtb-mono);">' + (lagging > 0 ? '+' : '') + lagging.toFixed(1) + '</b></span>'
         );
+
+        _cmdRenderCrudeScoreChart();
+    }
+
+    // Builds a table of time-sliced strike rows for tableAtT-consuming reconstructors
+    // (_gtbMaxPainScoreAtTime/_gtbIVSkewScoreAtTime) — same shape _oiScoreAtTime builds
+    // internally, just exposed here so it can be reused for those two too.
+    function _cmdTableAtTime(oiData, hhmm) {
+        if (!oiData || !oiData.tableData) return [];
+        var out = [];
+        oiData.tableData.forEach(function (item) {
+            var at = _gtbStrikeItemAtTime(item, hhmm);
+            if (!at) return;
+            at.STRIKE = item['STRIKE'];
+            out.push(at);
+        });
+        return out;
+    }
+
+    // Full-day reconstruction (09:00 → the last cached 5-min candle, i.e. "now" while the
+    // market's open, or the actual close once it isn't) instead of a forward-only tail —
+    // every input here is already-cached same-day candle data (spot candles + per-strike
+    // OI/OBV/IV series), same free reconstruction _gtbLevelProbAtTime/_oiScoreAtTime use for
+    // NSE, so no extra network calls are needed. futures_trend has no per-candle cache
+    // (same documented gap as the NSE history) so it's held at its current live value across
+    // every bucket rather than faked per-time.
+    // Every bucket except the most recent one is a CLOSED 5-min candle — its underlying
+    // OI/OBV/IV/spot data will never change again, so it only needs computing once. Without
+    // this cache, every popup refresh was redoing the full ~174-bucket reconstruction (MCX's
+    // 09:00-23:30 session is >2x NSE's ~75 buckets) from scratch every time, each bucket
+    // re-scanning every strike's full candle series — the actual cause of the slowness, not
+    // the (already-cached, no-refetch) data itself. Keyed by date so it resets on a new day.
+    var _cmdScoreHistCache = { day: null, buckets: {} };
+
+    function _cmdBuildCrudeScoreHistoryToday() {
+        var sm = INSTRUMENT_SCORE_MAP['CRUDEOILM'];
+        if (!sm || !sm.oiData || !sm.oiData.spotCandles || !sm.oiData.spotCandles.length) return [];
+        var spotCandles = sm.oiData.spotCandles;
+        var strikeMap = sm.strikeMap || {};
+        var aso = parseFloat(strikeMap.ustrikeOne), ast = parseFloat(strikeMap.ustrikeTwo);
+        var bso = parseFloat(strikeMap.bstrikeOne), bst = parseFloat(strikeMap.bstrikeTwo);
+        if (isNaN(aso) || isNaN(bso)) return [];
+
+        var b915 = {};
+        try { b915 = JSON.parse(localStorage.getItem('VALID_BREAKOUT_NINE_FIFTEEN') || '{}'); } catch (e) {}
+        var c915 = (b915['CRUDEOILM'] || {})['CLOSE_9_15'];
+        var s915 = c915 === 'AST' ? 2 : c915 === 'ASO' ? 1 : c915 === 'BST' ? -2 : c915 === 'BSO' ? -1 : 0;
+        var sFut = sm.futures_trend || 0;
+        // No GTB_INCLUDE_LAGGING toggle for crude — always both, per explicit request.
+
+        var lastCandleTime = moment(spotCandles[spotCandles.length - 1][0]);
+        var today = lastCandleTime.format('YYYY-MM-DD');
+        if (_cmdScoreHistCache.day !== today) { _cmdScoreHistCache = { day: today, buckets: {} }; }
+
+        var buckets = [];
+        var cursor = lastCandleTime.clone().hour(9).minute(0).second(0);
+        while (cursor.isSameOrBefore(lastCandleTime)) { buckets.push(cursor.format('HH:mm')); cursor.add(5, 'minutes'); }
+
+        var hist = [];
+        buckets.forEach(function (hhmm, bi) {
+            var isLast = (bi === buckets.length - 1);
+            if (!isLast && _cmdScoreHistCache.buckets[hhmm] !== undefined) {
+                hist.push({ time: hhmm, leading: _cmdScoreHistCache.buckets[hhmm].leading, lagging: _cmdScoreHistCache.buckets[hhmm].lagging });
+                return;
+            }
+            var idx = _gtbCandleIdxAtTime(spotCandles, hhmm);
+            if (idx < 0) return;
+
+            var price = parseFloat(spotCandles[idx][4]);
+            var sTrend = 0;
+            if      (price >= ast) sTrend = 2;
+            else if (price >= aso) sTrend = 1;
+            else if (price <= bst) sTrend = -2;
+            else if (price <= bso) sTrend = -1;
+
+            var sOI = _oiScoreAtTime(sm.oiData, hhmm);
+            if (sOI === null) sOI = 0;
+            var tableAtT = _cmdTableAtTime(sm.oiData, hhmm);
+            var sMP = _gtbMaxPainScoreAtTime(tableAtT);
+            var sIV = _gtbIVSkewScoreAtTime(tableAtT);
+
+            var leading = parseFloat((s915 + sTrend + sFut).toFixed(1));
+            var lagging = parseFloat((sOI + sMP + sIV).toFixed(1));
+            _cmdScoreHistCache.buckets[hhmm] = { leading: leading, lagging: lagging };
+            hist.push({ time: hhmm, leading: leading, lagging: lagging });
+        });
+        return hist;
+    }
+
+    function _cmdRenderCrudeScoreChart() {
+        var el = document.getElementById('cmd-crude-score-chart');
+        if (!el) return;
+        var hist = [];
+        try { hist = _cmdBuildCrudeScoreHistoryToday(); } catch (e) {}
+        if (!hist.length) { el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--gtb-muted);font-size:0.44rem;">Building history…</div>'; return; }
+
+        if (el._apexChart) { try { el._apexChart.destroy(); } catch (e2) {} }
+        var leadVals = hist.map(function (h) { return h.leading; });
+        var lagVals  = hist.map(function (h) { return h.lagging; });
+        var labels   = hist.map(function (h) { return h.time; });
+
+        var leadCol = '#38bdf8', lagCol = '#a78bfa'; // blue = leading, purple = lagging
+        var allVals = leadVals.concat(lagVals);
+        var minV = Math.min.apply(null, allVals), maxV = Math.max.apply(null, allVals);
+        var padV = Math.max(1, (maxV - minV) * 0.15);
+
+        var chart = new ApexCharts(el, {
+            series: [
+                { name: 'Leading', data: leadVals },
+                { name: 'Lagging', data: lagVals },
+            ],
+            chart: { type: 'line', height: '100%', background: 'transparent', toolbar: { show: false }, animations: { enabled: false }, sparkline: { enabled: false } },
+            colors: [leadCol, lagCol],
+            xaxis: {
+                categories: labels, axisBorder: { show: false }, axisTicks: { show: false },
+                tickAmount: Math.min(6, labels.length - 1),
+                labels: { show: true, style: { fontSize: '7px', colors: '#7d8590' }, rotate: 0 },
+            },
+            yaxis: {
+                show: true, min: minV - padV, max: maxV + padV, tickAmount: 3,
+                labels: {
+                    style: { fontSize: '7px', colors: '#7d8590' }, offsetX: -2,
+                    formatter: function (v) { return (v > 0 ? '+' : '') + v.toFixed(0); },
+                },
+            },
+            stroke: { curve: 'smooth', width: 2 },
+            dataLabels: { enabled: false },
+            markers: { size: 0, hover: { size: 3 } },
+            legend: {
+                show: true, position: 'top', horizontalAlign: 'center', fontSize: '7px',
+                markers: { size: 4 }, itemMargin: { horizontal: 6, vertical: 0 },
+                labels: { colors: '#7d8590' },
+            },
+            grid: {
+                show: true, borderColor: 'rgba(125,133,144,0.14)',
+                yaxis: { lines: { show: true } }, xaxis: { lines: { show: false } },
+                padding: { left: 6, right: 8, top: 0, bottom: 0 },
+            },
+            annotations: { yaxis: [{ y: 0, borderColor: 'rgba(125,133,144,0.45)', strokeDashArray: 3 }] },
+            tooltip: { theme: 'dark', x: { show: true }, y: { formatter: function (v) { return (v > 0 ? '+' : '') + v; } } },
+            theme: { mode: 'dark' },
+        });
+        chart.render();
+        el._apexChart = chart;
     }
 
     function _cmdFetchYahooQuote(symbol) {
@@ -11522,9 +11732,7 @@ function showComponentOITable(name, suffix) {
     // to someone else entirely — showing that other instrument's strikes here instead of
     // this instrument's own (e.g. a low-priced stock's ~95 strikes on an HDFCBANK popup).
     let sm = INSTRUMENT_SCORE_MAP[name];
-    let strikes = (sm && sm.oiData && sm.oiData['tableData'])
-        ? sm.oiData['tableData']
-        : ((stock[0] && stock[0]['DATA']) ? stock[0]['DATA']['tableData'] : []); // last-resort fallback
+    let strikes = (sm && sm.oiData && sm.oiData['tableData']) ? sm.oiData['tableData'] : [];
     let link = "https://kite.zerodha.com/markets/ext/chart/web/tvc/NFO-OPT/##INSTRUMENT##/##TOKEN##"
 
     // Determine which index is ATM from the data flag
@@ -13087,9 +13295,16 @@ function showOIOBVBarChart(name, suffix, _oiDataOverride) {
     let oiCEOBV = ["CE OBV"]
     let oiPEOBV = ["PE OBV"]
 
-    // When called from the bar-width slider, _oiDataOverride carries the per-instrument
-    // cached data so we never read the shared stock[0] global (which only holds the last fetch).
-    let oiData = _oiDataOverride || stock[0]['DATA']
+    // _oiDataOverride carries the per-instrument cached data (used by the bar-width
+    // slider). Otherwise, showPrictionProbabilty()/showPrictionProbabiltyMCX() both cache
+    // their result safely per-instrument (INSTRUMENT_SCORE_MAP[name].stockEntry) — this is
+    // the only source now; the shared `stock[0]` global is never read here anymore. It was
+    // a real race: _refreshNSE/_refreshMCX run every instrument in parallel (Promise.all),
+    // so `stock` could be overwritten by a different instrument's fetch mid-flight,
+    // silently collapsing every instrument's OI/OBV data onto whichever one won the race.
+    let _cachedEntry = INSTRUMENT_SCORE_MAP[name] && INSTRUMENT_SCORE_MAP[name].stockEntry;
+    let oiData = _oiDataOverride || (_cachedEntry && _cachedEntry['DATA']);
+    if (!oiData) { console.warn('[showOIOBVBarChart] no cached OI data for ' + name + ' — skipping (run a refresh first)'); return; }
     let data = oiData['tableData']
 
     // Cache per-instrument so maximize can re-render without re-fetching
@@ -13122,9 +13337,10 @@ function showOIOBVBarChart(name, suffix, _oiDataOverride) {
     try {
         priceChange = parseFloat(generateTrend(name).change) || 0;
     } catch(e) {
-        // MCX instruments not in INSTRUMENT_LIST_GLOBAL — derive from stock LTP vs open
-        if (stock[0] && stock[0]['LTP'] && stock[0]['OPEN']) {
-            let ltp = parseFloat(stock[0]['LTP']), open = parseFloat(stock[0]['OPEN']);
+        // MCX instruments not in INSTRUMENT_LIST_GLOBAL — derive from this instrument's own
+        // cached entry (_cachedEntry, resolved above), never the shared stock[0] global.
+        if (_cachedEntry && _cachedEntry['LTP'] && _cachedEntry['OPEN']) {
+            let ltp = parseFloat(_cachedEntry['LTP']), open = parseFloat(_cachedEntry['OPEN']);
             priceChange = open > 0 ? ((ltp - open) / open * 100) : 0;
         }
     }
@@ -15453,7 +15669,12 @@ function _gtbBuildChecklistHtml() {
 //   Layer 2 — Bayesian nudge from each current signal
 //   Layer 3 — VIX regime confidence filter
 // Outputs Bull% / Bear% / Sideways% + trade recommendation + key levels.
-function _gtbBuildPrediction() {
+function _gtbBuildPrediction(threeCol) {
+    // threeCol: Dashboard tab passes true to lay the 4 top-level sections out as a
+    // 3-column grid instead of stacked (the Metrics tab call site passes nothing —
+    // its narrower panel keeps the original stacked layout). The disclaimer strip and
+    // the (wide) signal evidence table span all 3 columns via _span below.
+    var _span = threeCol ? 'grid-column:1/-1;' : '';
 
     // ── helpers ──────────────────────────────────────────────────────────────
     var _s   = function(v) { return (v > 0 ? '+' : '') + parseFloat(v).toFixed(1); };
@@ -15734,10 +15955,10 @@ function _gtbBuildPrediction() {
              + '</div>';
     }
 
-    var html = '<div style="padding:10px 12px;font-size:0.65rem;">';
+    var html = '<div style="padding:10px 12px;font-size:0.65rem;' + (threeCol ? 'display:grid;grid-template-columns:repeat(3,1fr);gap:8px;align-items:start;' : '') + '">';
 
     // ── Disclaimer strip ──────────────────────────────────────────────────────
-    html += '<div style="padding:4px 8px;background:var(--gtb-surface2);border-left:3px solid var(--gtb-amber);font-size:0.5rem;color:var(--gtb-muted);margin-bottom:8px;">'
+    html += '<div style="' + _span + 'padding:4px 8px;background:var(--gtb-surface2);border-left:3px solid var(--gtb-amber);font-size:0.5rem;color:var(--gtb-muted);margin-bottom:8px;">'
           + '<i class="bi bi-exclamation-triangle-fill" style="color:var(--gtb-amber);"></i>'
           + ' Probabilistic model — not financial advice. Accuracy is directional, not guaranteed. 9:15 combo is the only signal with historical backtesting; other weights are heuristic.'
           + '</div>';
@@ -15815,9 +16036,13 @@ function _gtbBuildPrediction() {
             : '<div style="font-size:0.52rem;color:var(--gtb-muted);margin-top:3px;"><i class="bi bi-info-circle"></i> Run 9:15 Backtest to load historical win rates for this combo</div>')
         + '</div>';
 
-    // ── Signal evidence table ──────────────────────────────────────────────────
-    html += '<div style="background:var(--gtb-surface);padding:10px 12px;margin-bottom:8px;">'
-        + '<div style="font-size:0.55rem;font-weight:800;color:var(--gtb-muted);margin-bottom:6px;letter-spacing:0.05em;"><i class="bi bi-list-check"></i> SIGNAL EVIDENCE</div>'
+    // ── Signal evidence table — collapsed by default, click header to expand ────
+    html += '<div style="' + _span + 'background:var(--gtb-surface);padding:10px 12px;margin-bottom:8px;">'
+        + '<div class="gtb-pred-sig-toggle" style="cursor:pointer;display:flex;align-items:center;gap:5px;font-size:0.55rem;font-weight:800;color:var(--gtb-muted);letter-spacing:0.05em;">'
+        +   '<i class="bi bi-chevron-right gtb-pred-chevron" style="transition:transform 0.15s;"></i>'
+        +   '<i class="bi bi-list-check"></i> SIGNAL EVIDENCE'
+        + '</div>'
+        + '<div class="gtb-pred-sig-body" style="display:none;margin-top:6px;">'
         + '<table style="width:100%;border-collapse:collapse;">'
         + '<thead><tr>'
         + '<th style="font-size:0.48rem;font-weight:600;color:var(--gtb-muted);text-align:left;padding:2px 4px;border-bottom:1px solid var(--gtb-border);">Signal</th>'
@@ -15842,11 +16067,170 @@ function _gtbBuildPrediction() {
         + '<td style="font-size:0.46rem;color:var(--gtb-muted);padding:3px 4px;">→ ' + (shift > 0 ? '+' : '') + shift.toFixed(1) + ' pt probability shift</td>'
         + '</tr>'
         + '</tbody></table>'
-        + '</div>'
+        + '</div>' // end .gtb-pred-sig-body
+        + '</div>' // end signal-evidence card
 
         + '</div>'; // end padding wrapper
 
+    jQ(document).off('click.gtbpredtoggle').on('click.gtbpredtoggle', '.gtb-pred-sig-toggle', function () {
+        jQ(this).next('.gtb-pred-sig-body').slideToggle(120);
+        jQ(this).find('.gtb-pred-chevron').toggleClass('bi-chevron-right bi-chevron-down');
+    });
+
     return html;
+}
+
+// ── Dashboard tab — first tab, default landing view ─────────────────────────
+// Consolidates: the Overview top bar (Market Verdict/Composite Score/Instrument
+// Breadth/9:15 Breakout/Key Stats — literally mirrored, see _renderGtbOverview's
+// _both() helper), the Metrics tab's 9:15-combo Predict card, per-instrument
+// OI/OBV + Futures (Overview tab), and Signals tab's Index/Stock OI + Weighted
+// Constituents OI + Futures Accuracy sections — all reusing the exact same render
+// functions the source tabs use (into new -dash-suffixed containers), so this tab
+// stays in sync automatically on every refresh rather than being a static copy.
+function _gtbDashboardOverviewHtml() {
+    return '<div id="gtb-overview-dash" class="gtb-overview">'
+        + '<div class="gtb-ov-block gtb-ov-verdict-block">'
+        +   '<div class="gtb-ov-cap">MARKET VERDICT</div>'
+        +   '<div class="gtb-ov-verdict" id="gtb-ov-verdict-dash">—</div>'
+        +   '<div class="gtb-ov-verdict-sub" id="gtb-ov-verdict-sub-dash">Awaiting data…</div>'
+        + '</div>'
+        + '<div class="gtb-ov-block gtb-ov-score-block">'
+        +   '<div class="gtb-ov-cap">COMPOSITE SCORE</div>'
+        +   '<div class="gtb-ov-score" id="gtb-ov-score-dash">—</div>'
+        +   '<div class="gtb-ov-score-scale"><span>-40</span><span>0</span><span>+40</span></div>'
+        + '</div>'
+        + '<div class="gtb-ov-block gtb-ov-breadth-block">'
+        +   '<div class="gtb-ov-cap">INSTRUMENT BREADTH</div>'
+        +   '<div class="gtb-ov-breadth-bar" id="gtb-ov-breadth-bar-dash">'
+        +     '<div class="gtb-ov-breadth-fill bull" id="gtb-ov-breadth-bull-dash" style="width:50%;"></div>'
+        +     '<div class="gtb-ov-breadth-fill bear" id="gtb-ov-breadth-bear-dash" style="width:50%;"></div>'
+        +   '</div>'
+        +   '<div class="gtb-ov-breadth-legend"><span id="gtb-ov-breadth-bull-n-dash" class="bull">0 ▲</span>'
+        +   '<span id="gtb-ov-breadth-bear-n-dash" class="bear">0 ▼</span></div>'
+        + '</div>'
+        + '<div class="gtb-ov-block gtb-ov-915-block">'
+        +   '<div class="gtb-ov-cap">9:15 BREAKOUT</div>'
+        +   '<div class="gtb-ov-915-row"><span class="gtb-ov-915-lbl">N50</span><span class="gtb-ov-915-val" id="gtb-ov-915-n50-dash">—</span></div>'
+        +   '<div class="gtb-ov-915-row"><span class="gtb-ov-915-lbl">BN</span><span class="gtb-ov-915-val" id="gtb-ov-915-bn-dash">—</span></div>'
+        +   '<div class="gtb-ov-915-row"><span class="gtb-ov-915-lbl">ALL</span><span class="gtb-ov-915-val" id="gtb-ov-915-all-dash">—</span></div>'
+        + '</div>'
+        + '<div class="gtb-ov-block gtb-ov-stats-block">'
+        +   '<div class="gtb-ov-cap">KEY STATS</div>'
+        +   '<div class="gtb-ov-stat"><span class="gtb-ov-stat-lbl">N50 A/D</span><span class="gtb-ov-stat-val" id="gtb-ov-n50ad-dash">—</span></div>'
+        +   '<div class="gtb-ov-stat"><span class="gtb-ov-stat-lbl">BN A/D</span><span class="gtb-ov-stat-val" id="gtb-ov-bnad-dash">—</span></div>'
+        +   '<div class="gtb-ov-stat"><span class="gtb-ov-stat-lbl">INDIA VIX</span><span class="gtb-ov-stat-val" id="gtb-ov-vix-dash">—</span></div>'
+        + '</div>'
+        + '</div>';
+}
+
+function _gtbDashboardCard(title, icon, bodyId, bodyHtml) {
+    return '<div class="gtb-card gtb-widget" style="margin:0 8px 8px;">'
+        + '<div class="gtb-card-header"><span class="gtb-card-title"><i class="bi ' + icon + '"></i> ' + title + '</span></div>'
+        + '<div class="gtb-card-body" id="' + bodyId + '" style="padding:6px 8px;">' + (bodyHtml || '') + '</div>'
+        + '</div>';
+}
+
+function _gtbRenderDashboardPane() {
+    var $pane = jQ('#gtb-pane-dashboard');
+    if (!$pane.length) {
+        // If this fires, the popup's DOM doesn't have #gtb-pane-dashboard at all — almost
+        // always a stale Tampermonkey cache serving an older grootTradeBot.js (bump
+        // @version and hard-reload TM's externals, or check TM's update interval).
+        console.warn('[Dashboard] #gtb-pane-dashboard not found in DOM — stale script cache?');
+        return;
+    }
+
+    console.log('[Dashboard] render start, existing children:', $pane.children().length, 'allInstruments:', (typeof _allInstruments !== 'undefined' ? _allInstruments.length : 'undefined'));
+
+    // Build the skeleton once — every subsequent refresh just repopulates the
+    // containers below via the same functions the source tabs already use, instead
+    // of rebuilding the DOM (matching the convention every other pane follows).
+    if (!$pane.children().length) {
+      try {
+        var h = '<div style="padding:8px 0;">';
+        h += _gtbDashboardOverviewHtml();
+
+        // Predict is a full-width row on its own, above the OI/OBV grid — not squeezed
+        // into one grid cell among the (much shorter) instrument mini-cards.
+        h += '<div class="gtb-card gtb-widget" style="margin:0 8px 8px;">'
+        +      '<div class="gtb-card-header"><span class="gtb-card-title"><i class="bi bi-graph-up-arrow"></i> PREDICT (9:15 COMBO)</span></div>'
+        +      '<div class="gtb-card-body" id="gtb-dash-predict" style="padding:6px 8px;"></div>'
+        +    '</div>';
+
+        // Per-instrument OI/OBV grid. GIFT NIFTY has no futures/OI (see hasFut convention
+        // elsewhere in this file) so it's skipped entirely rather than shown as an empty
+        // placeholder cell.
+        h += '<div class="gtb-dash-grid" style="padding:0 8px 8px;">';
+        _allInstruments.forEach(function (item) {
+            var name = item.name, tid = name.replace(/ /g, '-').replace(/&/g, '-');
+            if (name === 'GIFT NIFTY' || name === 'SENSEX') return; // no futures/OI for these
+            h += '<div class="gtb-dash-cell gtb-card gtb-widget">'
+            +      '<div class="gtb-card-header"><span class="gtb-card-title">' + name + '</span>'
+            +        '<span id="' + tid + '-futures-dash" style="font-size:0.5rem;font-weight:700;"></span></div>'
+            +      '<div class="gtb-card-body" style="padding:4px 6px;">'
+            +        '<div style="font-size:0.4rem;color:var(--gtb-muted);">OI</div>'
+            +        '<div id="' + tid + '-oi-dash" class="gtb-chart-oi" style="height:44px;"></div>'
+            +        '<div style="font-size:0.4rem;color:var(--gtb-muted);">OBV</div>'
+            +        '<div id="' + tid + '-obv-dash" class="gtb-chart-oi" style="height:44px;"></div>'
+            +        '<div id="' + tid + '-oiobv-xaxis-dash" class="gtb-oiobv-xaxis"></div>'
+            +      '</div>'
+            +    '</div>';
+        });
+        h += '</div>'; // end .gtb-dash-grid
+
+        // Index/Stock OI + Weighted Constituents OI + Futures Accuracy — same 3-column
+        // side-by-side layout the Signals tab uses (.gtb-dash-sig-col below is a
+        // page-flow variant of that tab's .gtb-sig-col, which assumes a fixed-height
+        // flex parent Dashboard doesn't have).
+        h += '<div class="gtb-dash-sig-cols" style="padding:0 8px 8px;">';
+        h +=   '<div class="gtb-dash-sig-col gtb-card gtb-widget">'
+        +        '<div class="gtb-card-header"><span class="gtb-card-title"><i class="bi bi-layers-fill"></i> INDEX / STOCK OI</span></div>'
+        +        '<div class="gtb-card-body" id="gtb-dash-sig-oi-index" style="padding:0;overflow:auto;"></div>'
+        +      '</div>';
+        h +=   '<div class="gtb-dash-sig-col gtb-card gtb-widget">'
+        +        '<div class="gtb-card-header"><span class="gtb-card-title"><i class="bi bi-diagram-3-fill"></i> WEIGHTED CONSTITUENTS OI</span></div>'
+        +        '<div class="gtb-card-body" id="gtb-dash-sig-oi-wtd" style="padding:0;overflow:auto;"></div>'
+        +      '</div>';
+        h +=   '<div class="gtb-dash-sig-col gtb-card gtb-widget">'
+        +        '<div class="gtb-card-header"><span class="gtb-card-title"><i class="bi bi-bullseye"></i> FUTURES ACCURACY</span></div>'
+        +        '<div class="gtb-card-body" id="gtb-dash-sig-fut-body" style="padding:0;overflow:auto;">'
+        +          '<div class="gtb-sig-wait"><i class="bi bi-hourglass-split"></i> Replaying 5-min candles…</div>'
+        +        '</div>'
+        +      '</div>';
+        h += '</div>'; // end .gtb-dash-sig-cols
+        h += '</div>';
+        $pane.html(h);
+        console.log('[Dashboard] skeleton built, children now:', $pane.children().length);
+      } catch (skelErr) {
+        console.error('[Dashboard] SKELETON BUILD FAILED:', skelErr);
+      }
+    }
+
+    // ── Populate / refresh (every call — cheap, all reused from already-cached data) ──
+    try { jQ('#gtb-dash-predict').html(_gtbBuildPrediction(true)); } catch (e) {}
+
+    _allInstruments.forEach(function (item) {
+        var name = item.name;
+        if (name === 'GIFT NIFTY' || name === 'SENSEX') return;
+        try { showOIOBVBarChart(name, '-dash'); } catch (e) {}
+        try {
+            var sm = INSTRUMENT_SCORE_MAP[name] || {};
+            var ft = sm.futures_trend || 0;
+            var col = ft > 0 ? 'var(--gtb-green)' : ft < 0 ? 'var(--gtb-red)' : 'var(--gtb-muted)';
+            var lbl = ft > 0 ? '▲ Long' : ft < 0 ? '▼ Short' : '— Flat';
+            var tid = name.replace(/ /g, '-').replace(/&/g, '-');
+            jQ('#' + tid + '-futures-dash').html('<span style="color:' + col + ';font-weight:700;">' + lbl + '</span>');
+        } catch (e) {}
+    });
+
+    try {
+        var allList = _gtbAllOIInstruments();
+        _gtbSigOiColHtml(allList.filter(function (it) { return it.group === 'Index / Stock'; }), '#gtb-dash-sig-oi-index');
+        _gtbSigOiWtdColHtml('#gtb-dash-sig-oi-wtd');
+    } catch (e) {}
+
+    _gtbLoadFutAccInPane(['gtb-dash-sig-fut-body']);
 }
 
 function _gtbRenderMetricsPane() {
@@ -19116,12 +19500,13 @@ async function _ocAnalyzeStock(name, onProgress) {
         if (!INSTRUMENT_SCORE_MAP[name]) INSTRUMENT_SCORE_MAP[name] = {};
         var oiData;
         if (_msIsMcx(name) && typeof showTrendingOIMCX === 'function') {
-            // showTrendingOIMCX reads the global `stock[0]` for the ATM reference price
-            // (normally seeded by the commodities panel) — seed it from our spot candles.
+            // Pass ltp/open explicitly (showTrendingOIMCX's 3rd/4th params) instead of
+            // seeding the shared `stock[0]` global — this scanner can run alongside the
+            // main parallel refresh, so writing to `stock` here risked the same race
+            // fixed elsewhere (see showPrictionProbabiltyMCX).
             var _mcxOpen = spotCandles.length ? parseFloat(spotCandles[0][1]) : zoneData.open;
             var _mcxLtp  = spotCandles.length ? parseFloat(spotCandles[spotCandles.length - 1][4]) : zoneData.ltp;
-            stock = [{ TRADINGSYMBOL: name, LTP: _mcxLtp, OPEN: _mcxOpen }];
-            oiData = await showTrendingOIMCX(name, 2);
+            oiData = await showTrendingOIMCX(name, 2, _mcxLtp, _mcxOpen);
         } else {
             oiData = await showTrendingOI(name, 2);
         }

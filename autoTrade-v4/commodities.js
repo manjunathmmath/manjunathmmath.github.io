@@ -315,6 +315,14 @@ async function showFutureDetailsMCX(name) {
             open: first[1], high: high, low: low, close: last[4],
             volume: sumVol, oi: last[6]
         });
+    } else {
+        // No intraday candles for this instrument today (e.g. thin/no data yet for this
+        // MCX/currency-derivative segment) — data[data.length-1] would be undefined and
+        // showTableAiNiftyPrediction() crashes reading .volume off it. Fail loudly with a
+        // clear message instead of that opaque TypeError three calls deep; the caller
+        // (_refreshMCX) already wraps this in a try/catch and logs '<name> mcx', so this
+        // surfaces as a readable one-line reason there instead.
+        throw new Error('showFutureDetailsMCX: no intraday candles for ' + name + ' today');
     }
 
     let prevData = []
@@ -359,11 +367,18 @@ async function showFutureDetailsMCX(name) {
     return resp;
 }
 
-async function showTrendingOIMCX(instrument, strikToShowOverride) {
+// ltpOverride/openOverride (optional, appended so the existing 2-arg call site in
+// grootTradeBot.js's Master Scanner keeps working unchanged): pass these explicitly to
+// avoid the shared `stock[0]` global entirely — callPredictionAnalyseTrendMCX() reading
+// stock[0] here was a real race, since every instrument's refresh runs in parallel
+// (Promise.all) and stock is a single global mutated by ALL of them concurrently. Whichever
+// instrument's fetch happened to still hold `stock[0]` at the moment THIS instrument's
+// fetch reached this line got its price used instead — silently making every MCX
+// instrument's OI/OBV table (wrong strikes entirely) collapse onto one winner.
+async function showTrendingOIMCX(instrument, strikToShowOverride, ltpOverride, openOverride) {
     OI_DIVISOR = 1000;
-    let name = stock[0]['TRADINGSYMBOL']
-    let ltp = stock[0]['LTP']
-    let open = stock[0]['OPEN']
+    let ltp = (ltpOverride !== undefined) ? ltpOverride : stock[0]['LTP']
+    let open = (openOverride !== undefined) ? openOverride : stock[0]['OPEN']
 
     let strikToShow = (strikToShowOverride !== undefined) ? strikToShowOverride : 4
     let strikeData = []
@@ -639,32 +654,42 @@ async function showMCXOITrendingDetails(strikeData, selectedStrike, spotCandles,
     map['tableData'] = tableData
     map['pcr'] = pcr
     map['chPcr'] = chPcr
+    // Underlying spot candles retained for per-5min score reconstruction (see
+    // _oiScoreAtTime()/_cmdBuildCrudeScoreHistoryToday() in grootTradeBot.js) — the NSE
+    // counterpart (showOITrendingDetails, oiAnalyzer.js) already attaches this; it was
+    // missing here even though spotCandles is fetched locally above (only used for IV calc),
+    // so any per-candle reconstruction for MCX instruments silently had nothing to read.
+    map['spotCandles'] = spotCandles
     return map
 }
 
 
+// Builds a LOCAL entry object and fetches OI data directly with this instrument's own
+// ltp/open passed explicitly — never touches the shared `stock` global for its own fetch,
+// mirroring oiAnalyzer.js's showPrictionProbabilty (NSE), which was already safe this way.
+// _refreshMCX/_refreshNSE run every instrument in parallel (Promise.all); the previous
+// version funneled through `stock` (reset + rebuilt here, then read back inside
+// showTrendingOIMCX/callPredictionAnalyseTrendMCX) — a real race, since another
+// instrument's parallel call could reset/overwrite `stock` mid-fetch. `stock = [obj]` is
+// kept at the end only for legacy synchronous readers (e.g. showOIOBVBarChart's fallback).
 async function showPrictionProbabiltyMCX(name, intr) {
-    stock = []
-    let scripts = []
-    let obj = {}
-    obj['TRADINGSYMBOL'] = name;
-    obj['LTP'] = intr['ltp']
-    scripts.push(obj)
-
-    for (let i = 0; i < scripts.length; i++) {
-        let obj = {}
-        obj['TRADINGSYMBOL'] = scripts[i]['TRADINGSYMBOL']
-        obj['LTP'] = intr['ltp']
-        obj['OPEN'] = intr['open']
-        obj['DATA'] = ''
-        stock.push(obj)
+    let obj = { TRADINGSYMBOL: name, LTP: intr['ltp'], OPEN: intr['open'], DATA: '' };
+    if (name !== 'GIFT NIFTY') {
+        try {
+            obj['DATA'] = await showTrendingOIMCX(name, undefined, intr['ltp'], intr['open']);
+        } catch (err) {
+            console.log('Error while analyzing stock : ' + name);
+            console.log(err);
+        }
     }
 
-    if (stock.length > 0) {
-        await callPredictionAnalyseTrendMCX();
-    }
+    if (!INSTRUMENT_SCORE_MAP[name]) INSTRUMENT_SCORE_MAP[name] = {};
+    INSTRUMENT_SCORE_MAP[name].stockEntry = obj;
+    stock = [obj];
 }
 
+// Legacy — no longer called from showPrictionProbabiltyMCX (see the race-condition fix
+// there); kept only in case another caller still depends on the shared-stock loop.
 async function callPredictionAnalyseTrendMCX() {
     let scriptsCount = stock.length
     for (let i = 0; i < scriptsCount; i++) {

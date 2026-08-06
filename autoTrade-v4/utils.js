@@ -133,6 +133,11 @@ function generateTrends() {
         for (let i = 0; i < instru.length; i++) {
             try {
                 let name = instru[i]['TRADINGSYMBOL']
+                // INDIA VIX isn't an F&O underlying — it has no ASO/AST/BSO/BST strike
+                // concept and legitimately has no NSE_STRIKE_DIFF entry, so computing
+                // strike-based trends for it is meaningless (it was only ever reaching
+                // getStrikeDetails() and erroring/being skipped every refresh cycle).
+                if (name === 'INDIA VIX') continue;
                 let ltp = ltpPrices[name]['ltp']           // current live price from Kite DOM
                 let openDetail = openDetails[name]          // open + prevClose stored at market open
 
@@ -388,7 +393,11 @@ function getStrikeDetails(item, instrument) {
 // Returns "strikeOne,strikeTwo" string (e.g. "50,100" for NIFTY 50).
 // Defaults to "100" if not found.
 function getStrikeDiff(instrument) {
-    let strikeDiff = 100;
+    // Must be a "N,N"-shaped string, not a bare number — getStrikeDetails() always calls
+    // .split(",") on the return value. A bare number here throws "strikeDiff.split is not
+    // a function" for any instrument missing from NSE_STRIKE_DIFF (e.g. INDIA VIX, which
+    // has no strikes/ASO-BSO concept and legitimately isn't in that map).
+    let strikeDiff = "100,100";
     if (NSE_STRIKE_DIFF[instrument]) {
         strikeDiff = NSE_STRIKE_DIFF[instrument]
         strikeDiff = strikeDiff.replace(/ /g, '')
