@@ -88,4 +88,6 @@ Strategy 2 :  OI Based and OI of Weightage components (Reliance/HDFC) and Number
     html += '<p>'
     html += 'Above is for AST and BST Trades. Also check for Breakout True and False count. Check aslo the prediction logic'
     html += '</p>'
+	
+    Testing
 			
