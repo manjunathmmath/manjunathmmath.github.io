@@ -1052,6 +1052,9 @@ function _buildCardStandalone(item) {
        + '</div>';
 
     // 8 panels — identical to _buildCard (abbreviated to identity + placeholders)
+    // Panel: predict
+    h += _svPredictPanelHtml(name, tid);
+
     // Panel: chart
     h += '<div class="gtb-ic-panel" data-col="chart"><div class="gtb-ic-panel-hdr"><span class="gtb-ic-panel-title"><i class="bi bi-bar-chart-line-fill"></i> PRICE ACTION' + _ii('dv-chart') + '</span>'
        + '<span class="gtb-ic-panel-btns"><button class="sv-icon-btn maximize-component-btn" data-name="' + name + '" data-type="chart" title="Maximize"><i class="bi bi-fullscreen"></i></button></span></div>'
@@ -5971,6 +5974,9 @@ async function _dvFetchAndRender(name, tid, sfx, isMcx) {
         } catch(e) {}
         try { jQ('#' + tid + '-prob' + sfx).html(_cmdTrendProb(name, null)); } catch(e) {}
         try { jQ('#' + tid + '-lvlprob' + sfx).html(_gtbLevelProbHtml(name)); } catch(e) {}
+        // Prediction panel is built synchronously with the card HTML, before futures/OI/score
+        // data for this instrument has finished loading — re-render it now that it has.
+        try { jQ('#' + tid + '-predict' + sfx).html(_svPredictPanelBody(name, sfx)); } catch(e) {}
         // Fire-and-forget — a full day's candle replay is slower than everything else on this
         // page, and doesn't block any score-dependent panel above.
         try { _dvLoadFutAcc(name, tid, sfx, isMcx); } catch(e) {}
@@ -6036,6 +6042,9 @@ async function _gtbLoadInstrDetail(name) {
     h +=     '<button class="sv-icon-btn gtb-dv-refresh" data-name="' + name + '" style="margin-left:auto;"><i class="bi bi-arrow-clockwise"></i> Refresh</button>';
     h +=   '</div>';
     h += '</div>';
+
+    // ── [predict] Prediction ──────────────────────────────────────────────────
+    h += _svPredictPanelHtml(name, tid, sfx);
 
     // ── [1] Chart ─────────────────────────────────────────────────────────────
     h += '<div class="gtb-ic-panel" data-col="chart">';
@@ -6210,9 +6219,10 @@ function _gtbLoadInstrDetailPanel(name) {
     var h = '<div class="gtb-instr-card-v gtb-dv-col" id="gtb-dv-col-' + tid + '">';
 
     // [0] Identity — sticky full-width header
+    var kiteLink = 'https://kite.zerodha.com/markets/ext/chart/web/tvc/NSE/' + name + '/' + INSTRUMENT_TOKENS[name];
     h += '<div class="gtb-ic-panel gtb-ic-panel-identity" data-col="id">';
     h +=   '<div class="gtb-ic-panel-hdr">';
-    h +=     '<span style="font-weight:900;font-size:0.68rem;letter-spacing:0.01em;">' + name + '</span>';
+    h +=     '<a class="gtb-instr-link" href="' + kiteLink + '" target="_blank" style="font-weight:900;font-size:0.68rem;letter-spacing:0.01em;">' + name + '</a>';
     h +=     '<span id="' + tid + '-ltp' + sfx + '" class="gtb-row-ltp"></span>';
     h +=     '<span id="' + tid + '-trend-zone' + sfx + '" class="gtb-trend-zone"></span>';
     h +=     '<span id="' + tid + '-915-badge' + sfx + '" class="gtb-915-badge"></span>';
@@ -6229,6 +6239,8 @@ function _gtbLoadInstrDetailPanel(name) {
 
     // LEFT COLUMN: Chart + 9:15 + Futures
     h += '<div class="gtb-dv-left-col">';
+
+    h += _svPredictPanelHtml(name, tid, sfx);
 
     h += '<div class="gtb-ic-panel" data-col="chart">';
     h +=   '<div class="gtb-ic-panel-hdr">';
@@ -6388,6 +6400,100 @@ function _gtbLoadInstrDetailPanel(name) {
     _dvFetchAndRender(name, tid, sfx, isMcx);
 }
 
+// ── Filter bar (same ALL/ASO/BSO/9:15/NIFTY 50/BANK NIFTY/WEIGHTED chips as
+// Stock Viewer, reusing _svSegBtn/_svBuildList from stockViewer.js) — clicking
+// a chip bulk-loads the matching instruments as columns via the EXISTING
+// _gtbLoadInstrDetailPanel() mechanism, alongside (not replacing) the search
+// box / quick-pick buttons already in the popup.
+function _dvFilterCounts() {
+    var scriptData  = generateTrends();
+    var breakOut915 = JSON.parse(localStorage.getItem("VALID_BREAKOUT_NINE_FIFTEEN")) || {};
+    var counts = { all: 0, aso: 0, bso: 0, nine15: 0 };
+    jQ.each(INSTRUMENT_TOKENS, function (name) {
+        var trends = scriptData[name] ? scriptData[name]['trends'] : [];
+        var c915   = breakOut915[name] && breakOut915[name]['CLOSE_9_15'];
+        counts.all++;
+        if (jQ.inArray("ASO", trends) !== -1) counts.aso++;
+        if (jQ.inArray("BSO", trends) !== -1) counts.bso++;
+        if (c915 === 'ASO' || c915 === 'BSO') counts.nine15++;
+    });
+    return counts;
+}
+
+function _dvFilterRowHtml() {
+    var counts = _dvFilterCounts();
+    var h = '<div id="dv-filter-row">';
+    h +=   '<div class="sv-seg-group">';
+    h +=     _svSegBtn('all',    'ALL',        counts.all,    '');
+    h +=     _svSegBtn('aso',    'ASO',        counts.aso,    'green');
+    h +=     _svSegBtn('bso',    'BSO',        counts.bso,    'red');
+    h +=     _svSegBtn('nine15', '9:15',       counts.nine15, 'gold');
+    h +=     _svSegBtn('n50',    'NIFTY 50',   null,          '');
+    h +=     _svSegBtn('bank',   'BANK NIFTY', null,          '');
+    h +=     _svSegBtn('weight', 'WEIGHTED',   null,          '');
+    h +=   '</div>';
+    h += '</div>';
+    // Chip select-panel — same pick-then-load flow as Stock Viewer, hidden until a filter is picked
+    h += '<div id="dv-chip-panel" style="display:none;">';
+    h +=   '<div id="dv-chip-controls">';
+    h +=     '<span id="dv-chip-label">SELECT INSTRUMENTS</span>';
+    h +=     '<div style="display:flex;gap:4px;">';
+    h +=       '<button id="dv-chip-select-all"  class="sv-pill-btn" type="button">All</button>';
+    h +=       '<button id="dv-chip-select-none" class="sv-pill-btn" type="button">None</button>';
+    h +=     '</div>';
+    h +=     '<button id="dv-load-selected" class="sv-load-btn" type="button"><i class="bi bi-play-fill"></i> LOAD</button>';
+    h +=   '</div>';
+    h +=   '<div id="dv-chip-list"></div>';
+    h += '</div>';
+    return h;
+}
+
+// Same chip-selection UX as _svShowChipPanel — populates #dv-chip-list, defaults every
+// matched instrument to selected, and waits for the user to click LOAD before touching
+// _gtbLoadInstrDetailPanel (the existing per-instrument add mechanism is untouched).
+function _dvShowChipPanel(list) {
+    var scriptData  = generateTrends();
+    var breakOut915 = JSON.parse(localStorage.getItem("VALID_BREAKOUT_NINE_FIFTEEN")) || {};
+    var chipsHtml = '';
+    list.forEach(function (name) {
+        var trends = scriptData[name] ? scriptData[name]['trends'] : [];
+        var c915   = (breakOut915[name] || {})['CLOSE_9_15'];
+        var isASO  = jQ.inArray("ASO", trends) !== -1;
+        var isBSO  = jQ.inArray("BSO", trends) !== -1;
+        var trendClass = isASO ? 'sv-chip-aso' : isBSO ? 'sv-chip-bso' : '';
+        var show915 = c915 && ((c915 === 'ASO' && !isASO) || (c915 === 'BSO' && !isBSO) || (c915 !== 'ASO' && c915 !== 'BSO'));
+        var c915html = show915 ? '<span class="sv-chip-915 ' + (c915 === 'ASO' ? 'green' : c915 === 'BSO' ? 'red' : '') + '">★</span>' : '';
+        chipsHtml += '<div class="sv-chip sv-chip-selected ' + trendClass + '" data-name="' + name + '">'
+            + '<span class="sv-chip-name">' + name + '</span>' + c915html + '</div>';
+    });
+    jQ('#dv-chip-list').html(chipsHtml);
+    jQ('#dv-chip-panel').show();
+    _dvUpdateLoadCount();
+}
+
+function _dvUpdateLoadCount() {
+    var n = jQ('#dv-chip-list .sv-chip.sv-chip-selected').length;
+    jQ('#dv-load-selected').html('<i class="bi bi-play-fill"></i> LOAD ' + (n ? '(' + n + ')' : ''));
+}
+
+jQ(document).on('click', '#dv-filter-row .sv-seg-btn', function () {
+    jQ('#dv-filter-row .sv-seg-btn').removeClass('sv-seg-active');
+    jQ(this).addClass('sv-seg-active');
+    _dvShowChipPanel(_svBuildList(jQ(this).attr('data-svfilter')));
+});
+// NOTE: stockViewer.js already binds a document-level '.sv-chip' click handler that
+// toggles 'sv-chip-selected' for ANY chip with that class (Stock Viewer's own chips
+// included) — it fires first since that file loads before this one. Adding our own
+// toggleClass here would double-toggle (net no-op), so this handler only updates the count.
+jQ(document).on('click', '#dv-chip-list .sv-chip', function () { _dvUpdateLoadCount(); });
+jQ(document).on('click', '#dv-chip-select-all',  function () { jQ('#dv-chip-list .sv-chip').addClass('sv-chip-selected');    _dvUpdateLoadCount(); });
+jQ(document).on('click', '#dv-chip-select-none', function () { jQ('#dv-chip-list .sv-chip').removeClass('sv-chip-selected'); _dvUpdateLoadCount(); });
+jQ(document).on('click', '#dv-load-selected', function () {
+    var selected = jQ('#dv-chip-list .sv-chip.sv-chip-selected').map(function () { return jQ(this).attr('data-name'); }).get();
+    if (!selected.length) return;
+    selected.forEach(function (n) { _gtbLoadInstrDetailPanel(n); });
+});
+
 // ── Creates (or brings to front) the Instrument Detail View popup ─────────────
 // Returns true if the popup was newly created, false if it was already open.
 function _gtbCreateInstrDetailPopup() {
@@ -6406,6 +6512,7 @@ function _gtbCreateInstrDetailPopup() {
     var allPicks = builtIn.concat(extras.filter(function(n){ return builtIn.indexOf(n) === -1; }));
 
     var body = '<div class="fsig-wrap">'
+        + _dvFilterRowHtml()
         + '<div class="fsig-topbar">'
         + '<div class="fsig-chip-search" id="fsig-chip-search">'
         + '<i class="bi bi-search" style="color:var(--gtb-muted);font-size:0.55rem;flex-shrink:0;margin-right:4px;"></i>'
@@ -7171,6 +7278,22 @@ function _gtbRemarkChip(remark) {
          + entry.label + '</span>';
 }
 
+// Raw VWAP-vs-price direction from the badge HTML getFutureDirection() returns —
+// true = bullish (BUY/Strong BUY), false = bearish (SELL/Strong SELL), null = no read.
+// Shared by the chip renderer below and by setFutureDetails' INSTRUMENT_SCORE_MAP cache
+// (the only reason this signal is available to _svComputePrediction's nudge list at all —
+// it's otherwise never persisted anywhere, only rendered into the identity-strip chip).
+function _gtbVwapTrendBull(trendHtml) {
+    if (!trendHtml) return null;
+    var label = trendHtml.replace(/<[^>]+>/g, '').trim();
+    if (!label) return null;
+    var bull = /strong buy|buy/i.test(label) && !/sell/i.test(label);
+    var bear = /sell/i.test(label);
+    if (bull) return true;
+    if (bear) return false;
+    return null;
+}
+
 // Secondary badge: VWAP price direction, dimmed when it agrees with REMARK, amber when it conflicts.
 function _gtbVwapChip(trendHtml, remark) {
     if (!trendHtml) return '';
@@ -7254,6 +7377,10 @@ function setFutureDetails(name, data, suffix) {
     var _remarkHtml = _gtbRemarkChip(data['REMARK']);
     var _vwapHtml   = _gtbVwapChip(data['trend'], data['REMARK']);
     jQ("#" + tempName + "-futures-trend" + suffix).html(_remarkHtml + _vwapHtml);
+    try {
+        if (!INSTRUMENT_SCORE_MAP[name]) INSTRUMENT_SCORE_MAP[name] = {};
+        INSTRUMENT_SCORE_MAP[name].vwapTrendBull = _gtbVwapTrendBull(data['trend']);
+    } catch (e) {}
 
     // Update futures strip at bottom — only on main panel
     if (!suffix) {
@@ -8279,6 +8406,8 @@ var GTB_INFO = {
         body:'Intraday candlestick (5-min) with reference lines: <b>OPEN</b> (white), <b>ASO/AST</b> (green — above-strike levels), <b>BSO/BST</b> (red — below-strike levels), <b>VIXL/VIXU</b> (blue — VIX-based daily expected range). The LTP dot moves in real time. Use the fullscreen button to expand into a large chart.' },
     'dv-oiobv':   { icon:'bi-layers-fill', title:'OI / OBV',
         body:'Two bar charts per strike: <b>top — Change-OI</b> (green = PE OI added = bullish, red = CE OI added = bearish) and <b>bottom — OBV momentum</b> (accumulation vs distribution). The ATM strike is highlighted. The signal row beneath scores each strike and the overall OI/OBV score feeds into the composite instrument score.' },
+    'dv-predict': { icon:'bi-lightbulb-fill', title:'Prediction',
+        body:'Per-stock version of the market-wide Today\'s Prediction model. Base rate comes from this instrument\'s own 9:15 zone (no cross-index combo table exists for individual stocks), then nudged by its own 9:15/trend/futures/OBV/OI/Max-Pain/IV-Skew scores, then filtered by India VIX regime (no per-stock VIX exists). Trade plan uses this instrument\'s own ASO/AST/BSO/BST levels. Max Pain is a nudge only — never used to dampen confidence.' },
     'dv-915':     { icon:'bi-alarm', title:'9:15 Breakout',
         body:'Where the very first 9:15 candle closed relative to the strike levels: <b style="color:#3fb950">AST/ASO</b> = bullish breakout, <b style="color:#f85149">BSO/BST</b> = bearish breakdown, <b>B/W</b> = inside the range. This is fixed for the day at 9:20 and contributes ±1 to the instrument score.' },
     'dv-prob':    { icon:'bi-speedometer2', title:'Trend Probability',
@@ -10706,6 +10835,14 @@ jQ(document).on('click', '#show-commodities', function (e) {
         +       '</div>'
         +     '</div>'
         +     '<div id="cmd-crude-score-breakdown" style="display:flex;justify-content:center;gap:14px;margin:2px 0 6px;font-size:0.46rem;color:var(--gtb-muted);"></div>'
+        // Prediction — same per-instrument model used in Stock Viewer / Instrument Detail View,
+        // scoped to CRUDEOILM (MCX-aware: strike levels + OVX-based VIXU/VIXL come from
+        // strikeMap/.open, not INSTRUMENT_LIST_GLOBAL, since MCX has no INSTRUMENT_TOKENS entry).
+        +     '<div class="cmd-st" style="margin-top:8px;display:flex;align-items:center;gap:6px;">'
+        +       '<i class="bi bi-lightbulb-fill"></i> PREDICTION' + _ii('dv-predict')
+        +       '<button class="gtb-sig-hdr-btn" id="cmd-crude-predict-reload" style="margin-left:auto;"><i class="bi bi-arrow-clockwise"></i></button>'
+        +     '</div>'
+        +     '<div id="cmd-crude-predict" style="margin-bottom:6px;"><div class="cmd-load"><i class="bi bi-hourglass-split"></i> Loading after OI fetch…</div></div>'
         +     '<div id="cmd-crude-usdinr-div" style="margin-bottom:4px;"></div>'
         +     '<div id="cmd-crude-session" style="margin-bottom:4px;"></div>'
         +     '<div id="cmd-crude-global" style="margin-bottom:6px;"></div>'
@@ -11408,6 +11545,7 @@ jQ(document).on('click', '#show-commodities', function (e) {
             jQ('#cmd-crude-lvlprob').html('<div class="cmd-load" style="color:var(--gtb-muted);">OI unavailable — level probability requires OI data.</div>');
         }
         try { _cmdRenderCrudeScoreGauge(); } catch(e10) {}
+        try { jQ('#cmd-crude-predict').html(_svPredictPanelBody('CRUDEOILM')); } catch(e11) { jQ('#cmd-crude-predict').html('<div class="cmd-load" style="color:var(--gtb-red);">Prediction error.</div>'); }
         // CRUDEOILM Futures Remark Accuracy
         _cmdLoadCrudeAcc();
 
@@ -11484,6 +11622,9 @@ jQ(document).on('click', '#show-commodities', function (e) {
         $i.removeClass('spin');
     });
     jQ(document).off('click.cmd-crude-acc-reload').on('click.cmd-crude-acc-reload', '#cmd-crude-acc-reload', function() { _cmdLoadCrudeAcc(); });
+    jQ(document).off('click.cmd-crude-predict-reload').on('click.cmd-crude-predict-reload', '#cmd-crude-predict-reload', function() {
+        jQ('#cmd-crude-predict').html(_svPredictPanelBody('CRUDEOILM'));
+    });
     jQ(document).off('change.cmd-iv').on('change.cmd-iv', '#cmd-interval', function() {
         _CMD.intervalMs = parseInt(jQ(this).val());
         if (_CMD.running) { _cmdStopRefresh(); _cmdStartRefresh(); }
@@ -11612,6 +11753,444 @@ jQ(document).on('click', '.gtb-prob-btn', async function (e) {
         jQ('#groot-maximize-body').html(_renderStrikeProb(name, r));
     } catch (err) {
         jQ('#groot-maximize-body').html('<div style="padding:24px;color:var(--gtb-red);">Error: ' + (err && err.message) + '</div>');
+    }
+});
+
+/**
+ * Prediction panel for the Instrument Detail View — shown before Price Action.
+ * Renders _svBuildPrediction(name) inline (synchronous, cached-data-only, no
+ * fetch) into a per-instrument panel body keyed by tid+sfx.
+ */
+function _svPredictPanelHtml(name, tid, sfx) {
+    sfx = sfx || '';
+    var bodyId = tid + '-predict' + sfx;
+    var h = '<div class="gtb-ic-panel" data-col="predict">';
+    h +=   '<div class="gtb-ic-panel-hdr">';
+    h +=     '<span class="gtb-ic-panel-title"><i class="bi bi-lightbulb-fill"></i> PREDICTION' + _ii('dv-predict') + '</span>';
+    h +=     '<span class="gtb-ic-panel-btns"><button class="sv-icon-btn dv-predict-reload" data-name="' + name + '" data-target="' + bodyId + '" data-sfx="' + sfx + '" title="Refresh"><i class="bi bi-arrow-clockwise"></i></button></span>';
+    h +=   '</div>';
+    h +=   '<div class="gtb-ic-panel-body" id="' + bodyId + '" style="padding:0;">';
+    h +=     _svPredictPanelBody(name, sfx);
+    h +=   '</div>';
+    h += '</div>';
+    return h;
+}
+
+function _svPredictPanelBody(name, sfx) {
+    try {
+        return _svBuildPrediction(name, sfx);
+    } catch (err) {
+        return '<div style="padding:12px;color:var(--gtb-red);font-size:0.55rem;">Error: ' + (err && err.message) + '</div>';
+    }
+}
+
+jQ(document).on('click', '.dv-predict-reload', function (e) {
+    e.preventDefault(); e.stopPropagation();
+    var name = jQ(this).data('name');
+    var target = jQ(this).data('target');
+    var sfx = jQ(this).data('sfx');
+    jQ('#' + target).html(_svPredictPanelBody(name, sfx));
+});
+
+/**
+ * Per-instrument version of _gtbBuildPrediction() — same 3-layer probabilistic
+ * model, scoped to a single stock via computeInstrumentScore() instead of the
+ * market-wide 9:15 combo lookup. Max Pain is included as a nudge only, never
+ * used to dampen confidence (see trade-signal-priority: futures/OI flow leads).
+ */
+// Pure data computation for the per-stock prediction model — shared by the full
+// popup (_svBuildPrediction) and the compact inline column (_svPredictCompactHtml)
+// so both surfaces always agree.
+// Shared "SIGNAL EVIDENCE" disclosure toggle — used by both the market-wide
+// prediction card (_gtbBuildPrediction) and the per-instrument one (_svBuildPrediction),
+// which render identical .gtb-pred-sig-toggle/.gtb-pred-sig-body markup. Bound ONCE here
+// at load time rather than per-render, so there is never more than one handler on the
+// class (two handlers under different namespaces would both fire per click, toggling
+// the panel open then immediately shut again).
+jQ(document).on('click', '.gtb-pred-sig-toggle', function () {
+    jQ(this).next('.gtb-pred-sig-body').slideToggle(120);
+    jQ(this).find('.gtb-pred-chevron').toggleClass('bi-chevron-right bi-chevron-down');
+});
+
+function _svComputePrediction(name, suffix) {
+    // Layer 1 — this stock's own 9:15 zone as base bias (no cross-index combo lookup exists for individual stocks)
+    var b915 = {};
+    try { b915 = JSON.parse(localStorage.getItem('VALID_BREAKOUT_NINE_FIFTEEN') || '{}'); } catch (e) {}
+    var zone915 = (b915[name] || {}).CLOSE_9_15 || 'B/W';
+
+    var bullBase = 33, bearBase = 33, sidewaysBase = 34;
+    if (zone915 === 'AST')      { bullBase = 66; bearBase = 14; sidewaysBase = 20; }
+    else if (zone915 === 'ASO') { bullBase = 55; bearBase = 20; sidewaysBase = 25; }
+    else if (zone915 === 'BST') { bearBase = 66; bullBase = 14; sidewaysBase = 20; }
+    else if (zone915 === 'BSO') { bearBase = 55; bullBase = 20; sidewaysBase = 25; }
+
+    // Layer 2 — weighted signal nudges from this instrument's own cached score
+    var nudges = [], totalNudge = 0;
+    function _addNudge(label, rawVal, weight, note) {
+        var n = rawVal * weight;
+        nudges.push({ label: label, rawVal: rawVal, weight: weight, nudge: n, note: note || '' });
+        totalNudge += n;
+    }
+
+    var cs = {}; try { cs = computeInstrumentScore(name); } catch (e) {}
+    var sm = INSTRUMENT_SCORE_MAP[name] || {};
+
+    _addNudge('9:15 breakout zone', cs.nine_fifteen || 0, 2.0, 'fixed at 9:15 — historically the most reliable signal');
+    _addNudge('Current trend (LTP vs levels)', cs.current_trend || 0, 2.5, 'is the 9:15 breakout still holding?');
+    _addNudge('Futures REMARK', cs.futures_trend || 0, 3.0, 'futures OI flow — leading, faster than options OI');
+
+    // VWAP price-trend vs REMARK — same signal the identity strip's ⚠ VWAP chip flags as a
+    // conflict, now actually fed into the composite instead of only being shown visually.
+    var vwapTrendBull = sm.vwapTrendBull;
+    _addNudge('VWAP price trend', vwapTrendBull === true ? 1 : vwapTrendBull === false ? -1 : 0, 1.5,
+        'intraday price vs VWAP — flagged ⚠ in the identity strip when it disagrees with futures REMARK');
+
+    var obvFlow = (sm.oiExtras && sm.oiExtras.obvFlow != null) ? sm.oiExtras.obvFlow : 0;
+    _addNudge('OBV flow (raw options tape)', obvFlow > 0 ? 1 : obvFlow < 0 ? -1 : 0, 1.0, 'today-only options volume direction');
+    _addNudge('OI/OBV score', cs.oi_obv || 0, 1.0, 'lagging; reflects prior candle batch');
+
+    var lvlProb = null; try { lvlProb = _gtbLevelProb(name); } catch (e) {}
+    if (lvlProb && lvlProb.netDir !== undefined) {
+        _addNudge('Level probability net direction', lvlProb.netDir || 0, 1.5, 'blend of score / OBV / wall pressure');
+    }
+
+    _addNudge('Max Pain gravity', cs.max_pain || 0, 0.6, 'informational target level, never a dampener on conviction');
+    _addNudge('IV Skew', cs.iv_skew || 0, 0.8, 'put skew → fear (-1), call skew → demand (+1)');
+
+    var maxNudge = nudges.reduce(function (s, n) { return s + Math.abs(n.weight); }, 0) || 1;
+    var shift = Math.max(-40, Math.min(40, (totalNudge / maxNudge) * 40));
+
+    var bullP = Math.max(5, Math.min(88, bullBase + shift));
+    var bearP = Math.max(5, Math.min(88, bearBase - shift));
+    var sidewaysP = Math.max(4, 100 - bullP - bearP);
+    var _tot = bullP + bearP + sidewaysP;
+    bullP     = Math.round(bullP     / _tot * 100);
+    bearP     = Math.round(bearP     / _tot * 100);
+    sidewaysP = Math.max(0, 100 - bullP - bearP);
+
+    // Layer 3 — VIX regime filter (India VIX; no per-stock VIX equivalent exists)
+    var _vixVal = 0;
+    try {
+        var _ltpMap = JSON.parse(localStorage.getItem('INSTRUMENT_LTP_PRICE') || '{}');
+        _vixVal = parseFloat((_ltpMap['INDIA VIX'] || {}).ltp) || 0;
+    } catch (e) {}
+    var vixRegime = 'NO DATA', vixColor = 'var(--gtb-muted)', noTrade = false;
+    if (_vixVal > 0) {
+        if      (_vixVal < 13) { vixRegime = 'LOW';      vixColor = 'var(--gtb-green)'; }
+        else if (_vixVal < 18) { vixRegime = 'NORMAL';   vixColor = 'var(--gtb-accent)'; }
+        else if (_vixVal < 25) {
+            vixRegime = 'ELEVATED'; vixColor = 'var(--gtb-amber)';
+            bullP = Math.round(bullP * 0.75 + 25 * 0.25);
+            bearP = Math.round(bearP * 0.75 + 25 * 0.25);
+            sidewaysP = Math.max(0, 100 - bullP - bearP);
+        } else { vixRegime = 'HIGH'; vixColor = 'var(--gtb-red)'; noTrade = true; }
+    }
+
+    // Strike levels, LTP, and VIX daily range — via INSTRUMENT_LIST_GLOBAL/getStrikeDetails
+    // directly (NOT generateTrend(), which reads INSTRUMENT_LTP_PRICE — only populated for
+    // the main watchlist tab, so it throws/silently returns nothing for most individual
+    // stocks; this is the same known gap _svRenderScoreConfidence already works around).
+    // VIXU/VIXL (India-VIX-derived daily range) is only backtested/reliable as an
+    // exhaustion signal for the indices themselves — it applies index-wide implied
+    // volatility to a single stock's own price, which back-testing showed does NOT
+    // hold up per-stock. So the exhaustion CHECK (atVIXU/atVIXL, and the noTrade/
+    // bounce-hint logic that reads them) is index-only; individual F&O stocks never
+    // set atVIXU/atVIXL, regardless of where their LTP sits relative to the band.
+    var _VIX_BAND_INDICES = ['NIFTY 50', 'NIFTY BANK', 'SENSEX', 'GIFT NIFTY'];
+    var isMcx = false; try { isMcx = _gtbIsMcxFuture(name); } catch (e) {}
+    // Crude/MCX names get the exhaustion check too — unlike the arbitrary-stock case,
+    // their VIXU/VIXL band is a genuine OVX-based per-instrument range (strikeMap,
+    // already used elsewhere for the same instrument — see _gtbLevelProb/_gtbDeadZone),
+    // not India VIX scaled onto an unrelated stock's price.
+    var isIndexForVixBand = _VIX_BAND_INDICES.indexOf(name) !== -1 || isMcx;
+
+    var tid = name.replace(/ /g, '-').replace(/&/g, '-');
+    var sm2 = INSTRUMENT_SCORE_MAP[name] || {};
+    var strikeData = null, vixRange = null, atVIXU = false, atVIXL = false;
+    try {
+        if (isMcx) {
+            // MCX (CRUDEOILM etc.) has no INSTRUMENT_LIST_GLOBAL/INSTRUMENT_TOKENS entry —
+            // strike levels + OVX-based range come from strikeMap/.open (set by
+            // showTopChartMCX), same source the commodities popup's own level labels use.
+            if (sm2.strikeMap && sm2.open) {
+                strikeData = sm2.strikeMap;
+                var _mcxLtp = null;
+                if (sm2.oiData && sm2.oiData.tableData) {
+                    sm2.oiData.tableData.forEach(function (it) { if (it['ATM_STRIKE']) _mcxLtp = parseFloat(it['STRIKE']); });
+                }
+                if (!_mcxLtp) { try { _mcxLtp = parseFloat(sm2.mcxLtp) || parseFloat((sm2.stockEntry || {})['LTP']); } catch (e2) {} }
+                var _vU = parseFloat(sm2.strikeMap.vixDDUpper), _vL = parseFloat(sm2.strikeMap.vixDDLower);
+                if (isFinite(_vU) && isFinite(_vL)) {
+                    vixRange = { vixu: _vU, vixl: _vL, range: (_vU - _vL) / 2 };
+                    if (_mcxLtp) {
+                        atVIXU = _mcxLtp >= _vU;
+                        atVIXL = _mcxLtp <= _vL;
+                    }
+                }
+            }
+        } else {
+            var _instList  = JSON.parse(localStorage.getItem('INSTRUMENT_LIST_GLOBAL') || '{}');
+            var _instData  = _instList[name] || {};
+            var _prevClose = parseFloat(_instData.prevPrice);
+            var _dayOpen   = parseFloat(_instData.price);
+
+            if (!isNaN(_dayOpen)) strikeData = getStrikeDetails({ price: _dayOpen }, name);
+
+            var _ltpStore = JSON.parse(localStorage.getItem('INSTRUMENT_LTP_PRICE') || '{}');
+            var _ltpEntry = _ltpStore[name];
+            var _ltpDom   = parseFloat((document.getElementById(tid + '-ltp' + (suffix || '')) || {}).innerText || 'NaN');
+            var _ltp      = _ltpEntry ? parseFloat(_ltpEntry.ltp) : _ltpDom;
+
+            if (!isNaN(_prevClose) && _vixVal) {
+                var vr = getVixRange(_prevClose, _vixVal);
+                vixRange = { vixu: parseFloat(vr.vixDDUpper), vixl: parseFloat(vr.vixDDLower), range: parseFloat(vr.vixDDRange) };
+                if (isIndexForVixBand && !isNaN(_ltp)) {
+                    atVIXU = _ltp >= vixRange.vixu;
+                    atVIXL = _ltp <= vixRange.vixl;
+                }
+            }
+        }
+    } catch (e) {}
+
+    // Confidence — % of individual nudge signals agreeing with the primary direction
+    var primaryBull = bullP > bearP && bullP > sidewaysP;
+    var primaryBear = bearP > bullP && bearP > sidewaysP;
+
+    // VIX-band exhaustion only blocks the trade that would be CHASING the
+    // exhausted side (long at VIXU top, short at VIXL bottom) — mirrors
+    // _svRenderScoreConfidence's direction-aware AVOID LONG/AVOID SHORT logic.
+    // The opposite case (bullish at VIXL, bearish at VIXU) is a mean-reversion
+    // bounce setup, not exhaustion, so it must NOT be blanket blocked.
+    if ((primaryBull && atVIXU) || (primaryBear && atVIXL)) noTrade = true;
+
+    var agreedCount = 0, totalSigs = nudges.length || 1;
+    nudges.forEach(function (n) {
+        if (primaryBull && n.nudge > 0) agreedCount++;
+        else if (primaryBear && n.nudge < 0) agreedCount++;
+        else if (!primaryBull && !primaryBear && Math.abs(n.nudge) < 0.5) agreedCount++;
+    });
+    var confidence = Math.round((agreedCount / totalSigs) * 100);
+
+    var tradeAction = '—', tradeColor = 'var(--gtb-muted)', tradeEntry = '', tradeTarget = '', tradeStop = '';
+    if (noTrade) {
+        tradeAction = 'NO TRADE'; tradeColor = 'var(--gtb-amber)';
+        tradeEntry = atVIXU ? name + ' at VIXU — range exhausted upside' : atVIXL ? name + ' at VIXL — range exhausted downside' : 'VIX HIGH — wide unpredictable swings';
+    } else if (primaryBull && bullP >= 52 && strikeData) {
+        tradeAction = 'BUY CE'; tradeColor = 'var(--gtb-green)';
+        tradeEntry  = 'Entry: near BSO ' + parseFloat(strikeData.bstrikeOne).toFixed(0) + (atVIXL ? ' ★ at VIXL — high-probability bounce' : '');
+        tradeTarget = 'Target 1: ASO ' + parseFloat(strikeData.ustrikeOne).toFixed(0) + ' → Target 2: AST ' + parseFloat(strikeData.ustrikeTwo).toFixed(0);
+        tradeStop   = 'Stop: below BST ' + parseFloat(strikeData.bstrikeTwo).toFixed(0);
+    } else if (primaryBear && bearP >= 52 && strikeData) {
+        tradeAction = 'BUY PE'; tradeColor = 'var(--gtb-red)';
+        tradeEntry  = 'Entry: near ASO ' + parseFloat(strikeData.ustrikeOne).toFixed(0) + (atVIXU ? ' ★ at VIXU — high-probability reversal' : '');
+        tradeTarget = 'Target 1: BSO ' + parseFloat(strikeData.bstrikeOne).toFixed(0) + ' → Target 2: BST ' + parseFloat(strikeData.bstrikeTwo).toFixed(0);
+        tradeStop   = 'Stop: above AST ' + parseFloat(strikeData.ustrikeTwo).toFixed(0);
+    } else {
+        tradeAction = 'WAIT / RANGE'; tradeColor = 'var(--gtb-amber)';
+        if (strikeData) {
+            tradeEntry  = 'Range: BSO ' + parseFloat(strikeData.bstrikeOne).toFixed(0) + ' ↔ ASO ' + parseFloat(strikeData.ustrikeOne).toFixed(0);
+            tradeTarget = 'No clear edge — wait for a break of the range';
+            tradeStop   = 'Watch for a break of BST/AST to re-evaluate';
+        }
+    }
+
+    var scenarios = [];
+    if (primaryBull) {
+        scenarios.push({ prob: bullP,     label: 'BULL TREND', detail: 'Sustained move above ASO toward AST.', col: 'var(--gtb-green)' });
+        scenarios.push({ prob: sidewaysP, label: 'RANGE DAY',  detail: 'Oscillates between BSO and ASO.',       col: 'var(--gtb-muted)' });
+        scenarios.push({ prob: bearP,     label: 'REVERSAL',   detail: 'Fails at ASO, drops below BSO.',        col: 'var(--gtb-red)' });
+    } else if (primaryBear) {
+        scenarios.push({ prob: bearP,     label: 'BEAR TREND', detail: 'Sustained move below BSO toward BST.', col: 'var(--gtb-red)' });
+        scenarios.push({ prob: sidewaysP, label: 'RANGE DAY',  detail: 'Oscillates between BSO and ASO.',       col: 'var(--gtb-muted)' });
+        scenarios.push({ prob: bullP,     label: 'REVERSAL',   detail: 'Fails at BSO, rallies above ASO.',      col: 'var(--gtb-green)' });
+    } else {
+        scenarios.push({ prob: sidewaysP, label: 'SIDEWAYS',   detail: 'Choppy range between BSO and ASO.', col: 'var(--gtb-muted)' });
+        scenarios.push({ prob: bullP,     label: 'BULL BREAK', detail: 'Clear break above ASO.',             col: 'var(--gtb-green)' });
+        scenarios.push({ prob: bearP,     label: 'BEAR BREAK', detail: 'Break below BSO.',                   col: 'var(--gtb-red)' });
+    }
+
+    var confColor = confidence >= 65 ? 'var(--gtb-green)' : confidence >= 45 ? 'var(--gtb-amber)' : 'var(--gtb-red)';
+    var confLabel = confidence >= 65 ? 'HIGH' : confidence >= 45 ? 'MODERATE' : 'LOW';
+    var primaryScenario = scenarios[0];
+
+    // A confident-LOOKING headline (bold green "BULL TREND 70%") is misleading when
+    // Confidence itself is LOW — that number means fewer than half the individual signals
+    // actually agree with the direction the % implies (e.g. VWAP disagreeing with futures
+    // REMARK/9:15/trend). Flag it so the renderer can visually demote the headline instead
+    // of only burying the caveat in small text below it — same idea as the Stock Viewer's
+    // confidence conflict-gate (_svRenderScoreConfidence), applied here.
+    var lowConfidence = confidence < 45;
+
+    return {
+        name: name, zone915: zone915, nudges: nudges, cs: cs, sm: sm,
+        bullP: bullP, bearP: bearP, sidewaysP: sidewaysP,
+        vixVal: _vixVal, vixRegime: vixRegime, vixColor: vixColor, noTrade: noTrade,
+        atVIXU: atVIXU, atVIXL: atVIXL,
+        confidence: confidence, confColor: confColor, confLabel: confLabel, lowConfidence: lowConfidence,
+        tradeAction: tradeAction, tradeColor: tradeColor,
+        tradeEntry: tradeEntry, tradeTarget: tradeTarget, tradeStop: tradeStop, vixRange: vixRange,
+        scenarios: scenarios, primaryScenario: primaryScenario
+    };
+}
+
+function _svBuildPrediction(name, sfx) {
+    var d = _svComputePrediction(name, sfx);
+    var zone915 = d.zone915, nudges = d.nudges, cs = d.cs, sm = d.sm;
+    var _vixVal = d.vixVal, vixRegime = d.vixRegime, vixColor = d.vixColor;
+    var confidence = d.confidence, confColor = d.confColor, confLabel = d.confLabel, lowConfidence = d.lowConfidence;
+    var tradeAction = d.tradeAction, tradeColor = d.tradeColor;
+    var tradeEntry = d.tradeEntry, tradeTarget = d.tradeTarget, tradeStop = d.tradeStop, vixRange = d.vixRange;
+    var scenarios = d.scenarios, primaryScenario = d.primaryScenario;
+
+    // When Confidence is LOW, the headline % is carried by a minority of signals (e.g. VWAP
+    // disagreeing with futures REMARK/9:15/trend) — a bold green/red headline reads as far
+    // more certain than the model actually is. Demote it to a neutral amber treatment instead
+    // of only burying the caveat in small text below (same idea as the Stock Viewer's
+    // confidence conflict-gate, _svRenderScoreConfidence).
+    var headlineColor = lowConfidence ? 'var(--gtb-amber)' : tradeColor;
+
+    var _col = function(v) { return v > 0 ? 'var(--gtb-green)' : v < 0 ? 'var(--gtb-red)' : 'var(--gtb-muted)'; };
+    var _dot = function(v) {
+        var c = v > 0 ? 'var(--gtb-green)' : v < 0 ? 'var(--gtb-red)' : 'var(--gtb-muted)';
+        return '<span style="color:' + c + ';font-weight:700;">' + (v > 0 ? '▲' : v < 0 ? '▼' : '—') + '</span>';
+    };
+    function probBar(pct, col) {
+        return '<div style="position:relative;height:10px;background:var(--gtb-border);border-radius:2px;flex:1;">'
+             + '<div style="height:10px;width:' + pct + '%;background:' + col + ';border-radius:2px;"></div>'
+             + '</div>';
+    }
+
+    var html = '<div style="padding:10px 12px;font-size:0.65rem;max-width:640px;">';
+    html += lowConfidence
+        ? '<div style="padding:6px 8px;background:var(--gtb-amber);color:#1a1400;font-weight:800;font-size:0.55rem;margin-bottom:8px;">'
+          + '<i class="bi bi-exclamation-triangle-fill"></i>'
+          + ' LOW CONFIDENCE (' + confidence + '%) — fewer than half the signals agree with this direction. Treat the % below as a lean, not a call.'
+          + '</div>'
+        : '<div style="padding:4px 8px;background:var(--gtb-surface2);border-left:3px solid var(--gtb-amber);font-size:0.5rem;color:var(--gtb-muted);margin-bottom:8px;">'
+          + '<i class="bi bi-exclamation-triangle-fill" style="color:var(--gtb-amber);"></i>'
+          + ' Probabilistic model — not financial advice. Heuristic weights, not backtested per-stock (unlike the 9:15 index combo model).'
+          + '</div>';
+
+    html += '<div style="background:var(--gtb-surface);padding:12px;margin-bottom:8px;border-left:4px solid ' + headlineColor + ';">'
+        + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px;">'
+        + '<div>'
+        +   '<div style="font-size:0.5rem;color:var(--gtb-muted);margin-bottom:2px;">TODAY\'S PREDICTION — ' + name + '</div>'
+        +   '<div style="font-size:1.1rem;font-weight:900;color:' + headlineColor + ';">' + primaryScenario.label + (lowConfidence ? ' <span style="font-size:0.55rem;font-weight:700;">(low confidence)</span>' : '') + '</div>'
+        + '</div>'
+        + '<div style="margin-left:auto;text-align:right;">'
+        +   '<div style="font-size:0.5rem;color:var(--gtb-muted);margin-bottom:2px;">RECOMMENDED ACTION</div>'
+        +   '<div style="font-size:0.75rem;font-weight:900;color:' + headlineColor + ';border:1px solid ' + headlineColor + ';padding:3px 12px;">' + tradeAction + '</div>'
+        + '</div>'
+        + '</div>'
+        + '<div style="margin-bottom:8px;">'
+        + scenarios.map(function (sc) {
+            return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">'
+                 + '<span style="font-size:0.55rem;font-weight:700;color:' + sc.col + ';min-width:100px;">' + sc.label + '</span>'
+                 + probBar(sc.prob, sc.col)
+                 + '<span style="font-size:0.6rem;font-weight:900;font-family:var(--gtb-mono);color:' + sc.col + ';min-width:30px;text-align:right;">' + sc.prob + '%</span>'
+                 + '</div>';
+        }).join('')
+        + '</div>'
+        + '<div style="display:flex;gap:12px;align-items:center;padding-top:6px;border-top:1px solid var(--gtb-border);">'
+        + '<span style="font-size:0.5rem;color:var(--gtb-muted);">Confidence: <b style="color:' + confColor + ';">' + confLabel + ' (' + confidence + '%)</b></span>'
+        + '<span style="font-size:0.5rem;color:var(--gtb-muted);">VIX: <b style="color:' + vixColor + ';">' + (_vixVal ? _vixVal.toFixed(2) + ' · ' + vixRegime : '—') + '</b></span>'
+        + '</div>'
+        + '</div>';
+
+    if (tradeEntry || tradeTarget || tradeStop) {
+        html += '<div style="background:var(--gtb-surface);padding:10px 12px;margin-bottom:8px;">'
+            + '<div style="font-size:0.55rem;font-weight:800;color:var(--gtb-muted);margin-bottom:6px;letter-spacing:0.05em;"><i class="bi bi-map-fill"></i> TRADE PLAN</div>'
+            + (tradeEntry  ? '<div style="font-size:0.6rem;margin-bottom:3px;color:var(--gtb-text);"><span style="color:var(--gtb-muted);">Entry → </span>' + tradeEntry  + '</div>' : '')
+            + (tradeTarget ? '<div style="font-size:0.6rem;margin-bottom:3px;color:var(--gtb-green);"><span style="color:var(--gtb-muted);">Target → </span>' + tradeTarget + '</div>' : '')
+            + (tradeStop   ? '<div style="font-size:0.6rem;margin-bottom:3px;color:var(--gtb-red);"><span style="color:var(--gtb-muted);">Stop → </span>'   + tradeStop   + '</div>' : '')
+            + (vixRange    ? '<div style="font-size:0.55rem;color:var(--gtb-muted);margin-top:4px;">Daily range (India VIX-based): VIXL <b>' + vixRange.vixl.toFixed(0) + '</b> ↔ VIXU <b>' + vixRange.vixu.toFixed(0) + '</b> (±' + vixRange.range.toFixed(0) + ' pts)</div>' : '')
+            + '</div>';
+    }
+
+    html += '<div style="background:var(--gtb-surface);padding:10px 12px;margin-bottom:8px;">'
+        + '<div style="font-size:0.55rem;font-weight:800;color:var(--gtb-muted);margin-bottom:6px;letter-spacing:0.05em;"><i class="bi bi-alarm"></i> 9:15 ZONE — ' + zone915 + '</div>'
+        + '<div style="font-size:0.55rem;color:var(--gtb-text);">Futures REMARK: <b style="color:' + _col(cs.futures_trend || 0) + ';">' + (sm.futures_trend_remark || '—') + '</b></div>'
+        + '</div>';
+
+    html += '<div style="background:var(--gtb-surface);padding:10px 12px;margin-bottom:8px;">'
+        + '<div class="gtb-pred-sig-toggle" style="cursor:pointer;display:flex;align-items:center;gap:5px;font-size:0.55rem;font-weight:800;color:var(--gtb-muted);letter-spacing:0.05em;">'
+        +   '<i class="bi bi-chevron-right gtb-pred-chevron" style="transition:transform 0.15s;"></i>'
+        +   '<i class="bi bi-list-check"></i> SIGNAL EVIDENCE'
+        + '</div>'
+        + '<div class="gtb-pred-sig-body" style="display:none;margin-top:6px;">'
+        + '<table style="width:100%;border-collapse:collapse;">'
+        + '<thead><tr>'
+        + '<th style="font-size:0.48rem;font-weight:600;color:var(--gtb-muted);text-align:left;padding:2px 4px;border-bottom:1px solid var(--gtb-border);">Signal</th>'
+        + '<th style="font-size:0.48rem;font-weight:600;color:var(--gtb-muted);text-align:center;padding:2px 4px;border-bottom:1px solid var(--gtb-border);">Dir</th>'
+        + '<th style="font-size:0.48rem;font-weight:600;color:var(--gtb-muted);text-align:center;padding:2px 4px;border-bottom:1px solid var(--gtb-border);">Wt</th>'
+        + '<th style="font-size:0.48rem;font-weight:600;color:var(--gtb-muted);text-align:right;padding:2px 4px;border-bottom:1px solid var(--gtb-border);">Nudge</th>'
+        + '<th style="font-size:0.48rem;font-weight:600;color:var(--gtb-muted);text-align:left;padding:2px 4px;border-bottom:1px solid var(--gtb-border);">Note</th>'
+        + '</tr></thead><tbody>'
+        + nudges.map(function (n) {
+            var nc = n.nudge > 0 ? 'var(--gtb-green)' : n.nudge < 0 ? 'var(--gtb-red)' : 'var(--gtb-muted)';
+            return '<tr>'
+                 + '<td style="font-size:0.5rem;color:var(--gtb-text);padding:2px 4px;border-bottom:1px solid var(--gtb-border);">' + n.label + '</td>'
+                 + '<td style="text-align:center;padding:2px 4px;border-bottom:1px solid var(--gtb-border);">' + _dot(n.rawVal) + '</td>'
+                 + '<td style="font-size:0.48rem;text-align:center;color:var(--gtb-muted);padding:2px 4px;border-bottom:1px solid var(--gtb-border);">×' + n.weight.toFixed(1) + '</td>'
+                 + '<td style="font-size:0.52rem;font-weight:700;font-family:var(--gtb-mono);text-align:right;color:' + nc + ';padding:2px 4px;border-bottom:1px solid var(--gtb-border);">' + (n.nudge > 0 ? '+' : '') + n.nudge.toFixed(1) + '</td>'
+                 + '<td style="font-size:0.46rem;color:var(--gtb-muted);padding:2px 4px;border-bottom:1px solid var(--gtb-border);">' + n.note + '</td>'
+                 + '</tr>';
+        }).join('')
+        + '</tbody></table>'
+        + '</div>'
+        + '</div>';
+
+    html += '</div>';
+
+    // NOTE: no per-render click binding here — see the single top-level
+    // '.gtb-pred-sig-toggle' handler shared by both prediction cards (market-wide
+    // and per-instrument). Binding a second one under a different namespace here
+    // would fire alongside it on every click, toggling the panel open then
+    // immediately shut again (looks like the disclosure "won't stay open").
+
+    return html;
+}
+
+// Condensed always-visible version of the prediction card for the Stock Viewer's
+// PREDICT column — action pill + confidence bar + primary scenario %, no click needed.
+// Clicking it still opens the full _svBuildPrediction popup.
+function _svPredictCompactHtml(name, suffix) {
+    var d;
+    try { d = _svComputePrediction(name, suffix); } catch (err) {
+        return '<div class="sv-predict-compact" data-name="' + name + '" style="cursor:pointer;padding:4px;font-size:0.46rem;color:var(--gtb-muted);">n/a</div>';
+    }
+    var sc = d.primaryScenario;
+    // Low confidence → same demotion as the full popup: amber instead of a bold green/red
+    // call, so a mixed-signal read doesn't look as certain as a clean majority read.
+    var headlineColor = d.lowConfidence ? 'var(--gtb-amber)' : d.tradeColor;
+    var scColor = d.lowConfidence ? 'var(--gtb-amber)' : sc.col;
+    return '<div class="sv-predict-compact" data-name="' + name + '" data-sfx="' + (suffix || '') + '" title="Click for full prediction" style="cursor:pointer;padding:4px 6px;display:flex;flex-direction:column;gap:3px;height:100%;justify-content:center;">'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;gap:4px;">'
+        +   '<span style="font-size:0.5rem;font-weight:900;color:' + headlineColor + ';border:1px solid ' + headlineColor + ';padding:1px 5px;border-radius:3px;white-space:nowrap;">' + d.tradeAction + '</span>'
+        +   '<span style="font-size:0.42rem;color:var(--gtb-muted);">' + (d.vixVal ? d.vixVal.toFixed(1) : '—') + '</span>'
+        + '</div>'
+        + '<div style="font-size:0.46rem;font-weight:800;color:' + scColor + ';">' + sc.label + ' <span style="font-family:var(--gtb-mono);">' + sc.prob + '%</span></div>'
+        + '<div style="position:relative;height:5px;background:var(--gtb-border);border-radius:2px;">'
+        +   '<div style="height:5px;width:' + sc.prob + '%;background:' + scColor + ';border-radius:2px;"></div>'
+        + '</div>'
+        + '<div style="font-size:0.4rem;color:var(--gtb-muted);">Conf <b style="color:' + d.confColor + ';">' + d.confLabel + ' ' + d.confidence + '%</b></div>'
+        + '</div>';
+}
+
+jQ(document).on('click', '.sv-predict-compact', function (e) {
+    e.preventDefault(); e.stopPropagation();
+    var name = jQ(this).data('name');
+    var sfx = jQ(this).data('sfx');
+    // The compact card is only rendered once at LOAD time (no periodic refresh loop
+    // touches Stock Viewer rows), so it can drift stale vs. live data. Re-render it
+    // in place on click — from the same underlying data the popup is about to show —
+    // so the row and the popup never visibly disagree.
+    try { jQ(this).replaceWith(_svPredictCompactHtml(name, sfx)); } catch (e2) {}
+    try {
+        showMaximizeOverlay('<i class="bi bi-lightbulb-fill"></i> ' + name + ' — Today\'s Prediction', _svBuildPrediction(name, sfx));
+    } catch (err) {
+        showMaximizeOverlay('<i class="bi bi-lightbulb-fill"></i> ' + name + ' — Today\'s Prediction',
+            '<div style="padding:24px;color:var(--gtb-red);">Error: ' + (err && err.message) + '</div>');
     }
 });
 
@@ -16072,11 +16651,6 @@ function _gtbBuildPrediction(threeCol) {
 
         + '</div>'; // end padding wrapper
 
-    jQ(document).off('click.gtbpredtoggle').on('click.gtbpredtoggle', '.gtb-pred-sig-toggle', function () {
-        jQ(this).next('.gtb-pred-sig-body').slideToggle(120);
-        jQ(this).find('.gtb-pred-chevron').toggleClass('bi-chevron-right bi-chevron-down');
-    });
-
     return html;
 }
 
@@ -16164,7 +16738,7 @@ function _gtbRenderDashboardPane() {
         h += '<div class="gtb-dash-grid" style="padding:0 8px 8px;">';
         _allInstruments.forEach(function (item) {
             var name = item.name, tid = name.replace(/ /g, '-').replace(/&/g, '-');
-            if (name === 'GIFT NIFTY' || name === 'SENSEX') return; // no futures/OI for these
+            if (name === 'GIFT NIFTY' || name === 'SENSEX' || name === 'USDINR') return; // no futures/OI card for these
             h += '<div class="gtb-dash-cell gtb-card gtb-widget">'
             +      '<div class="gtb-card-header"><span class="gtb-card-title">' + name + '</span>'
             +        '<span id="' + tid + '-futures-dash" style="font-size:0.5rem;font-weight:700;"></span></div>'
@@ -16212,7 +16786,7 @@ function _gtbRenderDashboardPane() {
 
     _allInstruments.forEach(function (item) {
         var name = item.name;
-        if (name === 'GIFT NIFTY' || name === 'SENSEX') return;
+        if (name === 'GIFT NIFTY' || name === 'SENSEX' || name === 'USDINR') return;
         try { showOIOBVBarChart(name, '-dash'); } catch (e) {}
         try {
             var sm = INSTRUMENT_SCORE_MAP[name] || {};

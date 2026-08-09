@@ -166,6 +166,8 @@ jQ(document).on("click", ".refresh-oi-stock-viewer", async function () {
         INSTRUMENT_SCORE_MAP[name].score = sc;
         _gtbUpdateWeightBars(name, _SV_SUFFIX);
         _svRenderScoreConfidence(name, sc, _SV_SUFFIX);
+        var tid = name.replace(/ /g, '-').replace(/&/g, '-');
+        jQ('#' + tid + '-predict' + _SV_SUFFIX).html(_svPredictCompactHtml(name, _SV_SUFFIX));
     } catch(e) {}
     jQ(this).html('<i class="bi bi-bar-chart-fill"></i>');
 });
@@ -350,7 +352,10 @@ function _svRowHtml(name, scriptData, breakOut915) {
     h +=   '</div>';
     h += '</div>';
 
-    // col 2 — chart
+    // col 2 — prediction (always-visible condensed card, click for full popup)
+    h += '<div class="gtb-row-predict" id="' + tid + '-predict' + s + '"><span class="gtb-row-na" style="margin:auto">—</span></div>';
+
+    // col 3 — chart
     h += '<div class="gtb-row-col-chart">';
     h +=   '<div id="' + tid + '-chart-levels' + s + '" class="gtb-chart-levels"></div>';
     h +=   '<div id="' + tid + '-chart' + s + '" class="gtb-chart-mini gtb-row-chart"></div>';
@@ -436,6 +441,7 @@ async function _svLoadCards(list) {
     // Column header inside card area — same 8 columns as #gtb-rows-head
     let header = '<div id="sv-rows-head">'
         + '<span class="gtb-rh-instr">INSTRUMENT</span>'
+        + '<span class="gtb-rh-predict"><i class="bi bi-lightbulb-fill"></i> PREDICT</span>'
         + '<span class="gtb-rh-chart">PRICE ACTION</span>'
         + '<span class="gtb-rh-915">9:15</span>'
         + '<span class="gtb-rh-fut">FUTURES</span>'
@@ -467,6 +473,7 @@ async function _svLoadCards(list) {
                 _svRenderScoreConfidence(name, sc, _SV_SUFFIX);
             } catch(e2) { console.log(e2); }
         } catch(e) { console.log(e); }
+        try { jQ('#' + tid + '-predict' + _SV_SUFFIX).html(_svPredictCompactHtml(name, _SV_SUFFIX)); } catch(e3) { console.log(e3); }
     }
 }
 

@@ -2778,6 +2778,7 @@ td.details-control {
   --gtb-col-oiobv:   280px;
   --gtb-col-wt:      170px;
   --gtb-col-detail:  160px;
+  --gtb-col-predict: 130px;
 }
 
 /* ── Individual View popup — same layout as main panel, scaled to 1400px wide ── */
@@ -3046,6 +3047,15 @@ td.details-control {
   padding: 3px 6px; border-right: none;
   min-width: 0; overflow: hidden; gap: 2px;
 }
+/* ── Prediction column (Stock Viewer only) — always-visible condensed
+   version of the per-stock prediction model, click for the full popup.
+   Sits right after INSTRUMENT, so (unlike DETAIL) it needs its own divider. ── */
+.gtb-row-predict {
+  display: flex; flex-direction: column; justify-content: center;
+  border-right: 1px solid var(--gtb-border2);
+  min-width: 0; overflow: hidden;
+}
+.sv-predict-compact:hover { background: color-mix(in srgb, var(--gtb-accent) 8%, transparent); }
 .gtb-det-row {
   display: flex; align-items: flex-start; flex-direction: column; gap: 3px;
   font-size: 0.44rem; overflow: hidden;
@@ -3949,7 +3959,7 @@ td.details-control {
 }
 
 /* ── Filter bar ───────────────────────────────────────────── */
-#sv-filter-row {
+#sv-filter-row, #dv-filter-row {
   background: var(--gtb-surface);
   border-bottom: 1px solid var(--gtb-border);
   padding: 4px 8px;
@@ -3982,16 +3992,16 @@ td.details-control {
 }
 
 /* ── Chip panel ───────────────────────────────────────────── */
-#sv-chip-panel {
+#sv-chip-panel, #dv-chip-panel {
   display: none; flex-shrink: 0;
   background: var(--gtb-surface);
   border-bottom: 1px solid var(--gtb-border);
   padding: 3px 8px 4px;
 }
-#sv-chip-controls {
+#sv-chip-controls, #dv-chip-controls {
   display: flex; align-items: center; gap: 4px; margin-bottom: 3px;
 }
-#sv-chip-label {
+#sv-chip-label, #dv-chip-label {
   font-size: 0.44rem; color: var(--gtb-muted); font-weight: 800;
   text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap;
 }
@@ -4011,7 +4021,7 @@ td.details-control {
 .sv-load-btn:hover { opacity: 0.85; }
 .sv-load-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
-#sv-chip-list {
+#sv-chip-list, #dv-chip-list {
   display: flex; flex-wrap: wrap; gap: 2px;
   max-height: 56px; overflow-y: auto;
   scrollbar-width: thin;
@@ -4044,6 +4054,7 @@ td.details-control {
   display: grid;
   grid-template-columns:
     var(--gtb-col-instr)
+    var(--gtb-col-predict)
     var(--gtb-col-chart)
     var(--gtb-col-915)
     var(--gtb-col-fut)
@@ -4052,7 +4063,7 @@ td.details-control {
     var(--gtb-col-wt)
     var(--gtb-col-detail);
   min-width: calc(
-    var(--gtb-col-instr) + var(--gtb-col-chart) + var(--gtb-col-915) +
+    var(--gtb-col-instr) + var(--gtb-col-predict) + var(--gtb-col-chart) + var(--gtb-col-915) +
     var(--gtb-col-fut)   + var(--gtb-col-oi)    + var(--gtb-col-oiobv) +
     var(--gtb-col-wt)    + var(--gtb-col-detail)
   );
@@ -4062,6 +4073,31 @@ td.details-control {
   font-size: 0.46rem; font-weight: 800; letter-spacing: 0.12em;
   text-transform: uppercase; color: var(--gtb-muted);
 }
+/* Stock Viewer rows get the 9th (PREDICT) column too — scoped here so the main
+   dashboard / Instrument Detail View's plain .gtb-row (8 columns) is untouched. */
+#sv-card-area .gtb-row {
+  grid-template-columns:
+    var(--gtb-col-instr)
+    var(--gtb-col-predict)
+    var(--gtb-col-chart)
+    var(--gtb-col-915)
+    var(--gtb-col-fut)
+    var(--gtb-col-oi)
+    var(--gtb-col-oiobv)
+    var(--gtb-col-wt)
+    var(--gtb-col-detail);
+  min-width: calc(
+    var(--gtb-col-instr) + var(--gtb-col-predict) + var(--gtb-col-chart) + var(--gtb-col-915) +
+    var(--gtb-col-fut)   + var(--gtb-col-oi)    + var(--gtb-col-oiobv) +
+    var(--gtb-col-wt)    + var(--gtb-col-detail)
+  );
+}
+/* Comparison-table polish — zebra striping + clearer hover so scanning down a
+   column (comparing the same field across many stocks) is easier to track. */
+#sv-card-area .gtb-row:nth-child(even) { background: color-mix(in srgb, var(--gtb-surface2) 14%, var(--gtb-bg)); }
+#sv-card-area .gtb-row:nth-child(even) .gtb-row-id { background: color-mix(in srgb, var(--gtb-surface2) 14%, var(--gtb-bg)); }
+#sv-card-area .gtb-row:hover { background: color-mix(in srgb, var(--gtb-accent) 7%, var(--gtb-bg)); }
+#sv-card-area .gtb-row:hover .gtb-row-id { background: color-mix(in srgb, var(--gtb-accent) 7%, var(--gtb-bg)); }
 #sv-rows-head > span {
   padding: 4px 8px; border-right: 1px solid var(--gtb-border2);
   display: flex; align-items: center;
