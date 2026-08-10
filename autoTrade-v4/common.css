@@ -2322,6 +2322,7 @@ td.details-control {
 .gtb-fut-card.long-card  { border-left: 3px solid var(--gtb-green); }
 .gtb-fut-card.short-card { border-left: 3px solid var(--gtb-red); }
 .gtb-fut-name { font-size: 0.58rem; font-weight: 800; color: var(--gtb-muted); margin-bottom: 1px; text-transform: uppercase; letter-spacing: 0.5px; }
+.gtb-fut-ltp { font-family: var(--gtb-mono); font-weight: 700; color: var(--gtb-text); text-transform: none; letter-spacing: 0; }
 .gtb-fut-remark { font-size: 0.68rem; font-weight: 900; margin-bottom: 1px; font-variant-numeric: tabular-nums; }
 .gtb-fut-remark.long  { color: var(--gtb-green); }
 .gtb-fut-remark.short { color: var(--gtb-red); }

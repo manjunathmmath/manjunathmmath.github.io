@@ -1739,7 +1739,7 @@ function commonMarkupPlaceHolder() {
     ['NIFTY 50', 'NIFTY BANK', 'RELIANCE', 'HDFCBANK', 'ICICIBANK', 'CRUDEOILM', 'USDINR'].forEach(function(name) {
         let tid = name.replace(/ /g, '-').replace(/&/g, '-');
         h += '<div class="gtb-fut-card" id="gtb-fut-strip-' + tid + '">';
-        h += '<div class="gtb-fut-name"><i class="bi bi-lightning-fill"></i> ' + name + '</div>';
+        h += '<div class="gtb-fut-name"><i class="bi bi-lightning-fill"></i> ' + name + ' <span class="gtb-fut-ltp" id="gtb-strip-ltp-' + tid + '"></span></div>';
         h += '<div class="gtb-fut-remark other" id="gtb-strip-remark-' + tid + '">—</div>';
         h += '<div class="gtb-fut-meta">';
         h += '<span id="gtb-strip-vwap-' + tid + '">VWAP —</span>';
@@ -8304,6 +8304,19 @@ function updateFuturesStrip(name, remark, vwap, premium) {
     let tid = name.replace(/ /g, '-').replace(/&/g, '-');
     let remarkEl = jQ('#gtb-strip-remark-' + tid);
     if (!remarkEl.length) return;
+
+    // LTP — same fallback chain used elsewhere for MCX names with no INSTRUMENT_LTP_PRICE
+    // entry (CRUDEOILM/USDINR have no INSTRUMENT_TOKENS entry, so that store never
+    // populates for them; INSTRUMENT_SCORE_MAP[name].mcxLtp is the live LTP cache instead).
+    try {
+        var _ltpStore = JSON.parse(localStorage.getItem('INSTRUMENT_LTP_PRICE') || '{}');
+        var _ltp = _ltpStore[name] ? parseFloat(_ltpStore[name].ltp) : NaN;
+        if (isNaN(_ltp)) {
+            var _sm = INSTRUMENT_SCORE_MAP[name] || {};
+            _ltp = parseFloat(_sm.mcxLtp) || parseFloat((_sm.stockEntry || {})['LTP']) || NaN;
+        }
+        jQ('#gtb-strip-ltp-' + tid).text(isNaN(_ltp) ? '' : _ltp.toLocaleString('en-IN', { maximumFractionDigits: 2 }));
+    } catch (e) {}
     // Use the authoritative sentiment, not substring matching — "LONG_UNWINDING"
     // contains "LONG" but is bearish, so includes('LONG') wrongly flagged it bullish.
     let sent = (typeof getFuturesTrendScore === 'function') ? getFuturesTrendScore(remark) : 0;
@@ -11868,15 +11881,38 @@ function _svComputePrediction(name, suffix) {
     bearP     = Math.round(bearP     / _tot * 100);
     sidewaysP = Math.max(0, 100 - bullP - bearP);
 
-    // Layer 3 — VIX regime filter (India VIX; no per-stock VIX equivalent exists)
-    var _vixVal = 0;
-    try {
-        var _ltpMap = JSON.parse(localStorage.getItem('INSTRUMENT_LTP_PRICE') || '{}');
-        _vixVal = parseFloat((_ltpMap['INDIA VIX'] || {}).ltp) || 0;
-    } catch (e) {}
+    // Layer 3 — volatility regime filter. Per-instrument, not India-VIX-for-everything:
+    // MCX names (CRUDEOILM etc.) use their own OVX config value (config.js `OVX`, an
+    // OVX proxy the user enters by hand for the crude dashboard — see CLAUDE.md's "VIX
+    // config is crude-only" note) with the same LOW/NORMAL/ELEVATED thresholds
+    // _cmdRenderCrudeMeta's OVX regime chip already uses, since India VIX (NIFTY options
+    // implied vol) has no relationship to crude's own volatility. Everything else still
+    // has no per-instrument vol index of its own, so it falls back to India VIX as a
+    // general market risk-off tone (no NSE-VIX exists for individual F&O stocks either).
+    var isMcxForVol = false; try { isMcxForVol = _gtbIsMcxFuture(name); } catch (e) {}
+    var _vixVal = 0, _volLabel = 'India VIX';
+    if (isMcxForVol) {
+        _vixVal = parseFloat(OVX) || 0;
+        _volLabel = 'OVX';
+    } else {
+        try {
+            var _ltpMap = JSON.parse(localStorage.getItem('INSTRUMENT_LTP_PRICE') || '{}');
+            _vixVal = parseFloat((_ltpMap['INDIA VIX'] || {}).ltp) || 0;
+        } catch (e) {}
+    }
     var vixRegime = 'NO DATA', vixColor = 'var(--gtb-muted)', noTrade = false;
     if (_vixVal > 0) {
-        if      (_vixVal < 13) { vixRegime = 'LOW';      vixColor = 'var(--gtb-green)'; }
+        if (isMcxForVol) {
+            // Same thresholds as _cmdRenderCrudeMeta's OVX regime chip.
+            if      (_vixVal < 15) { vixRegime = 'LOW';      vixColor = 'var(--gtb-green)'; }
+            else if (_vixVal < 30) { vixRegime = 'NORMAL';   vixColor = 'var(--gtb-accent)'; }
+            else {
+                vixRegime = 'ELEVATED'; vixColor = 'var(--gtb-amber)';
+                bullP = Math.round(bullP * 0.75 + 25 * 0.25);
+                bearP = Math.round(bearP * 0.75 + 25 * 0.25);
+                sidewaysP = Math.max(0, 100 - bullP - bearP);
+            }
+        } else if (_vixVal < 13) { vixRegime = 'LOW';      vixColor = 'var(--gtb-green)'; }
         else if (_vixVal < 18) { vixRegime = 'NORMAL';   vixColor = 'var(--gtb-accent)'; }
         else if (_vixVal < 25) {
             vixRegime = 'ELEVATED'; vixColor = 'var(--gtb-amber)';
@@ -11897,7 +11933,7 @@ function _svComputePrediction(name, suffix) {
     // bounce-hint logic that reads them) is index-only; individual F&O stocks never
     // set atVIXU/atVIXL, regardless of where their LTP sits relative to the band.
     var _VIX_BAND_INDICES = ['NIFTY 50', 'NIFTY BANK', 'SENSEX', 'GIFT NIFTY'];
-    var isMcx = false; try { isMcx = _gtbIsMcxFuture(name); } catch (e) {}
+    var isMcx = isMcxForVol;
     // Crude/MCX names get the exhaustion check too — unlike the arbitrary-stock case,
     // their VIXU/VIXL band is a genuine OVX-based per-instrument range (strikeMap,
     // already used elsewhere for the same instrument — see _gtbLevelProb/_gtbDeadZone),
@@ -11906,7 +11942,7 @@ function _svComputePrediction(name, suffix) {
 
     var tid = name.replace(/ /g, '-').replace(/&/g, '-');
     var sm2 = INSTRUMENT_SCORE_MAP[name] || {};
-    var strikeData = null, vixRange = null, atVIXU = false, atVIXL = false;
+    var strikeData = null, vixRange = null, atVIXU = false, atVIXL = false, ltpResolved = NaN, dayOpenResolved = NaN;
     try {
         if (isMcx) {
             // MCX (CRUDEOILM etc.) has no INSTRUMENT_LIST_GLOBAL/INSTRUMENT_TOKENS entry —
@@ -11919,6 +11955,8 @@ function _svComputePrediction(name, suffix) {
                     sm2.oiData.tableData.forEach(function (it) { if (it['ATM_STRIKE']) _mcxLtp = parseFloat(it['STRIKE']); });
                 }
                 if (!_mcxLtp) { try { _mcxLtp = parseFloat(sm2.mcxLtp) || parseFloat((sm2.stockEntry || {})['LTP']); } catch (e2) {} }
+                ltpResolved = _mcxLtp;
+                dayOpenResolved = parseFloat(sm2.open);
                 var _vU = parseFloat(sm2.strikeMap.vixDDUpper), _vL = parseFloat(sm2.strikeMap.vixDDLower);
                 if (isFinite(_vU) && isFinite(_vL)) {
                     vixRange = { vixu: _vU, vixl: _vL, range: (_vU - _vL) / 2 };
@@ -11933,6 +11971,7 @@ function _svComputePrediction(name, suffix) {
             var _instData  = _instList[name] || {};
             var _prevClose = parseFloat(_instData.prevPrice);
             var _dayOpen   = parseFloat(_instData.price);
+            dayOpenResolved = _dayOpen;
 
             if (!isNaN(_dayOpen)) strikeData = getStrikeDetails({ price: _dayOpen }, name);
 
@@ -11940,6 +11979,7 @@ function _svComputePrediction(name, suffix) {
             var _ltpEntry = _ltpStore[name];
             var _ltpDom   = parseFloat((document.getElementById(tid + '-ltp' + (suffix || '')) || {}).innerText || 'NaN');
             var _ltp      = _ltpEntry ? parseFloat(_ltpEntry.ltp) : _ltpDom;
+            ltpResolved = _ltp;
 
             if (!isNaN(_prevClose) && _vixVal) {
                 var vr = getVixRange(_prevClose, _vixVal);
@@ -11962,6 +12002,91 @@ function _svComputePrediction(name, suffix) {
     // The opposite case (bullish at VIXL, bearish at VIXU) is a mean-reversion
     // bounce setup, not exhaustion, so it must NOT be blanket blocked.
     if ((primaryBull && atVIXU) || (primaryBear && atVIXL)) noTrade = true;
+
+    // ── Precision Entry — an exact price level, not just a strike-zone, built from
+    // every metric already cached for this instrument: OI walls (S1/R1, ranked by OBV
+    // pressure — _gtbFindWalls), AVWAP, today's session high/low (previous price action),
+    // and the 9:15 strike levels as an outer fallback. Picks the nearest support/resistance
+    // to LTP from that combined set, rather than relying on OI/OBV alone.
+    var precisionEntry = null;
+    try {
+        var oiDataPE = sm2.oiData;
+        var candSupport = [], candResist = [];
+
+        if (oiDataPE && oiDataPE.tableData && oiDataPE.tableData.length && !isNaN(ltpResolved)) {
+            var priceChangePct = (!isNaN(dayOpenResolved) && dayOpenResolved) ? (ltpResolved - dayOpenResolved) / dayOpenResolved * 100 : 0;
+            var walls = _gtbFindWalls(oiDataPE.tableData, priceChangePct, ltpResolved);
+            if (walls.support[0]) candSupport.push({ price: walls.support[0].strike, label: 'OI wall S1 (OBV pressure)' });
+            if (walls.resistance[0]) candResist.push({ price: walls.resistance[0].strike, label: 'OI wall R1 (OBV pressure)' });
+            if (walls.support[1]) candSupport.push({ price: walls.support[1].strike, label: 'OI wall S2 (OBV pressure)' });
+            if (walls.resistance[1]) candResist.push({ price: walls.resistance[1].strike, label: 'OI wall R2 (OBV pressure)' });
+        }
+
+        var avwapPE = parseFloat(sm2.avwap);
+        if (avwapPE && !isNaN(ltpResolved)) {
+            if (avwapPE < ltpResolved) candSupport.push({ price: avwapPE, label: 'AVWAP (9:15 anchor)' });
+            else if (avwapPE > ltpResolved) candResist.push({ price: avwapPE, label: 'AVWAP (9:15 anchor)' });
+        }
+
+        var spotCandlesPE = oiDataPE && oiDataPE.spotCandles;
+        if (spotCandlesPE && spotCandlesPE.length) {
+            var todaysHigh = -Infinity, todaysLow = Infinity;
+            spotCandlesPE.forEach(function (c) {
+                var h = parseFloat(c[2]), l = parseFloat(c[3]);
+                if (!isNaN(h) && h > todaysHigh) todaysHigh = h;
+                if (!isNaN(l) && l < todaysLow) todaysLow = l;
+            });
+            if (isFinite(todaysLow))  candSupport.push({ price: todaysLow,  label: "Today's low (price action)" });
+            if (isFinite(todaysHigh)) candResist.push({ price: todaysHigh, label: "Today's high (price action)" });
+        }
+
+        if (strikeData) {
+            candSupport.push({ price: parseFloat(strikeData.bstrikeOne), label: 'BSO (9:15 strike)' });
+            candResist.push({ price: parseFloat(strikeData.ustrikeOne), label: 'ASO (9:15 strike)' });
+        }
+
+        function _peNearest(cands, below) {
+            var valid = cands.filter(function (c) { return isFinite(c.price) && (below ? c.price < ltpResolved : c.price > ltpResolved); });
+            if (!valid.length) return null;
+            valid.sort(function (a, b) { return below ? b.price - a.price : a.price - b.price; });
+            return valid[0];
+        }
+        function _peNext(cands, below, excludePrice) {
+            var valid = cands.filter(function (c) { return isFinite(c.price) && (below ? c.price < excludePrice : c.price > excludePrice); });
+            if (!valid.length) return null;
+            valid.sort(function (a, b) { return below ? b.price - a.price : a.price - b.price; });
+            return valid[0];
+        }
+
+        var nearestSupport = _peNearest(candSupport, true);
+        var nearestResist  = _peNearest(candResist, false);
+
+        if (!isNaN(ltpResolved) && (candSupport.length || candResist.length)) {
+            if (primaryBull && nearestSupport) {
+                var stopS = _peNext(candSupport, true, nearestSupport.price);
+                precisionEntry = {
+                    side: 'LONG', entryPrice: nearestSupport.price, entryLabel: nearestSupport.label,
+                    targetPrice: nearestResist ? nearestResist.price : null, targetLabel: nearestResist ? nearestResist.label : null,
+                    stopPrice: stopS ? stopS.price : nearestSupport.price * 0.997,
+                    stopLabel: stopS ? stopS.label : '0.3% buffer below entry (no lower level cached)'
+                };
+            } else if (primaryBear && nearestResist) {
+                var stopR = _peNext(candResist, false, nearestResist.price);
+                precisionEntry = {
+                    side: 'SHORT', entryPrice: nearestResist.price, entryLabel: nearestResist.label,
+                    targetPrice: nearestSupport ? nearestSupport.price : null, targetLabel: nearestSupport ? nearestSupport.label : null,
+                    stopPrice: stopR ? stopR.price : nearestResist.price * 1.003,
+                    stopLabel: stopR ? stopR.label : '0.3% buffer above entry (no higher level cached)'
+                };
+            } else {
+                precisionEntry = {
+                    side: 'RANGE',
+                    supportPrice: nearestSupport ? nearestSupport.price : null, supportLabel: nearestSupport ? nearestSupport.label : null,
+                    resistPrice: nearestResist ? nearestResist.price : null, resistLabel: nearestResist ? nearestResist.label : null
+                };
+            }
+        }
+    } catch (e) {}
 
     var agreedCount = 0, totalSigs = nudges.length || 1;
     nudges.forEach(function (n) {
@@ -12022,21 +12147,21 @@ function _svComputePrediction(name, suffix) {
     var lowConfidence = confidence < 45;
 
     return {
-        name: name, zone915: zone915, nudges: nudges, cs: cs, sm: sm,
+        name: name, zone915: zone915, nudges: nudges, cs: cs, sm: sm, isMcx: isMcx,
         bullP: bullP, bearP: bearP, sidewaysP: sidewaysP,
-        vixVal: _vixVal, vixRegime: vixRegime, vixColor: vixColor, noTrade: noTrade,
+        vixVal: _vixVal, vixRegime: vixRegime, vixColor: vixColor, volLabel: _volLabel, noTrade: noTrade,
         atVIXU: atVIXU, atVIXL: atVIXL,
         confidence: confidence, confColor: confColor, confLabel: confLabel, lowConfidence: lowConfidence,
         tradeAction: tradeAction, tradeColor: tradeColor,
         tradeEntry: tradeEntry, tradeTarget: tradeTarget, tradeStop: tradeStop, vixRange: vixRange,
-        scenarios: scenarios, primaryScenario: primaryScenario
+        scenarios: scenarios, primaryScenario: primaryScenario, precisionEntry: precisionEntry
     };
 }
 
 function _svBuildPrediction(name, sfx) {
     var d = _svComputePrediction(name, sfx);
-    var zone915 = d.zone915, nudges = d.nudges, cs = d.cs, sm = d.sm;
-    var _vixVal = d.vixVal, vixRegime = d.vixRegime, vixColor = d.vixColor;
+    var zone915 = d.zone915, nudges = d.nudges, cs = d.cs, sm = d.sm, isMcx = d.isMcx;
+    var _vixVal = d.vixVal, vixRegime = d.vixRegime, vixColor = d.vixColor, volLabel = d.volLabel;
     var confidence = d.confidence, confColor = d.confColor, confLabel = d.confLabel, lowConfidence = d.lowConfidence;
     var tradeAction = d.tradeAction, tradeColor = d.tradeColor;
     var tradeEntry = d.tradeEntry, tradeTarget = d.tradeTarget, tradeStop = d.tradeStop, vixRange = d.vixRange;
@@ -12093,7 +12218,7 @@ function _svBuildPrediction(name, sfx) {
         + '</div>'
         + '<div style="display:flex;gap:12px;align-items:center;padding-top:6px;border-top:1px solid var(--gtb-border);">'
         + '<span style="font-size:0.5rem;color:var(--gtb-muted);">Confidence: <b style="color:' + confColor + ';">' + confLabel + ' (' + confidence + '%)</b></span>'
-        + '<span style="font-size:0.5rem;color:var(--gtb-muted);">VIX: <b style="color:' + vixColor + ';">' + (_vixVal ? _vixVal.toFixed(2) + ' · ' + vixRegime : '—') + '</b></span>'
+        + '<span style="font-size:0.5rem;color:var(--gtb-muted);">' + volLabel + ': <b style="color:' + vixColor + ';">' + (_vixVal ? _vixVal.toFixed(2) + ' · ' + vixRegime : '—') + '</b></span>'
         + '</div>'
         + '</div>';
 
@@ -12103,8 +12228,33 @@ function _svBuildPrediction(name, sfx) {
             + (tradeEntry  ? '<div style="font-size:0.6rem;margin-bottom:3px;color:var(--gtb-text);"><span style="color:var(--gtb-muted);">Entry → </span>' + tradeEntry  + '</div>' : '')
             + (tradeTarget ? '<div style="font-size:0.6rem;margin-bottom:3px;color:var(--gtb-green);"><span style="color:var(--gtb-muted);">Target → </span>' + tradeTarget + '</div>' : '')
             + (tradeStop   ? '<div style="font-size:0.6rem;margin-bottom:3px;color:var(--gtb-red);"><span style="color:var(--gtb-muted);">Stop → </span>'   + tradeStop   + '</div>' : '')
-            + (vixRange    ? '<div style="font-size:0.55rem;color:var(--gtb-muted);margin-top:4px;">Daily range (India VIX-based): VIXL <b>' + vixRange.vixl.toFixed(0) + '</b> ↔ VIXU <b>' + vixRange.vixu.toFixed(0) + '</b> (±' + vixRange.range.toFixed(0) + ' pts)</div>' : '')
+            + (vixRange    ? '<div style="font-size:0.55rem;color:var(--gtb-muted);margin-top:4px;">Daily range (' + (isMcx ? 'OVX-based' : 'India VIX-based') + '): VIXL <b>' + vixRange.vixl.toFixed(0) + '</b> ↔ VIXU <b>' + vixRange.vixu.toFixed(0) + '</b> (±' + vixRange.range.toFixed(0) + ' pts)</div>' : '')
             + '</div>';
+    }
+
+    // ── Precision Entry — a specific price, alongside (not replacing) the strike-zone
+    // Trade Plan above. Built from OI walls + AVWAP + today's price action + strike
+    // levels combined, not OI/OBV alone.
+    if (d.precisionEntry) {
+        var pe = d.precisionEntry;
+        // 2 decimals reads fine at every instrument's price scale used here (stocks,
+        // indices, crude) — no need for a magnitude-based decimals lookup.
+        var peDecimals = 2;
+        html += '<div style="background:var(--gtb-surface);padding:10px 12px;margin-bottom:8px;">'
+            + '<div style="font-size:0.55rem;font-weight:800;color:var(--gtb-muted);margin-bottom:6px;letter-spacing:0.05em;"><i class="bi bi-crosshair"></i> PRECISION ENTRY <span style="font-weight:600;color:var(--gtb-muted);text-transform:none;letter-spacing:0;">— OI walls + AVWAP + today\'s price action + strike levels</span></div>';
+        if (pe.side === 'RANGE') {
+            html += '<div style="font-size:0.6rem;color:var(--gtb-text);margin-bottom:3px;">No directional edge — nearest levels only:</div>';
+            if (pe.supportPrice != null) html += '<div style="font-size:0.6rem;color:var(--gtb-green);margin-bottom:2px;"><span style="color:var(--gtb-muted);">Support → </span><b>' + pe.supportPrice.toFixed(peDecimals) + '</b> <span style="color:var(--gtb-muted);font-size:0.5rem;">(' + pe.supportLabel + ')</span></div>';
+            if (pe.resistPrice != null) html += '<div style="font-size:0.6rem;color:var(--gtb-red);"><span style="color:var(--gtb-muted);">Resistance → </span><b>' + pe.resistPrice.toFixed(peDecimals) + '</b> <span style="color:var(--gtb-muted);font-size:0.5rem;">(' + pe.resistLabel + ')</span></div>';
+            if (pe.supportPrice == null && pe.resistPrice == null) html += '<div style="font-size:0.55rem;color:var(--gtb-muted);">No levels cached yet — refresh OI for this instrument.</div>';
+        } else {
+            var peSideCol = pe.side === 'LONG' ? 'var(--gtb-green)' : 'var(--gtb-red)';
+            html += '<div style="font-size:0.65rem;font-weight:900;color:' + peSideCol + ';margin-bottom:4px;">' + pe.side + '</div>'
+                + '<div style="font-size:0.62rem;margin-bottom:3px;color:var(--gtb-text);"><span style="color:var(--gtb-muted);">Entry → </span><b>' + pe.entryPrice.toFixed(peDecimals) + '</b> <span style="color:var(--gtb-muted);font-size:0.5rem;">(' + pe.entryLabel + ')</span></div>'
+                + (pe.targetPrice != null ? '<div style="font-size:0.6rem;margin-bottom:3px;color:var(--gtb-green);"><span style="color:var(--gtb-muted);">Target → </span><b>' + pe.targetPrice.toFixed(peDecimals) + '</b> <span style="color:var(--gtb-muted);font-size:0.5rem;">(' + pe.targetLabel + ')</span></div>' : '')
+                + '<div style="font-size:0.6rem;color:var(--gtb-red);"><span style="color:var(--gtb-muted);">Stop → </span><b>' + pe.stopPrice.toFixed(peDecimals) + '</b> <span style="color:var(--gtb-muted);font-size:0.5rem;">(' + pe.stopLabel + ')</span></div>';
+        }
+        html += '</div>';
     }
 
     html += '<div style="background:var(--gtb-surface);padding:10px 12px;margin-bottom:8px;">'
@@ -16741,6 +16891,7 @@ function _gtbRenderDashboardPane() {
             if (name === 'GIFT NIFTY' || name === 'SENSEX' || name === 'USDINR') return; // no futures/OI card for these
             h += '<div class="gtb-dash-cell gtb-card gtb-widget">'
             +      '<div class="gtb-card-header"><span class="gtb-card-title">' + name + '</span>'
+            +        '<span id="' + tid + '-ltp-dash" class="gtb-dash-ltp" style="font-size:0.48rem;font-weight:700;font-family:var(--gtb-mono);color:var(--gtb-text);margin-left:6px;"></span>'
             +        '<span id="' + tid + '-futures-dash" style="font-size:0.5rem;font-weight:700;"></span></div>'
             +      '<div class="gtb-card-body" style="padding:4px 6px;">'
             +        '<div style="font-size:0.4rem;color:var(--gtb-muted);">OI</div>'
@@ -16795,6 +16946,19 @@ function _gtbRenderDashboardPane() {
             var lbl = ft > 0 ? '▲ Long' : ft < 0 ? '▼ Short' : '— Flat';
             var tid = name.replace(/ /g, '-').replace(/&/g, '-');
             jQ('#' + tid + '-futures-dash').html('<span style="color:' + col + ';font-weight:700;">' + lbl + '</span>');
+        } catch (e) {}
+        // Spot LTP — same fallback chain as the bottom Futures Strip (MCX names like
+        // CRUDEOILM have no INSTRUMENT_TOKENS entry, so INSTRUMENT_LTP_PRICE never
+        // populates for them; INSTRUMENT_SCORE_MAP[name].mcxLtp is the live cache instead).
+        try {
+            var _ltpStore2 = JSON.parse(localStorage.getItem('INSTRUMENT_LTP_PRICE') || '{}');
+            var _ltp2 = _ltpStore2[name] ? parseFloat(_ltpStore2[name].ltp) : NaN;
+            if (isNaN(_ltp2)) {
+                var _sm2 = INSTRUMENT_SCORE_MAP[name] || {};
+                _ltp2 = parseFloat(_sm2.mcxLtp) || parseFloat((_sm2.stockEntry || {})['LTP']) || NaN;
+            }
+            var _tid2 = name.replace(/ /g, '-').replace(/&/g, '-');
+            jQ('#' + _tid2 + '-ltp-dash').text(isNaN(_ltp2) ? '' : _ltp2.toLocaleString('en-IN', { maximumFractionDigits: 2 }));
         } catch (e) {}
     });
 
