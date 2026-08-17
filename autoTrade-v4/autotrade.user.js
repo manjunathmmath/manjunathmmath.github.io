@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Groot Bot
 // @namespace    Groot Bot
-// @version      27.62
+// @version      27.99
 // @description  Groot Bot
 // @author       Manjunath
 // @match        https://kite.zerodha.com/*
@@ -92,6 +92,8 @@
 // @require      https://manjunathmmath.github.io/autoTrade-v4/quoteWs.js
 
 // @require      https://manjunathmmath.github.io/autoTrade-v4/help.js
+// @require      https://manjunathmmath.github.io/autoTrade-v4/backtest.js
+// @require      https://manjunathmmath.github.io/autoTrade-v4/optionStrikeSearch.js
 // @require      https://manjunathmmath.github.io/autoTrade-v4/grootTradeBot.js
 // @require      https://manjunathmmath.github.io/autoTrade-v4/bloombergDashboard.js
 // @require      https://manjunathmmath.github.io/autoTrade-v4/bloombergAnalysis.js

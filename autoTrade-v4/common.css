@@ -4022,6 +4022,21 @@ td.details-control {
 .sv-load-btn:hover { opacity: 0.85; }
 .sv-load-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
+/* ── Auto-refresh (Start/Stop/interval) control ──────────────── */
+.sv-autoref-group { display: inline-flex; align-items: center; gap: 4px; }
+.sv-autoref-btn { display: inline-flex; align-items: center; gap: 3px; font-weight: 700; }
+.sv-autoref-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+#sv-autoref-start:not(:disabled) { border-color: var(--gtb-green); color: var(--gtb-green); }
+#sv-autoref-stop:not(:disabled) { border-color: var(--gtb-red); color: var(--gtb-red); }
+.sv-autoref-status {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 0.44rem; font-weight: 700; color: var(--gtb-muted);
+  margin-left: 2px; white-space: nowrap;
+}
+.sv-autoref-status.sv-autoref-running { color: var(--gtb-green); }
+.sv-autoref-status.sv-autoref-running i { animation: sv-autoref-pulse 1.4s ease-in-out infinite; }
+@keyframes sv-autoref-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
 #sv-chip-list, #dv-chip-list {
   display: flex; flex-wrap: wrap; gap: 2px;
   max-height: 56px; overflow-y: auto;
@@ -4056,11 +4071,11 @@ td.details-control {
   grid-template-columns:
     var(--gtb-col-instr)
     var(--gtb-col-predict)
+    var(--gtb-col-oiobv)
     var(--gtb-col-chart)
     var(--gtb-col-915)
     var(--gtb-col-fut)
     var(--gtb-col-oi)
-    var(--gtb-col-oiobv)
     var(--gtb-col-wt)
     var(--gtb-col-detail);
   min-width: calc(
@@ -4080,11 +4095,11 @@ td.details-control {
   grid-template-columns:
     var(--gtb-col-instr)
     var(--gtb-col-predict)
+    var(--gtb-col-oiobv)
     var(--gtb-col-chart)
     var(--gtb-col-915)
     var(--gtb-col-fut)
     var(--gtb-col-oi)
-    var(--gtb-col-oiobv)
     var(--gtb-col-wt)
     var(--gtb-col-detail);
   min-width: calc(
@@ -5235,21 +5250,139 @@ td.details-control {
     font-size: 0.56rem; color: var(--gtb-muted); font-style: italic;
 }
 
-/* ── Dashboard tab — 3/4-column grid layout ─────────────────────────────
-   Page-flow (natural height, scrolls with the pane) variants of the fixed-
-   height Signals-tab layout above — Dashboard isn't a flex:0 0 55% panel,
-   it's a normal scrolling page, so these use CSS grid instead. */
-.gtb-dash-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
-    gap: 8px;
-    /* Grid items default to align-items:stretch — every cell in a row matches the
-       TALLEST cell (Predict, with far more content than a short OI/OBV mini-chart
-       card), leaving huge empty space under every other card. align-items:start lets
-       each cell size to its own content instead. */
-    align-items: start;
+/* ── Dashboard tab — instrument matrix (2-panel: Index/Stock | Weighted Constituents) ──
+   One row per instrument (Instrument | Predict | OI/OBV), reusing Stock Viewer's
+   own .gtb-row/.gtb-row-id/.gtb-row-predict/.gtb-row-oiobv classes/CSS so both
+   tables look and behave the same — sticky identity column, zebra striping, etc.
+   Only the column set (3 vs 9) differs, via the scoped override below (same
+   convention Stock Viewer's own #sv-card-area .gtb-row uses). Two panels
+   (#gtb-dash-matrix-index / #gtb-dash-matrix-wtd) share this styling via the
+   common .gtb-dash-matrix-head class + [id^="gtb-dash-matrix-"] prefix selector. */
+.gtb-dash-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
 }
-.gtb-dash-cell { margin: 0 !important; }
+@media (max-width: 900px) {
+  .gtb-dash-2col { grid-template-columns: 1fr; }
+}
+.gtb-dash-matrix-head {
+  position: sticky; top: 0; z-index: 6;
+  display: grid;
+  grid-template-columns: var(--gtb-col-instr) var(--gtb-col-predict) var(--gtb-col-oiobv);
+  min-width: calc(var(--gtb-col-instr) + var(--gtb-col-predict) + var(--gtb-col-oiobv));
+  flex-shrink: 0;
+  background: var(--gtb-surface2);
+  border-bottom: 1px solid var(--gtb-border);
+  font-size: 0.46rem; font-weight: 800; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--gtb-muted);
+}
+.gtb-dash-matrix-head > span {
+  padding: 4px 8px; border-right: 1px solid var(--gtb-border2);
+  display: flex; align-items: center;
+}
+.gtb-dash-matrix-head > span:first-child {
+  position: sticky; left: 0; z-index: 3; background: var(--gtb-surface2);
+}
+[id^="gtb-dash-matrix-"] .gtb-row {
+  grid-template-columns: var(--gtb-col-instr) var(--gtb-col-predict) var(--gtb-col-oiobv);
+  min-width: calc(var(--gtb-col-instr) + var(--gtb-col-predict) + var(--gtb-col-oiobv));
+  height: auto;
+}
+[id^="gtb-dash-matrix-"] .gtb-row-oiobv { border-right: none; }
+[id^="gtb-dash-matrix-"] .gtb-row:nth-child(even) { background: color-mix(in srgb, var(--gtb-surface2) 14%, var(--gtb-bg)); }
+[id^="gtb-dash-matrix-"] .gtb-row:nth-child(even) .gtb-row-id { background: color-mix(in srgb, var(--gtb-surface2) 14%, var(--gtb-bg)); }
+[id^="gtb-dash-matrix-"] .gtb-row:hover { background: color-mix(in srgb, var(--gtb-accent) 7%, var(--gtb-bg)); }
+[id^="gtb-dash-matrix-"] .gtb-row:hover .gtb-row-id { background: color-mix(in srgb, var(--gtb-accent) 7%, var(--gtb-bg)); }
+/* .gtb-row-oiobv .gtb-chart-oi sets flex:1 1 0 (flex-basis:0) for Stock Viewer's compact
+   rows — in a flex-column layout that OVERRIDES any `height` (inline or CSS): flexbox
+   sizes a flex-basis:0 item from flex-grow, not from `height`, so the Dashboard matrix's
+   inline height:120px was silently losing to that rule, actually rendering at the 28px
+   min-height floor with overflow:hidden — clipping everything below the chart's own
+   midline, i.e. every negative bar. flex:0 0 120px opts back out of grow-based sizing. */
+[id^="gtb-dash-matrix-"] .gtb-row-oiobv .gtb-chart-oi { flex: 0 0 60px; min-height: 60px; height: 60px; }
+
+/* ── F&O Backtest popup ──────────────────────────────────────────────────── */
+.popup-custom-style-backtest-popup .popupwindow_content:after { display: none !important; content: none !important; }
+.bt-bk-wrap { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
+.bt-bk-header { flex: 0 0 auto; display: flex; flex-direction: column; }
+.bt-bk-controls {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 8px; border-bottom: 1px solid var(--gtb-border); flex: 0 0 auto;
+}
+.bt-bk-controls label {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 0.5rem; font-weight: 700; color: var(--gtb-muted); text-transform: uppercase;
+}
+.bt-bk-controls input[type="date"], .bt-bk-controls input[type="time"] {
+  background: var(--gtb-surface); border: 1px solid var(--gtb-border); color: var(--gtb-text);
+  font-size: 0.55rem; padding: 3px 5px; border-radius: 3px;
+}
+.bt-bk-search { position: relative; display: flex; align-items: center; gap: 4px; flex: 1; min-width: 180px; }
+.bt-bk-search input[type="text"] {
+  flex: 1; background: var(--gtb-surface); border: 1px solid var(--gtb-border); color: var(--gtb-text);
+  font-size: 0.55rem; padding: 4px 6px; border-radius: 3px;
+}
+.bt-bk-chip-box {
+  flex: 0 0 auto; margin: 0; padding: 5px 8px; min-height: 0;
+  border-bottom: 1px solid var(--gtb-border);
+}
+.bt-bk-status {
+  flex: 0 0 auto; padding: 4px 8px; font-size: 0.5rem; color: var(--gtb-muted);
+  border-bottom: 1px solid var(--gtb-border); min-height: 14px;
+}
+.bt-bk-rows-wrap { flex: 1 1 auto; min-height: 0; overflow: auto; }
+#bt-bk-rows-head {
+  display: grid;
+  grid-template-columns: var(--gtb-col-instr) var(--gtb-col-predict) var(--gtb-col-oiobv) var(--gtb-col-chart) var(--gtb-col-fut);
+  min-width: calc(var(--gtb-col-instr) + var(--gtb-col-predict) + var(--gtb-col-oiobv) + var(--gtb-col-chart) + var(--gtb-col-fut));
+  position: sticky; top: 0; z-index: 5;
+  background: var(--gtb-surface2); border-bottom: 1px solid var(--gtb-border);
+  font-size: 0.46rem; font-weight: 800; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--gtb-muted);
+}
+#bt-bk-rows-head > span { padding: 4px 8px; border-right: 1px solid var(--gtb-border2); display: flex; align-items: center; }
+#bt-bk-rows-wrap .gtb-row {
+  grid-template-columns: var(--gtb-col-instr) var(--gtb-col-predict) var(--gtb-col-oiobv) var(--gtb-col-chart) var(--gtb-col-fut);
+  min-width: calc(var(--gtb-col-instr) + var(--gtb-col-predict) + var(--gtb-col-oiobv) + var(--gtb-col-chart) + var(--gtb-col-fut));
+}
+
+/* ── Option Strike Search popup ──────────────────────────────────────────── */
+.popup-custom-style-option-strike-search .popupwindow_content:after { display: none !important; content: none !important; }
+.oss-wrap { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
+.oss-header { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 8px; border-bottom: 1px solid var(--gtb-border); flex: 0 0 auto; }
+.oss-ltp-override { display: flex; align-items: center; gap: 5px; font-size: 0.5rem; font-weight: 700; color: var(--gtb-muted); text-transform: uppercase; }
+.oss-ltp-override input {
+  width: 80px; background: var(--gtb-surface); border: 1px solid var(--gtb-border); color: var(--gtb-text);
+  font-size: 0.55rem; padding: 3px 5px; border-radius: 3px;
+}
+.oss-result { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 10px; }
+.oss-error { color: var(--gtb-red); font-size: 0.6rem; padding: 10px; }
+.oss-summary { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 8px 4px 12px; }
+.oss-summary-name { font-size: 0.85rem; font-weight: 900; color: var(--gtb-text); }
+.oss-summary-ltp, .oss-summary-expiry, .oss-summary-hedge {
+  font-size: 0.55rem; font-weight: 700; color: var(--gtb-muted);
+  padding: 3px 8px; border: 1px solid var(--gtb-border); border-radius: 4px;
+}
+.oss-override-tag { color: var(--gtb-amber); font-weight: 800; }
+.oss-table { width: 100%; border-collapse: collapse; font-size: 0.6rem; }
+.oss-table th {
+  text-align: left; padding: 6px 8px; font-size: 0.46rem; font-weight: 800; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--gtb-muted); border-bottom: 1px solid var(--gtb-border);
+}
+.oss-table td { padding: 8px; border-bottom: 1px solid var(--gtb-border2); color: var(--gtb-text); vertical-align: middle; }
+.oss-target-note { font-size: 0.44rem; color: var(--gtb-muted); font-weight: 500; margin-top: 2px; }
+.oss-type-badge {
+  display: inline-block; font-size: 0.44rem; font-weight: 800; border: 1px solid; border-radius: 3px;
+  padding: 0 4px; margin-right: 4px;
+}
+.oss-strike { font-weight: 800; font-family: var(--gtb-mono); }
+.oss-symbol { font-family: var(--gtb-mono); color: var(--gtb-accent); }
+.oss-token { font-family: var(--gtb-mono); color: var(--gtb-muted); font-size: 0.52rem; }
+.oss-na { color: var(--gtb-muted); font-style: italic; }
+.oss-chart-link { color: var(--gtb-blue); font-size: 0.7rem; }
+.oss-chart-link:hover { opacity: 0.7; }
+
 .gtb-dash-sig-cols {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;

@@ -83,8 +83,23 @@ const g_config = new MonkeyConfig({
             'type': 'text',
             'default': '',
         },
+        hedge_diff_nifty: {
+            'label': 'Hedge strike diff — NIFTY (points)',
+            'type': 'text',
+            'default': 500,
+        },
+        hedge_diff_banknifty: {
+            'label': 'Hedge strike diff — BANK NIFTY (points)',
+            'type': 'text',
+            'default': 500,
+        },
+        hedge_diff_stocks: {
+            'label': 'Hedge strike diff — Stocks (points)',
+            'type': 'text',
+            'default': 50,
+        },
     },
-  
+
 });
 
 const VERSION = "v1.0";
@@ -113,3 +128,11 @@ const OVX = g_config.get('OVX'); //CRUDE vix
 const VXSLV = g_config.get("VXSLV") //SILVER VIX
 const GVZ = g_config.get("GVZ") //GOLD VIX
 const VIX = g_config.get("VIX") //CBOE Volatility Index
+
+// Hedge strike distance (in points) — how far OTM to place the hedge leg's CE/PE strike
+// relative to the underlying's own ATM strike. Configurable per instrument class since a
+// stock's ATM±diff needs to be much tighter than NIFTY/BANK NIFTY's. Used by the Option
+// Strike Search popup (optionStrikeSearch.js).
+const HEDGE_DIFF_NIFTY = parseFloat(g_config.get('hedge_diff_nifty')) || 500;
+const HEDGE_DIFF_BANKNIFTY = parseFloat(g_config.get('hedge_diff_banknifty')) || 500;
+const HEDGE_DIFF_STOCKS = parseFloat(g_config.get('hedge_diff_stocks')) || 50;

@@ -2117,6 +2117,15 @@ async function _gtbSigFetchAndRenderOI(isIndex) {
                 if (!(_gtbIsMcxFuture && _gtbIsMcxFuture(name))) {
                     await showPrictionProbabilty(name);
                     showOIOBVBarChart(name);
+                    var _sc = computeInstrumentScore(name);
+                    if (!INSTRUMENT_SCORE_MAP[name]) INSTRUMENT_SCORE_MAP[name] = {};
+                    INSTRUMENT_SCORE_MAP[name].score = _sc;
+                    // Propagate this fetch to every other open surface (Dashboard matrix,
+                    // Stock Viewer, Detail View) instead of each of them needing their own
+                    // fresh fetch — this reload button already hits Kite for every instrument
+                    // here, no reason Dashboard should re-fetch the same data separately.
+                    _gtbRefreshAllPredictCards(name);
+                    _gtbRefreshAllOIOBVCharts(name);
                 }
             } catch(e) { console.log('sig OI reload', name, e); }
             done++;
@@ -5976,7 +5985,8 @@ async function _dvFetchAndRender(name, tid, sfx, isMcx) {
         try { jQ('#' + tid + '-lvlprob' + sfx).html(_gtbLevelProbHtml(name)); } catch(e) {}
         // Prediction panel is built synchronously with the card HTML, before futures/OI/score
         // data for this instrument has finished loading — re-render it now that it has.
-        try { jQ('#' + tid + '-predict' + sfx).html(_svPredictPanelBody(name, sfx)); } catch(e) {}
+        try { _gtbRefreshAllPredictCards(name); } catch(e) {}
+        try { _gtbRefreshAllOIOBVCharts(name); } catch(e) {}
         // Fire-and-forget — a full day's candle replay is slower than everything else on this
         // page, and doesn't block any score-dependent panel above.
         try { _dvLoadFutAcc(name, tid, sfx, isMcx); } catch(e) {}
@@ -6561,6 +6571,28 @@ jQ(document).on('click', '#show-futures-signal', function (e) {
     e.preventDefault();
     _gtbCreateInstrDetailPopup();
 });
+
+// Auto-minimize the Instrument Detail View popup whenever Kite navigates into its own
+// chart view (clicking a stock in Kite's own watchlist/search, or our identity-strip
+// chart link) — Kite is a single-page app, so that navigation never reloads the page and
+// this Tampermonkey-injected popup would otherwise just sit on top of the chart, blocking
+// it, until the user manually minimizes it. Polls location.pathname (SPA route changes
+// aren't reliably observable any other way without patching history.pushState) and only
+// acts on the transition INTO a chart route, not on every tick while already on one.
+var _gtbLastPath = location.pathname;
+setInterval(function () {
+    if (location.pathname === _gtbLastPath) return;
+    var wasChart = _gtbLastPath.indexOf('/markets/ext/chart/') !== -1;
+    var isChart  = location.pathname.indexOf('/markets/ext/chart/') !== -1;
+    _gtbLastPath = location.pathname;
+    if (!isChart || wasChart) return;
+    try {
+        var $pop = jQ('.popup-custom-style-gtb-instr-detail');
+        if (!$pop.length) return;
+        var content = $pop.find('.popupwindow_content');
+        if (content.is(':visible')) $pop.find('.popup-win-minimize').trigger('click');
+    } catch (e) {}
+}, 500);
 
 // ── Multi-select autocomplete for instrument detail search ────────────────────
 // Builds the full list once: _allInstruments names + OPTION_STRIKE_LIST + INSTRUMENT_TOKENS keys
@@ -11558,7 +11590,8 @@ jQ(document).on('click', '#show-commodities', function (e) {
             jQ('#cmd-crude-lvlprob').html('<div class="cmd-load" style="color:var(--gtb-muted);">OI unavailable — level probability requires OI data.</div>');
         }
         try { _cmdRenderCrudeScoreGauge(); } catch(e10) {}
-        try { jQ('#cmd-crude-predict').html(_svPredictPanelBody('CRUDEOILM')); } catch(e11) { jQ('#cmd-crude-predict').html('<div class="cmd-load" style="color:var(--gtb-red);">Prediction error.</div>'); }
+        try { _gtbRefreshAllPredictCards('CRUDEOILM'); } catch(e11) { jQ('#cmd-crude-predict').html('<div class="cmd-load" style="color:var(--gtb-red);">Prediction error.</div>'); }
+        try { _gtbRefreshAllOIOBVCharts('CRUDEOILM'); } catch(e12) {}
         // CRUDEOILM Futures Remark Accuracy
         _cmdLoadCrudeAcc();
 
@@ -11636,7 +11669,7 @@ jQ(document).on('click', '#show-commodities', function (e) {
     });
     jQ(document).off('click.cmd-crude-acc-reload').on('click.cmd-crude-acc-reload', '#cmd-crude-acc-reload', function() { _cmdLoadCrudeAcc(); });
     jQ(document).off('click.cmd-crude-predict-reload').on('click.cmd-crude-predict-reload', '#cmd-crude-predict-reload', function() {
-        jQ('#cmd-crude-predict').html(_svPredictPanelBody('CRUDEOILM'));
+        _gtbRefreshAllPredictCards('CRUDEOILM');
     });
     jQ(document).off('change.cmd-iv').on('change.cmd-iv', '#cmd-interval', function() {
         _CMD.intervalMs = parseInt(jQ(this).val());
@@ -11795,6 +11828,67 @@ function _svPredictPanelBody(name, sfx) {
     } catch (err) {
         return '<div style="padding:12px;color:var(--gtb-red);font-size:0.55rem;">Error: ' + (err && err.message) + '</div>';
     }
+}
+
+// Refreshes EVERY predict card currently on screen for this instrument, across every
+// surface (Stock Viewer's compact row card, the single Instrument Detail View popup,
+// the multi-column Detail View panel, Commodities' CRUDEOILM panel) — not just the one
+// that just fetched fresh data. Without this, each surface only re-renders its own
+// predict element after its own fetch, so two surfaces open for the same instrument at
+// different times silently drift out of sync (Stock Viewer showing an old snapshot next
+// to a freshly-fetched Detail View, or vice versa) even though both ultimately read the
+// same INSTRUMENT_SCORE_MAP cache — the cache is fresh, but the rendered HTML isn't.
+// Finds every '<tid>-predict<suffix>' element by id prefix and re-renders each with its
+// own suffix, so it works regardless of which surfaces happen to be open.
+function _gtbRefreshAllPredictCards(name) {
+    try {
+        var tid = name.replace(/ /g, '-').replace(/&/g, '-');
+        var prefix = tid + '-predict';
+        document.querySelectorAll('[id^="' + prefix + '"]').forEach(function (el) {
+            var sfx = el.id.slice(prefix.length); // '', '-stock-viewer', '-dv', '-dv-<tid>', '-dash', ...
+            // Stock Viewer's row table and the Dashboard matrix both use the same compact
+            // card (same row-comparison layout); every other surface (Detail View, Commodities)
+            // gets the full panel body.
+            if (sfx === (typeof _SV_SUFFIX !== 'undefined' ? _SV_SUFFIX : '-stock-viewer') || sfx === '-dash') {
+                el.innerHTML = _svPredictCompactHtml(name, sfx);
+            } else {
+                el.innerHTML = _svPredictPanelBody(name, sfx);
+            }
+        });
+        // Commodities popup's CRUDEOILM panel uses a fixed id (#cmd-crude-predict), not the
+        // '<tid>-predict<suffix>' convention every other surface follows — doesn't match the
+        // querySelector prefix above, so it needs its own explicit sync.
+        if (name === 'CRUDEOILM') {
+            var $cmd = jQ('#cmd-crude-predict');
+            if ($cmd.length) $cmd.html(_svPredictPanelBody(name));
+        }
+    } catch (e) {}
+}
+
+// Same idea as _gtbRefreshAllPredictCards, for the OI/OBV mini bar-charts: re-renders
+// EVERY '<tid>-oi<suffix>'/'<tid>-obv<suffix>' pair currently on screen for this
+// instrument from the current INSTRUMENT_SCORE_MAP[name].oiData, not just the one
+// suffix whichever surface just fetched. Without this, e.g. Instrument Detail View
+// fetching fresh data updates its own '-dv' chart but leaves the Dashboard matrix's
+// '-dash' chart showing whatever it last rendered — same staleness class as predict
+// cards had before _gtbRefreshAllPredictCards.
+function _gtbRefreshAllOIOBVCharts(name) {
+    try {
+        var tid = name.replace(/ /g, '-').replace(/&/g, '-');
+        var sm = INSTRUMENT_SCORE_MAP[name] || {};
+        var oiData = sm.oiData;
+        if (!oiData) return;
+        var oiPrefix = tid + '-oi';
+        // '-oi<suffix>' only — NOT '-oimatrix<suffix>', a different element that happens
+        // to share the same prefix. Suffix is empty or starts with '-'.
+        var oiRe = /^-|^$/;
+        document.querySelectorAll('[id^="' + oiPrefix + '"]').forEach(function (el) {
+            var rest = el.id.slice(oiPrefix.length); // '', '-dash', '-dv', 'matrix', 'matrix-dv', ...
+            if (rest.indexOf('matrix') === 0) return; // skip -oimatrix<suffix>
+            if (!oiRe.test(rest)) return;
+            try { showOIOBVBarChart(name, rest, oiData); } catch (e) {}
+        });
+    } catch (e) {}
 }
 
 jQ(document).on('click', '.dv-predict-reload', function (e) {
@@ -12314,7 +12408,7 @@ function _svPredictCompactHtml(name, suffix) {
     // call, so a mixed-signal read doesn't look as certain as a clean majority read.
     var headlineColor = d.lowConfidence ? 'var(--gtb-amber)' : d.tradeColor;
     var scColor = d.lowConfidence ? 'var(--gtb-amber)' : sc.col;
-    return '<div class="sv-predict-compact" data-name="' + name + '" data-sfx="' + (suffix || '') + '" title="Click for full prediction" style="cursor:pointer;padding:4px 6px;display:flex;flex-direction:column;gap:3px;height:100%;justify-content:center;">'
+    return '<div class="sv-predict-compact" data-name="' + name + '" data-sfx="' + (suffix || '') + '" data-confidence="' + d.confidence + '" title="Click for full prediction" style="cursor:pointer;padding:4px 6px;display:flex;flex-direction:column;gap:3px;height:100%;justify-content:center;">'
         + '<div style="display:flex;align-items:center;justify-content:space-between;gap:4px;">'
         +   '<span style="font-size:0.5rem;font-weight:900;color:' + headlineColor + ';border:1px solid ' + headlineColor + ';padding:1px 5px;border-radius:3px;white-space:nowrap;">' + d.tradeAction + '</span>'
         +   '<span style="font-size:0.42rem;color:var(--gtb-muted);">' + (d.vixVal ? d.vixVal.toFixed(1) : '—') + '</span>'
@@ -12332,10 +12426,11 @@ jQ(document).on('click', '.sv-predict-compact', function (e) {
     var name = jQ(this).data('name');
     var sfx = jQ(this).data('sfx');
     // The compact card is only rendered once at LOAD time (no periodic refresh loop
-    // touches Stock Viewer rows), so it can drift stale vs. live data. Re-render it
-    // in place on click — from the same underlying data the popup is about to show —
-    // so the row and the popup never visibly disagree.
-    try { jQ(this).replaceWith(_svPredictCompactHtml(name, sfx)); } catch (e2) {}
+    // touches Stock Viewer rows), so it can drift stale vs. live data — and other open
+    // surfaces for the same instrument (Detail View) can drift too. Refresh every predict
+    // card for this instrument on click, not just this one, so nothing visibly disagrees.
+    try { _gtbRefreshAllPredictCards(name); } catch (e2) {}
+    try { _gtbRefreshAllOIOBVCharts(name); } catch (e2) {}
     try {
         showMaximizeOverlay('<i class="bi bi-lightbulb-fill"></i> ' + name + ' — Today\'s Prediction', _svBuildPrediction(name, sfx));
     } catch (err) {
@@ -13329,18 +13424,23 @@ function _renderBarChart(containerId, config) {
         return timeFormat ? moment(l).format('HH:mm') : String(l);
     });
 
-    // Optional per-bar colouring: when a series carries `pointColors` (one colour per
-    // value, same length as `values`), render as object-form datapoints so each bar can
-    // be tinted individually — used to distinguish full-weight WRITE/BUY (new positions
+    // Optional per-bar colouring: used to distinguish full-weight WRITE/BUY (new positions
     // opening) from half-weight COV/UNWIND (positions closing) at a glance, instead of
     // requiring a table lookup.
+    //
+    // IMPORTANT: data is always a plain number array here — NOT the {x,y,fillColor}
+    // object-point form. The bundled ApexCharts version doesn't reliably position a
+    // NEGATIVE value below the zero baseline when it's given as an object-form datapoint
+    // with a per-point fillColor (positive values happened to render fine, which is why
+    // this went unnoticed for so long) — a negative bar rendered as if it were 0/absent,
+    // and no amount of axis/height/type-coercion config fixed it because the defect is in
+    // that specific data-point code path, not in scaling. Plain array data always
+    // positions correctly, so pointColors are instead patched directly onto the rendered
+    // SVG bar elements after the chart draws (see below chart.render().then(...)).
     let apexSeries = series.map(function(s) {
-        if (s.pointColors && s.pointColors.length === s.values.length) {
-            var pts = s.values.map(function(v, i) { return { x: xLabels[i], y: v, fillColor: s.pointColors[i] }; });
-            return { name: s.label, data: pts };
-        }
-        return { name: s.label, data: s.values, color: s.color };
+        return { name: s.label, data: s.values.map(function(v) { return parseFloat(v) || 0; }), color: s.color };
     });
+
 
     let annotations = {};
     let xAnnotations = [];
@@ -13371,6 +13471,22 @@ function _renderBarChart(containerId, config) {
     }
     if (xAnnotations.length) annotations.xaxis = xAnnotations;
 
+    // Force a symmetric y-axis centered on zero. Without this, ApexCharts auto-scales
+    // the axis range off whichever side (positive or negative) has the larger magnitude,
+    // which pushes the zero-baseline off-center — the smaller-magnitude side then gets a
+    // shrunken sliver of the plot area, invisible at these mini-chart heights (44px in
+    // the Dashboard matrix) even though the bar is technically rendered. Symmetric min/max
+    // keeps zero dead-center so a bar of a given value always gets the same visual weight
+    // on either side, at any chart height.
+    var maxAbs = 0;
+    series.forEach(function (s) {
+        (s.values || []).forEach(function (v) {
+            var av = Math.abs(parseFloat(v)) || 0;
+            if (av > maxAbs) maxAbs = av;
+        });
+    });
+    if (maxAbs === 0) maxAbs = 1; // avoid a degenerate 0..0 range when every value is 0
+
     let chart = new ApexCharts(el, {
         series: apexSeries,
         chart: { type: 'bar', height: h, background: 'transparent', toolbar: { show: false }, animations: { enabled: false }, sparkline: { enabled: false } },
@@ -13379,15 +13495,44 @@ function _renderBarChart(containerId, config) {
         stroke: { show: false },
         stacked: stacked,
         xaxis: { categories: xLabels, labels: { show: config.showXLabels !== false, style: { colors: '#7d8590', fontSize: '7px' }, rotate: 0 }, axisBorder: { show: false }, axisTicks: { show: false } },
-        yaxis: { labels: { show: false } },
+        yaxis: { min: -maxAbs, max: maxAbs, labels: { show: false } },
         grid: { borderColor: '#21262d', strokeDashArray: 3, yaxis: { lines: { show: true } }, xaxis: { lines: { show: false } } },
         legend: { show: false },
         theme: { mode: 'dark' },
         annotations: annotations,
-        tooltip: { theme: 'dark', x: { show: true } },
+        // fixed positioning lets the tooltip escape ancestor overflow:hidden clipping —
+        // these mini charts sit inside .gtb-row-oiobv (overflow:hidden, needed to keep the
+        // chart+labels from bleeding into neighbouring row cells), which otherwise clips
+        // the tooltip invisible since ApexCharts renders it as a child of the chart container.
+        tooltip: { theme: 'dark', x: { show: true }, fixed: { enabled: true, position: 'topRight', offsetX: 0, offsetY: 0 } },
     });
-    chart.render();
+    var renderResult = chart.render();
     el._apexChart = chart;
+
+    // Patch per-bar colours directly onto the rendered SVG, once ApexCharts has finished
+    // drawing the (correctly-positioned, since plain-array) bars. Each series renders as
+    // its own <g class="apexcharts-series"> group in series order, with one bar element
+    // per category inside it, in category order — same order as s.pointColors.
+    var hasPointColors = series.some(function (s) { return s.pointColors && s.pointColors.length === s.values.length; });
+    if (hasPointColors) {
+        var applyPointColors = function () {
+            var seriesGroups = el.querySelectorAll('.apexcharts-series');
+            series.forEach(function (s, sIdx) {
+                if (!s.pointColors || s.pointColors.length !== s.values.length) return;
+                var g = seriesGroups[sIdx];
+                if (!g) return;
+                var bars = g.querySelectorAll('path.apexcharts-bar-area, rect.apexcharts-bar-area');
+                bars.forEach(function (bar, i) {
+                    if (s.pointColors[i]) bar.setAttribute('fill', s.pointColors[i]);
+                });
+            });
+        };
+        if (renderResult && typeof renderResult.then === 'function') {
+            renderResult.then(applyPointColors).catch(function () {});
+        } else {
+            setTimeout(applyPointColors, 0);
+        }
+    }
 }
 
 // ── Range Scoreboard ──────────────────────────────────────────────────────────
@@ -16855,6 +17000,106 @@ function _gtbDashboardCard(title, icon, bodyId, bodyHtml) {
         + '</div>';
 }
 
+// Names shown in the Dashboard tab's per-instrument OI/OBV + Prediction grid — the
+// core fixed instruments (_allInstruments, minus the no-futures/OI ones) PLUS every
+// NIFTY 50 / Bank Nifty weighted constituent, not just the 3 that happen to also be
+// core instruments (RELIANCE/HDFCBANK/ICICIBANK). Deduped, core instruments first.
+// Per-row "Refresh OI/OBV" for the Dashboard tab's Instrument Matrix — same pattern as
+// Stock Viewer's own .refresh-oi-stock-viewer button, MCX-branched since the matrix
+// includes CRUDEOILM alongside NSE names (Stock Viewer's own handler is NSE-only).
+jQ(document).on('click', '.refresh-oi-dash', async function (e) {
+    e.preventDefault(); e.stopPropagation();
+    var name = jQ(this).data('name');
+    if (!name) return;
+    var $btn = jQ(this);
+    $btn.find('i').removeClass('bi-arrow-clockwise').addClass('bi-hourglass-split');
+    try {
+        if (_gtbIsMcxFuture(name)) {
+            var fres = await showFutureDetailsMCX(name);
+            if (fres) await showPrictionProbabiltyMCX(name, fres);
+        } else {
+            await showPrictionProbabilty(name);
+        }
+        // showPrictionProbabilty(MCX) only populates INSTRUMENT_SCORE_MAP[name].stockEntry.DATA
+        // — .oiData is derived as a side effect of showOIOBVBarChart actually running, so it
+        // must be called directly here (with the fresh stockEntry.DATA as override) before
+        // _gtbRefreshAllOIOBVCharts, which only READS .oiData rather than deriving it.
+        var sm = INSTRUMENT_SCORE_MAP[name] || {};
+        showOIOBVBarChart(name, '-dash', sm.stockEntry && sm.stockEntry.DATA);
+        var sc = computeInstrumentScore(name);
+        if (!INSTRUMENT_SCORE_MAP[name]) INSTRUMENT_SCORE_MAP[name] = {};
+        INSTRUMENT_SCORE_MAP[name].score = sc;
+        _gtbRefreshAllPredictCards(name);
+        _gtbRefreshAllOIOBVCharts(name);
+    } catch (err) { console.log('refresh-oi-dash', name, err); }
+    $btn.find('i').removeClass('bi-hourglass-split').addClass('bi-arrow-clockwise');
+});
+
+function _gtbDashGridNames() {
+    return _gtbDashCoreNames().concat(_gtbDashWeightedNames());
+}
+// Core instruments only (same set as the fixed instrument list, minus the ones with
+// no futures/OI) — the "Index / Stock" half of the matrix, mirroring INDEX / STOCK OI.
+function _gtbDashCoreNames() {
+    var names = [];
+    _allInstruments.forEach(function (item) {
+        if (item.name === 'GIFT NIFTY' || item.name === 'SENSEX' || item.name === 'USDINR') return;
+        names.push(item.name);
+    });
+    return names;
+}
+// Weighted constituents not already in the core list — the "Weighted Constituents"
+// half of the matrix, mirroring WEIGHTED CONSTITUENTS OI.
+function _gtbDashWeightedNames() {
+    var core = _gtbDashCoreNames();
+    var names = [];
+    [NIFTY_50_WEIGHTED_STOCKS, NIFTY_BANK_WEIGHTED_STOCKS].forEach(function (map) {
+        Object.keys(map || {}).forEach(function (n) { if (core.indexOf(n) === -1 && names.indexOf(n) === -1) names.push(n); });
+    });
+    return names;
+}
+
+// Builds one Instrument Matrix panel (own header row + one row per name), for a given
+// name list and container id — called once per side of the 2-column split.
+function _gtbDashMatrixColHtml(names, matrixId, groupLabel) {
+    var h = '<div class="gtb-card gtb-widget" style="margin:0 !important;">'
+        +     '<div class="gtb-card-header"><span class="gtb-card-title"><i class="bi bi-grid-3x3-gap-fill"></i> ' + groupLabel + '</span></div>'
+        +     '<div class="gtb-card-body" style="padding:0;overflow:auto;max-height:560px;">'
+        +       '<div id="' + matrixId + '">'
+        +         '<div class="gtb-dash-matrix-head">'
+        +           '<span class="gtb-rh-instr">INSTRUMENT</span>'
+        +           '<span class="gtb-rh-predict"><i class="bi bi-lightbulb-fill"></i> PREDICT</span>'
+        +           '<span class="gtb-rh-oiobv">OI / OBV</span>'
+        +         '</div>';
+    if (!names.length) {
+        h += '<div class="gtb-sig-wait">No instruments in this group.</div>';
+    }
+    names.forEach(function (name) {
+        var tid = name.replace(/ /g, '-').replace(/&/g, '-');
+        h += '<div class="gtb-row cat-stock">'
+        +      '<div class="gtb-row-id">'
+        +        '<div class="gtb-row-name">' + name
+        +          '<button class="sv-icon-btn refresh-oi-dash" data-name="' + name + '" title="Refresh OI/OBV" style="margin-left:4px;"><i class="bi bi-arrow-clockwise"></i></button>'
+        +        '</div>'
+        +        '<div class="gtb-row-ltp" id="' + tid + '-ltp-dash"></div>'
+        +        '<div id="' + tid + '-futures-dash" style="font-size:0.48rem;font-weight:700;margin-top:2px;"></div>'
+        +      '</div>'
+        +      '<div class="gtb-row-predict" id="' + tid + '-predict-dash"><span class="gtb-row-na" style="margin:auto">—</span></div>'
+        +      '<div class="gtb-row-oiobv">'
+        +        '<div class="gtb-oiobv-lbl">OI</div>'
+        +        '<div id="' + tid + '-oi-dash" class="gtb-chart-oi" style="height:120px;"></div>'
+        +        '<div class="gtb-oiobv-lbl">OBV</div>'
+        +        '<div id="' + tid + '-obv-dash" class="gtb-chart-oi" style="height:120px;"></div>'
+        +        '<div id="' + tid + '-oiobv-xaxis-dash" class="gtb-oiobv-xaxis"></div>'
+        +      '</div>'
+        +    '</div>';
+    });
+    h +=     '</div>'  // end #<matrixId>
+    +      '</div>'    // end .gtb-card-body
+    +    '</div>';      // end .gtb-card
+    return h;
+}
+
 function _gtbRenderDashboardPane() {
     var $pane = jQ('#gtb-pane-dashboard');
     if (!$pane.length) {
@@ -16882,27 +17127,15 @@ function _gtbRenderDashboardPane() {
         +      '<div class="gtb-card-body" id="gtb-dash-predict" style="padding:6px 8px;"></div>'
         +    '</div>';
 
-        // Per-instrument OI/OBV grid. GIFT NIFTY has no futures/OI (see hasFut convention
-        // elsewhere in this file) so it's skipped entirely rather than shown as an empty
-        // placeholder cell.
-        h += '<div class="gtb-dash-grid" style="padding:0 8px 8px;">';
-        _allInstruments.forEach(function (item) {
-            var name = item.name, tid = name.replace(/ /g, '-').replace(/&/g, '-');
-            if (name === 'GIFT NIFTY' || name === 'SENSEX' || name === 'USDINR') return; // no futures/OI card for these
-            h += '<div class="gtb-dash-cell gtb-card gtb-widget">'
-            +      '<div class="gtb-card-header"><span class="gtb-card-title">' + name + '</span>'
-            +        '<span id="' + tid + '-ltp-dash" class="gtb-dash-ltp" style="font-size:0.48rem;font-weight:700;font-family:var(--gtb-mono);color:var(--gtb-text);margin-left:6px;"></span>'
-            +        '<span id="' + tid + '-futures-dash" style="font-size:0.5rem;font-weight:700;"></span></div>'
-            +      '<div class="gtb-card-body" style="padding:4px 6px;">'
-            +        '<div style="font-size:0.4rem;color:var(--gtb-muted);">OI</div>'
-            +        '<div id="' + tid + '-oi-dash" class="gtb-chart-oi" style="height:44px;"></div>'
-            +        '<div style="font-size:0.4rem;color:var(--gtb-muted);">OBV</div>'
-            +        '<div id="' + tid + '-obv-dash" class="gtb-chart-oi" style="height:44px;"></div>'
-            +        '<div id="' + tid + '-oiobv-xaxis-dash" class="gtb-oiobv-xaxis"></div>'
-            +      '</div>'
-            +    '</div>';
-        });
-        h += '</div>'; // end .gtb-dash-grid
+        // Per-instrument OI/OBV + Prediction matrix — one row per instrument, reusing Stock
+        // Viewer's own row classes/CSS (.gtb-row/.gtb-row-id/.gtb-row-predict/.gtb-row-oiobv;
+        // scoped grid-template-columns override in common.css, same convention Stock Viewer
+        // uses). Split into two side-by-side panels — Index/Stock vs Weighted Constituents —
+        // mirroring the INDEX / STOCK OI | WEIGHTED CONSTITUENTS OI split below.
+        h += '<div class="gtb-dash-2col" style="padding:0 8px 8px;">'
+        +      _gtbDashMatrixColHtml(_gtbDashCoreNames(),     'gtb-dash-matrix-index', 'INDEX / STOCK')
+        +      _gtbDashMatrixColHtml(_gtbDashWeightedNames(), 'gtb-dash-matrix-wtd',   'WEIGHTED CONSTITUENTS')
+        + '</div>';
 
         // Index/Stock OI + Weighted Constituents OI + Futures Accuracy — same 3-column
         // side-by-side layout the Signals tab uses (.gtb-dash-sig-col below is a
@@ -16935,10 +17168,16 @@ function _gtbRenderDashboardPane() {
     // ── Populate / refresh (every call — cheap, all reused from already-cached data) ──
     try { jQ('#gtb-dash-predict').html(_gtbBuildPrediction(true)); } catch (e) {}
 
-    _allInstruments.forEach(function (item) {
-        var name = item.name;
-        if (name === 'GIFT NIFTY' || name === 'SENSEX' || name === 'USDINR') return;
-        try { showOIOBVBarChart(name, '-dash'); } catch (e) {}
+    _gtbDashGridNames().forEach(function (name) {
+        try {
+            // Without an override, showOIOBVBarChart only reads INSTRUMENT_SCORE_MAP[name]
+            // .stockEntry.DATA — populated by showPrictionProbabilty() (the 3 core stocks'
+            // full _refreshNSE cycle). The rest of the weighted constituents are scanned by
+            // fetchWeightedStocksOIScore() instead, which writes .oiData, a field the chart
+            // never falls back to on its own — pass it explicitly so it works for both.
+            var _sm3 = INSTRUMENT_SCORE_MAP[name] || {};
+            showOIOBVBarChart(name, '-dash', _sm3.oiData);
+        } catch (e) {}
         try {
             var sm = INSTRUMENT_SCORE_MAP[name] || {};
             var ft = sm.futures_trend || 0;
@@ -16960,6 +17199,8 @@ function _gtbRenderDashboardPane() {
             var _tid2 = name.replace(/ /g, '-').replace(/&/g, '-');
             jQ('#' + _tid2 + '-ltp-dash').text(isNaN(_ltp2) ? '' : _ltp2.toLocaleString('en-IN', { maximumFractionDigits: 2 }));
         } catch (e) {}
+        try { _gtbRefreshAllPredictCards(name); } catch (e) {}
+        try { _gtbRefreshAllOIOBVCharts(name); } catch (e) {}
     });
 
     try {
@@ -22214,6 +22455,8 @@ function _gtbCreateFloatingBar() {
         { id: 'show-liq-scanner',            icon: 'bi-water',          title: 'Liquidity / SL-Hunt Scanner' },
         { id: 'show-quote-fetch',            icon: 'bi-search',               title: 'Quote Fetch' },
         { id: 'show-ws-subscribe',           icon: 'bi-broadcast',            title: 'WebSocket Subscribe' },
+        { id: 'show-backtest-popup',         icon: 'bi-clock-history',        title: 'F&O Backtest' },
+        { id: 'show-option-strike-search',   icon: 'bi-crosshair',            title: 'Option Strike Search' },
         { id: 'show-help',                   icon: 'bi-question-circle-fill', title: 'Help' },
         { id: 'data-load',                   icon: 'bi-sliders',              title: 'Data Settings' },
     ];
@@ -22254,6 +22497,8 @@ function _gtbCreateFloatingBar() {
             if (id === 'show-master-scanner')    { _gtbShowMasterScanner(); return; }
             if (id === 'show-quote-fetch')       { showQuotePopup(); return; }
             if (id === 'show-ws-subscribe')      { showWebSocketPopup(); return; }
+            if (id === 'show-backtest-popup')    { _btShowPopup(); return; }
+            if (id === 'show-option-strike-search') { _ossShowPopup(); return; }
             var $el = jQ('#' + id);
             if ($el.length) {
                 $el[0].click();
