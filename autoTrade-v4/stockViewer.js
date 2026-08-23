@@ -630,6 +630,10 @@ function _svCheckWallProximityAlerts(list) {
     Object.keys(_SV_ACTIVE_WALL_ALERTS).forEach(function (key) { if (!seenKeys[key]) delete _SV_ACTIVE_WALL_ALERTS[key]; });
 }
 
+// Wall-building is now shown directly on the OI/OBV chart (a pulsing marker at the
+// forming strike, drawn in showOIOBVBarChart via _gtbWallVelocity) instead of firing a
+// toast — visible for as long as the buildup lasts rather than a one-shot notification.
+
 jQ(document).on('click', '#sv-autoref-start', _svStartAutoRefresh);
 jQ(document).on('click', '#sv-autoref-stop', _svStopAutoRefresh);
 // Popup close (native + custom close button) should stop the timer, not leave it running

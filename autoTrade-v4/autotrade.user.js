@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Groot Bot
 // @namespace    Groot Bot
-// @version      27.99
+// @version      28.25
 // @description  Groot Bot
 // @author       Manjunath
 // @match        https://kite.zerodha.com/*
@@ -14,6 +14,7 @@
 // @grant        GM_getClipboard
 // @grant        GM_xmlhttpRequest
 // @connect      www.nseindia.com
+// @connect      nsearchives.nseindia.com
 // @connect      api.kite.trade
 // @connect      query1.finance.yahoo.com
 // @resource     BOOTSTRAP_CSS https://manjunathmmath.github.io/autoTrade-v4/dist/css/bootstrap.css
@@ -94,6 +95,8 @@
 // @require      https://manjunathmmath.github.io/autoTrade-v4/help.js
 // @require      https://manjunathmmath.github.io/autoTrade-v4/backtest.js
 // @require      https://manjunathmmath.github.io/autoTrade-v4/optionStrikeSearch.js
+// @require      https://manjunathmmath.github.io/autoTrade-v4/positionalScreener.js
+// @require      https://manjunathmmath.github.io/autoTrade-v4/dataLoad.js
 // @require      https://manjunathmmath.github.io/autoTrade-v4/grootTradeBot.js
 // @require      https://manjunathmmath.github.io/autoTrade-v4/bloombergDashboard.js
 // @require      https://manjunathmmath.github.io/autoTrade-v4/bloombergAnalysis.js

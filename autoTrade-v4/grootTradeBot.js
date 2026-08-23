@@ -813,7 +813,7 @@ async function maximizeChart(name) {
         await _loadChart(80);
     }
 
-    showMaximizeOverlay('<i class="bi bi-candlestick"></i> ' + name + ' — Candlestick Chart', _buildBody(), _refreshChart);
+    showMaximizeOverlay('<i class="bi bi-bar-chart-fill"></i> ' + name + ' — Candlestick Chart', _buildBody(), _refreshChart);
     await _loadChart(220);
 }
 
@@ -895,7 +895,7 @@ jQ(document).on("click", "#data-load", function () {
     html += '<div class="gtb-ds-section">';
     html += '<div class="gtb-ds-section-title"><i class="bi bi-gear"></i> Data Controls</div>';
     html += '<div class="gtb-ds-actions">';
-    html += '  <button id="clean-storage"  class="gtb-ds-btn gtb-ds-btn-danger"><i class="bi bi-trash3"></i> Clear Storage</button>';
+    html += '  <button id="clean-storage"  class="gtb-ds-btn gtb-ds-btn-danger"><i class="bi bi-trash-fill"></i> Clear Storage</button>';
     html += '  <button id="load-price"     class="gtb-ds-btn gtb-ds-btn-primary"><i class="bi bi-cloud-download"></i> Load Prices</button>';
     html += '  <button id="nine-fifteen-scan" class="gtb-ds-btn gtb-ds-btn-success"><i class="bi bi-clock-history"></i> 9:15 SCAN</button>';
     html += '  <button id="add-to-watch-list" class="gtb-ds-btn gtb-ds-btn-muted"><i class="bi bi-bookmark-plus"></i> Add Watchlist</button>';
@@ -909,7 +909,7 @@ jQ(document).on("click", "#data-load", function () {
     html += '  <a class="gtb-ds-link" target="_blank" href="https://tradingeconomics.com/stocks"><i class="bi bi-globe2"></i> World Markets</a>';
     html += '  <a class="gtb-ds-link" target="_blank" href="https://in.investing.com/indices/cboe-crude-oil-volatility-historical-data"><i class="bi bi-droplet-fill"></i> OVX</a>';
     html += '  <a class="gtb-ds-link" target="_blank" href="https://www.investing.com/indices/cboe-gold-volatitity"><i class="bi bi-stars"></i> GVZ</a>';
-    html += '  <a class="gtb-ds-link" target="_blank" href="https://in.investing.com/indices/volatility-s-p-500"><i class="bi bi-activity"></i> VIX</a>';
+    html += '  <a class="gtb-ds-link" target="_blank" href="https://in.investing.com/indices/volatility-s-p-500"><i class="bi bi-thermometer-half"></i> VIX</a>';
     html += '  <a class="gtb-ds-link" target="_blank" href="https://docs.google.com/spreadsheets/d/1mJyXOLNqSqIuDIiB1ip9-0kpNGU0pl_o/edit?gid=20807039#gid=20807039"><i class="bi bi-file-earmark-spreadsheet"></i> Past Analysis</a>';
     html += '</div>';
     html += '</div>';
@@ -1010,9 +1010,9 @@ var _allInstruments = [];
 
 // Icons used by both _buildCardStandalone and commonMarkupPlaceHolder/_buildCard
 var _instrIcons = {
-    'NIFTY 50':'bi-graph-up','NIFTY BANK':'bi-bank2','GIFT NIFTY':'bi-globe-asia-australia',
+    'NIFTY 50':'bi-graph-up','NIFTY BANK':'bi-bank2','GIFT NIFTY':'bi-globe2',
     'SENSEX':'bi-globe2','CRUDEOILM':'bi-droplet-fill','USDINR':'bi-currency-exchange',
-    'RELIANCE':'bi-fuel-pump','HDFCBANK':'bi-building','ICICIBANK':'bi-credit-card',
+    'RELIANCE':'bi-droplet-fill','HDFCBANK':'bi-building','ICICIBANK':'bi-credit-card',
 };
 
 // Builds a single instrument card HTML string usable outside commonMarkupPlaceHolder
@@ -1097,7 +1097,7 @@ function _buildCardStandalone(item) {
        + '<div class="gtb-ic-panel-body" id="' + tid + '-futacc"><div class="cmd-load"><i class="bi bi-hourglass-split"></i> Replaying 5-min candles…</div></div></div>';
 
     // Panel: fut
-    h += '<div class="gtb-ic-panel" data-col="fut"><div class="gtb-ic-panel-hdr"><span class="gtb-ic-panel-title"><i class="bi bi-graph-up-arrow"></i> FUTURES' + _ii('dv-futures') + '</span>'
+    h += '<div class="gtb-ic-panel" data-col="fut"><div class="gtb-ic-panel-hdr"><span class="gtb-ic-panel-title"><i class="bi bi-graph-up"></i> FUTURES' + _ii('dv-futures') + '</span>'
        + '<span class="gtb-ic-panel-btns"><button class="sv-icon-btn maximize-component-btn" data-name="' + name + '" data-type="futures"><i class="bi bi-fullscreen"></i></button></span></div>'
        + '<div class="gtb-ic-panel-body">'
        + '<div id="' + tid + '-futures" class="gtb-cell-fut-signals"></div>'
@@ -1175,7 +1175,7 @@ function commonMarkupPlaceHolder() {
         h += '<span class="tk-chg flat" id="gtb-chg-' + t.id + '">—</span>';
         h += '</div>';
     });
-    h += '<div class="gtb-vix-badge"><div class="vix-label"><i class="bi bi-activity"></i> VIX</div><div class="vix-val" id="gtb-vix-val">—</div><div class="vix-chg flat" id="gtb-vix-chg">—</div></div>';
+    h += '<div class="gtb-vix-badge"><div class="vix-label"><i class="bi bi-thermometer-half"></i> VIX</div><div class="vix-val" id="gtb-vix-val">—</div><div class="vix-chg flat" id="gtb-vix-chg">—</div></div>';
 
     // Funds + day P&L — pulled from /oms/margins + /oms/portfolio/positions (same
     // enctoken/same-origin pattern as the Notes tab's Kite import, no separate API app).
@@ -1253,7 +1253,7 @@ function commonMarkupPlaceHolder() {
 
     // Entry / Trade
     h += '<div class="gtb-card gtb-widget">';
-    h += '<div class="gtb-card-header"><span class="gtb-card-title"><i class="bi bi-crosshair"></i> ENTRY / TRADE' + _ii('entry') + '</span></div>';
+    h += '<div class="gtb-card-header"><span class="gtb-card-title"><i class="bi bi-record-circle"></i> ENTRY / TRADE' + _ii('entry') + '</span></div>';
     h += '<div class="gtb-card-body gtb-widget-body" style="height:100px;" id="entry-confluence-panel"></div>';
     h += '</div>';
 
@@ -1321,9 +1321,9 @@ function commonMarkupPlaceHolder() {
     h += '<div id="gtb-tab-strip">'
         // ── Tabs ─────────────────────────────────────────────────────────────
         + '<button class="gtb-tab active" data-tab="dashboard"><i class="bi bi-columns-gap"></i> Dashboard</button>'
+        + '<button class="gtb-tab" data-tab="main"><i class="bi bi-grid"></i> Overview</button>'
         + '<button class="gtb-tab" data-tab="metrics"><i class="bi bi-speedometer2"></i> Metrics</button>'
         + '<button class="gtb-tab" data-tab="lvlprob"><i class="bi bi-signpost-split-fill"></i> Level Prob</button>'
-        + '<button class="gtb-tab" data-tab="main"><i class="bi bi-grid"></i> Overview</button>'
         + '<button class="gtb-tab" data-tab="signals"><i class="bi bi-layers-fill"></i> Signals</button>'
         + '<button class="gtb-tab" data-tab="mpgex"><i class="bi bi-bar-chart-steps"></i> Max Pain</button>'
         + '<button class="gtb-tab" data-tab="analysis"><i class="bi bi-bar-chart-line-fill"></i> Analysis</button>'
@@ -1331,6 +1331,7 @@ function commonMarkupPlaceHolder() {
         + '<button class="gtb-tab" data-tab="trade"><i class="bi bi-lightning-fill"></i> Trade</button>'
         + '<button class="gtb-tab" data-tab="checklist"><i class="bi bi-clipboard-check"></i> Checklist</button>'
         + '<button class="gtb-tab" data-tab="notes"><i class="bi bi-journal-text"></i> Notes</button>'
+        + '<button class="gtb-tab" data-tab="positional"><i class="bi bi-funnel-fill"></i> Positional</button>'
         // ── Spacer ───────────────────────────────────────────────────────────
         + '<span class="gtb-tab-sep"></span>'
         // ── Tool buttons (all 15 — topbar icons + float-menu extras) ─────────
@@ -1530,7 +1531,7 @@ function commonMarkupPlaceHolder() {
         // ── [5] Futures panel ────────────────────────────────────────────────
         h += '<div class="gtb-ic-panel" data-col="fut">';
         h +=   '<div class="gtb-ic-panel-hdr">';
-        h +=     '<span class="gtb-ic-panel-title"><i class="bi bi-graph-up-arrow"></i> FUTURES</span>';
+        h +=     '<span class="gtb-ic-panel-title"><i class="bi bi-graph-up"></i> FUTURES</span>';
         h +=     '<span class="gtb-ic-panel-btns">';
         h +=       '<button class="sv-icon-btn gtb-fut-refresh-btn" data-name="' + name + '" title="Refresh futures"><i class="bi bi-arrow-clockwise"></i></button>';
         h +=       '<button class="sv-icon-btn maximize-component-btn" data-name="' + name + '" data-type="futures" title="Maximize"><i class="bi bi-fullscreen"></i></button>';
@@ -1633,7 +1634,7 @@ function commonMarkupPlaceHolder() {
     h += '<div id="NIFTY-50-nine-fifteen-close-table" class="gtb-915-table"></div>';
     h += '</div>';
     h += '<div class="gtb-detail-toggle gtb-collapse-toggle" data-target="NIFTY-50-ad-body">';
-    h += '<span><i class="bi bi-arrows-collapse-vertical"></i> A/D</span>';
+    h += '<span><i class="bi bi-arrow-down-up"></i> A/D</span>';
     h += '<span class="hdr-actions"><button class="sv-icon-btn refresh-advance-decline" data-name="NIFTY 50" title="Spot A/D"><i class="bi bi-arrow-clockwise"></i> S</button><button class="sv-icon-btn refresh-advance-decline-futures" data-name="NIFTY 50" title="Futures A/D"><i class="bi bi-arrow-clockwise"></i> F</button><i class="bi bi-chevron-down gtb-caret"></i></span></div>';
     h += '<div id="NIFTY-50-ad-body" class="gtb-collapse-body">';
     h += '<div class="gtb-ad-label">SPOT <span id="NIFTY-50-advance-decline-adr" class="gtb-adr-val"></span></div>';
@@ -1654,7 +1655,7 @@ function commonMarkupPlaceHolder() {
     h += '<div id="NIFTY-BANK-nine-fifteen-close-table" class="gtb-915-table"></div>';
     h += '</div>';
     h += '<div class="gtb-detail-toggle gtb-collapse-toggle" data-target="NIFTY-BANK-ad-body">';
-    h += '<span><i class="bi bi-arrows-collapse-vertical"></i> A/D</span>';
+    h += '<span><i class="bi bi-arrow-down-up"></i> A/D</span>';
     h += '<span class="hdr-actions"><button class="sv-icon-btn refresh-advance-decline" data-name="NIFTY BANK" title="Spot A/D"><i class="bi bi-arrow-clockwise"></i> S</button><button class="sv-icon-btn refresh-advance-decline-futures" data-name="NIFTY BANK" title="Futures A/D"><i class="bi bi-arrow-clockwise"></i> F</button><i class="bi bi-chevron-down gtb-caret"></i></span></div>';
     h += '<div id="NIFTY-BANK-ad-body" class="gtb-collapse-body">';
     h += '<div class="gtb-ad-label">SPOT <span id="NIFTY-BANK-advance-decline-adr" class="gtb-adr-val"></span></div>';
@@ -1720,6 +1721,7 @@ function commonMarkupPlaceHolder() {
     h += '<div id="gtb-pane-trade"     class="gtb-tab-pane" style="display:none;overflow:hidden;padding:0;"></div>';
     h += '<div id="gtb-pane-checklist" class="gtb-tab-pane" style="display:none;overflow-y:auto;padding:0;"></div>';
     h += '<div id="gtb-pane-notes" class="gtb-tab-pane" style="display:none;overflow-y:auto;padding:0;"></div>';
+    h += '<div id="gtb-pane-positional" class="gtb-tab-pane" style="display:none;overflow:hidden;padding:0;"></div>';
 
     h += '</div>'; // end #gtb-right
 
@@ -1888,6 +1890,10 @@ var _GTB_PANE_GRIDS = {
     checklist: function() { return ''; },
     // Notes tab: rendered by _gtbRenderNotesPane
     notes: function() { return ''; },
+    // Positional tab: manages its own DOM (positionalScreener.js) — return null so
+    // _gtbRenderPane skips the wipe, same pattern 'trade'/'dashboard' use above; without
+    // this, switching away and back would reset the chip selection and any scan in progress.
+    positional: function() { return null; },
 };
 
 var _GTB_PANE_RENDERS = {
@@ -1911,7 +1917,8 @@ var _GTB_PANE_RENDERS = {
         }
     }],
     checklist: [function(){try{_gtbRenderChecklistPane();}catch(e){}}],
-    notes:     [function(){try{_gtbRenderNotesPane();}catch(e){}}]
+    notes:     [function(){try{_gtbRenderNotesPane();}catch(e){}}],
+    positional: [function(){try{_psRenderInPane();}catch(e){}}],
 };
 
 // ── Signals tab: 3-column layout ─────────────────────────────────────────────
@@ -1948,7 +1955,7 @@ function _gtbSignalsPaneHtml() {
         + '<div id="gtb-sig-iv-wrap">'
         +   '<div style="padding:4px 8px 0;">'
         +     '<div class="gtb-sig-hdr" style="margin-bottom:4px;">'
-        +       '<i class="bi bi-activity"></i> IV &amp; OI SIGNALS'
+        +       '<i class="bi bi-thermometer-half"></i> IV &amp; OI SIGNALS'
         +       '<button class="gtb-sig-hdr-btn" id="gtb-sig-iv-reload" style="margin-left:auto;"><i class="bi bi-arrow-clockwise"></i> Reload</button>'
         +     '</div>'
         +   '</div>'
@@ -5165,7 +5172,7 @@ async function _gtbShowHistoricalReplay() {
                     futBody += '<div style="font-size:0.36rem;color:var(--gtb-amber);margin-top:7px;">Option OI — strikes not found</div>';
                 }
             }
-            h += _panel('bi bi-graph-up-arrow', 'Futures & OI', futBody, 160);
+            h += _panel('bi bi-graph-up', 'Futures & OI', futBody, 160);
 
             // [D] OI Matrix per strike (NIFTY)
             if (oiMat && oiMat.nifty && Object.keys(oiMat.nifty).length) {
@@ -6134,7 +6141,7 @@ async function _gtbLoadInstrDetail(name) {
     // ── [6] Futures ──────────────────────────────────────────────────────────
     h += '<div class="gtb-ic-panel" data-col="fut">';
     h +=   '<div class="gtb-ic-panel-hdr">';
-    h +=     '<span class="gtb-ic-panel-title"><i class="bi bi-graph-up-arrow"></i> FUTURES</span>';
+    h +=     '<span class="gtb-ic-panel-title"><i class="bi bi-graph-up"></i> FUTURES</span>';
     h +=     '<span class="gtb-ic-panel-btns">';
     h +=       '<button class="sv-icon-btn gtb-fut-refresh-btn" data-name="' + name + '" title="Refresh futures"><i class="bi bi-arrow-clockwise"></i></button>';
     h +=       '<button class="sv-icon-btn maximize-component-btn" data-name="' + name + '" data-type="futures" title="Maximize"><i class="bi bi-fullscreen"></i></button>';
@@ -6275,7 +6282,7 @@ function _gtbLoadInstrDetailPanel(name) {
 
     h += '<div class="gtb-ic-panel" data-col="fut">';
     h +=   '<div class="gtb-ic-panel-hdr">';
-    h +=     '<span class="gtb-ic-panel-title"><i class="bi bi-graph-up-arrow"></i> FUTURES</span>';
+    h +=     '<span class="gtb-ic-panel-title"><i class="bi bi-graph-up"></i> FUTURES</span>';
     h +=     '<span class="gtb-ic-panel-btns"><button class="sv-icon-btn maximize-component-btn" data-name="' + name + '" data-type="futures" title="Maximize"><i class="bi bi-fullscreen"></i></button></span>';
     h +=   '</div>';
     h +=   '<div class="gtb-ic-panel-body">';
@@ -6536,7 +6543,7 @@ function _gtbCreateInstrDetailPopup() {
         + allPicks.map(function(p) { return '<button class="fsig-pick" data-name="' + p + '">' + p + '</button>'; }).join('')
         + '</div>'
         + '<button id="fsig-load-selected" class="fsig-load-sel-btn" title="Load all selected"><i class="bi bi-layers-fill"></i> Load Selected (<span id="fsig-sel-count">0</span>)</button>'
-        + '<button id="fsig-clear-all" class="fsig-clear-btn" title="Clear all"><i class="bi bi-trash3"></i></button>'
+        + '<button id="fsig-clear-all" class="fsig-clear-btn" title="Clear all"><i class="bi bi-trash-fill"></i></button>'
         + '</div>'
         + '<div id="fsig-multi-row" class="fsig-multi-row"></div>'
         + '</div>';
@@ -7151,7 +7158,7 @@ function setScore() {
         // PCR badge
         if (cf.pcr && cf.pcr !== 1) {
             let pcrCls = cf.pcr > 1.3 ? '#4ade80' : cf.pcr < 0.7 ? '#f87171' : '#94a3b8';
-            cfHtml += '<div style="font-size:0.6rem;font-weight:700;color:' + pcrCls + ';margin-bottom:4px;"><i class="bi bi-activity"></i> PCR ' + parseFloat(cf.pcr).toFixed(2) + '</div>';
+            cfHtml += '<div style="font-size:0.6rem;font-weight:700;color:' + pcrCls + ';margin-bottom:4px;"><i class="bi bi-thermometer-half"></i> PCR ' + parseFloat(cf.pcr).toFixed(2) + '</div>';
         }
 
         jQ("#entry-confluence-panel").html(cfHtml);
@@ -8369,6 +8376,18 @@ jQ(document).on("click", ".refresh-stock-list", function () {
 // ── Section info popovers ─────────────────────────────────────────────────────
 // Each key maps to a short explanation shown when its (i) icon is clicked.
 var GTB_INFO = {
+    'ps-overview': { icon:'bi-funnel-fill', title:'Positional Screener — how it works',
+        body:'Swing-trade screener on <b>daily</b> candles (not the 5-min intraday series every other tool here uses). Scores four independent signals per instrument: <b>Trend</b> (LTP vs SMA20 vs SMA50, &times;2) &middot; <b>20-day Breakout/Breakdown</b> (today\'s close vs the prior 20-day high/low, &times;1.5) &middot; <b>Relative Strength</b> (the stock\'s own 20-day % change minus NIFTY 50\'s, &times;1 — ranks movers against the market, not in absolute terms) &middot; <b>Futures OI buildup</b> (OI + price direction over ~5 trading days on daily FUT candles, &times;1.5).'
+            + '<br><br>Composite total &rarr; verdict: <b style="color:var(--gtb-green)">STRONG BUY &ge; 3</b>, <b style="color:var(--gtb-green)">BUY &ge; 1.5</b>, <b style="color:var(--gtb-red)">STRONG SELL &le; &minus;3</b>, <b style="color:var(--gtb-red)">SELL &le; &minus;1.5</b>, otherwise <b>WATCH</b>.'
+            + '<br><br>This is a first-pass model with no historical validation behind the weights/thresholds yet — treat the verdict as a starting lean, not a proven edge, and recalibrate once you\'ve watched it run for a while.' },
+    'ps-signals': { icon:'bi-graph-up', title:'Trend / Breakout / Rel. Strength / Futures OI columns',
+        body:'<b>Trend</b>: UPTREND = LTP &gt; SMA20 &gt; SMA50, DOWNTREND = the reverse, else SIDEWAYS.'
+            + '<br><b>Breakout</b>: today\'s close at/above the prior 20-day high = breakout; at/below the prior 20-day low = breakdown; otherwise inside range.'
+            + '<br><b>Rel. Strength</b>: this stock\'s 20-day % change minus NIFTY 50\'s over the same window — positive means it\'s outperforming the index, not just rising.'
+            + '<br><b>Futures OI (5d)</b>: classic price/OI quadrant on daily FUT candles — OI&uarr;+price&uarr; = LONG BUILDUP, OI&uarr;+price&darr; = SHORT BUILDUP, OI&darr;+price&uarr; = SHORT COVERING, OI&darr;+price&darr; = LONG UNWINDING. Reads NO FUT TOKEN / FETCH EMPTY / TOO FEW CANDLES when the futures data itself couldn\'t be resolved — check the browser console for which, and consider running Data Load\'s Kite Instruments sync if the futures contract list looks stale.' },
+    'ps-tradeplan': { icon:'bi-journal-check', title:'Entry / Target / Stop / R:R',
+        body:'Derived from the SAME daily levels the score already computed (SMA20, 20-day high/low) — not a separate data source. <b>Entry</b> = current LTP. <b>Target</b> = LTP &plusmn; 75% of the 20-day high&ndash;low range, in the trade\'s direction (a measured-move projection). <b>Stop</b>: for a BUY, the tighter of SMA20 or the 20-day low; for a SELL, the wider of SMA20 or the 20-day high. <b>R:R</b> = reward divided by risk from those three levels.'
+            + '<br><br>The (i) icon per row spells out the exact exit rule (a daily close through SMA20 or the opposite range boundary, whichever comes first). This is a starting structural framework, not a backtested exit system — size and adjust with your own risk rules.' },
     deadzone:     { icon:'bi-dash-circle-dotted', title:'Dead Zone (D&darr; / D&uarr;)',
         body:'Two dashed purple lines marking a price band where futures + OI/OBV + price-action signals disagree or are too weak for real conviction — price is expected to stay range-bound inside this band until it actually breaks it. Bounded by the nearest OI-wall support/resistance (S1/R1, ranked by OBV pressure) when available, else the 9:15 BSO/ASO band. Only drawn when the instrument\'s composite score (<code>computeInstrumentScore().total</code>) is inside &plusmn;3 — once there\'s real conviction, there\'s no dead zone to mark; trust the breakout normally. Read it as: wait for price to actually close through D&uarr;/D&darr; before trading the move.' },
     'cmd-crude-score': { icon:'bi-speedometer2', title:'Crude Score Gauge',
@@ -8386,7 +8405,7 @@ var GTB_INFO = {
         body:'Each sub-score (9:15, Adv/Dec, Futures, OI/OBV, Component) is shown as a range bar spanning its min/max. The needle shows the live value. The bottom verdict (LONG / WAIT / SHORT) is based on the composite score: <b style="color:#3fb950">LONG ≥ 4</b>, <b style="color:#f85149">SHORT ≤ −4</b>, otherwise WAIT (symmetric, recalibrated v26.31). Bar segments: red (bearish) → yellow (neutral) → green (bullish).' },
     signal:       { icon:'bi-lightning-charge', title:'Trade Signal',
         body:'The final call — STRONG BUY  *  BUY  *  WAIT  *  SELL  *  STRONG SELL  *  NO TRADE — derived from the composite score combined with VIX, any futures conflict, and the 9:15 candle pattern. The sub-line gives the suggested entry level (e.g. "at BSO/BST for long").' },
-    entry:        { icon:'bi-crosshair',        title:'Entry / Trade',
+    entry:        { icon:'bi-record-circle',        title:'Entry / Trade',
         body:'Entry-confluence panel: how strongly 9:15, current trend, futures and OI agree, and the resulting bullish/bearish tilt that supports an entry here.' },
     pillars:      { icon:'bi-bar-chart-steps',  title:'Pillars',
         body:'The individual scoring pillars and each one contribution to the total: 9:15 close, advance/decline, futures trend, OI/OBV, and the weighted index components.' },
@@ -8399,7 +8418,7 @@ var GTB_INFO = {
            + 'The <b>Lead</b> and <b>Lag</b> columns split the total: <b style="color:var(--gtb-green)">Lead</b> = 9:15 + Advance/Decline + Futures — fast signals that reflect the <i>current</i> session; <b>Lag</b> = OI/OBV + Component — computed from the prior candle batch, so they trail by minutes. When Lead and Lag <b>diverge</b> (e.g. Lead turns bearish while Lag is still positive), the leading signals are usually right and the score is about to catch down — this is the same idea the master signal uses to override a stale score.' },
     verdict:      { icon:'bi-flag-fill',        title:'Market Verdict',
         body:'The headline market call with a one-line reason. It blends the composite score, VIX state and the 9:15 pattern into a plain-English verdict.' },
-    compscore:    { icon:'bi-123',              title:'Composite Score',
+    compscore:    { icon:'bi-calculator',              title:'Composite Score',
         body:'The total score number (−40…+40). The further from zero, the stronger the directional confluence. Positive = bullish, negative = bearish.' },
     breadth:      { icon:'bi-distribute-horizontal', title:'Instrument Breadth',
         body:'Of the 9 tracked instruments (GIFT NIFTY, NIFTY 50, NIFTY BANK, SENSEX, CRUDEOILM, USDINR, RELIANCE, HDFCBANK, ICICIBANK), how many are net-bullish ▲ vs net-bearish ▼ by their own composite score. The bar shows the split.' },
@@ -8434,7 +8453,7 @@ var GTB_INFO = {
         body:'All 9 instruments ranked by <b>% change from today\'s open</b>, best performer at top. The horizontal bar length reflects the magnitude. Use this to spot which instruments are leading or lagging the move intraday.' },
     'bt-breadth': { icon:'bi-distribute-horizontal', title:'Market Breadth',
         body:'Breadth of the F&O stock universe (NIFTY 50 + BANK NIFTY weighted constituents). Top gauge: <b style="color:#3fb950">green = above open</b>, <b style="color:#f85149">red = below open</b>. Below: how many are in ASO/BSO strike zone (computed via <code>computeInstrumentScore</code>). A strong green skew with high ASO count = broad bullish participation.' },
-    'bt-vix':     { icon:'bi-activity',         title:'VIX Regime',
+    'bt-vix':     { icon:'bi-thermometer-half',         title:'VIX Regime',
         body:'India VIX with a colour-coded regime label: <b style="color:#3fb950">LOW &lt;13</b> (trend days, tight spreads), <b style="color:#fbbf24">NORMAL 13–18</b>, <b style="color:#f97316">ELEVATED 18–25</b> (wider swings, use wider SL), <b style="color:#f85149">HIGH &gt;25</b> (whipsaw risk, reduce size). Gauge needle shows current VIX. VIXL/VIXU are the NIFTY 50 expected daily range limits derived from VIX.' },
     'bt-flow':    { icon:'bi-arrows-collapse',  title:'Options Flow',
         body:'For each instrument with OI data, shows the <b>net Change-OI</b> in CE and PE. <b style="color:#f85149">CE bar red</b> = CE OI is being added (put writers on the other side = bullish for CE writers, bearish for CE buyers). <b style="color:#3fb950">PE bar green</b> = PE OI is being added (premium collected = bearish for index). Interpret: heavy PE writing with light CE writing = bulls selling puts = net bullish bias.' },
@@ -8465,7 +8484,7 @@ var GTB_INFO = {
            + 'The outer bands (AST/BST, and especially VIXU/VIXL) require progressively stronger conviction to light up, and VIXU/VIXL are additionally damped by how much of today\'s expected VIX range is already used up. These are <b>reasoned live estimates, not statistically fitted probabilities</b> — use as a likelihood ranking between levels, not a precise %.' },
     'dv-futacc': { icon:'bi-bullseye', title:'Futures Remark Accuracy',
         body:'Replays today\'s 5-min futures candles and checks, for each REMARK category this instrument\'s own futures contract produced (LONG/SHORT/SHOT_COVERING/LONG_UNWINDING/etc.), how often the next candle actually moved the direction that REMARK implied. <b>Win-rate</b> = % of times it was right; <b>Avg pts</b> = average next-candle move (signed). Rows with <8 samples are dimmed (not enough data yet); a ★ marks a REMARK that\'s both frequent (≥8 samples) and reliable (≥60% win-rate, positive avg pts) for THIS instrument today — not a guarantee, just today\'s reconstructed track record.' },
-    'dv-futures': { icon:'bi-graph-up-arrow', title:'Futures',
+    'dv-futures': { icon:'bi-graph-up', title:'Futures',
         body:'Futures positioning for this instrument: <b>Primary chip</b> = OI-based REMARK (Long Buildup / Short Buildup / Short Covering / Long Unwinding etc.) colour-coded green/red. <b>Secondary chip</b> = VWAP direction — amber with ⚠ when the two signals conflict. Also shows: VWAP, PCR, premium/discount vs spot, and 5-min OI trend.' },
     'dv-oimatrix':{ icon:'bi-table', title:'OI Matrix',
         body:'Mini option-chain centred on ATM ± 2 strikes. Each row: <b>CE ΔOI</b> | signal | strike | signal | <b>PE ΔOI</b>. Signals: <span style="color:#3fb950">Long Buildup / Short Covering</span> = bullish, <span style="color:#f85149">Short Buildup / Long Unwinding</span> = bearish. The max CE/PE OI walls (support/resistance) and PCR are shown at the bottom. Label turns "live" after data loads.' },
@@ -8534,7 +8553,7 @@ var GTB_INFO = {
         body:'This stock\'s free-float market-cap weight in the parent index (NIFTY 50 / BANK NIFTY), from the weighted-constituent maps. A high-weight stock moves the index a lot even on a modest price change; a low-weight stock barely moves it even on a big price change — this is why "Index Impact", not price change or OI score alone, tells you who is actually driving the index.' },
     'sig-oi-chg':    { icon:'bi-arrow-left-right', title:'Price Change %',
         body:'This stock\'s own live price change vs previous close — independent of the index. Compare against "Index Impact" to see how much of that move actually reaches the index once weight is applied.' },
-    'sig-oi-impact': { icon:'bi-graph-up-arrow', title:'Index Impact',
+    'sig-oi-impact': { icon:'bi-graph-up', title:'Index Impact',
         body:'<b>Weight% × Price Change% ÷ 100</b> — this stock\'s approximate contribution to the parent index\'s move, in index percentage-points. This is the number that answers "who is really driving the rally?" — a stock can have a strong OI score or a big price move and still contribute almost nothing if its index weight is small, while a heavy-weight stock with a modest move can dominate. Sort by Impact to rank constituents by actual influence rather than by raw score or price change.' },
     'sig-oi-verdict': { icon:'bi-check-circle-fill', title:'Verdict — Driving / Contributing / Negligible',
         body:'Tiered from each stock\'s share of <b>total |Index Impact|</b> in the group, ranked by impact magnitude (always — regardless of which sort mode you\'re viewing):<br><br>'
@@ -8559,7 +8578,7 @@ var GTB_INFO = {
     'sig-oi-itm':    { icon:'bi-shield-slash', title:'ITM Discount — (ITM) tag',
         body:'Below spot, CE strikes are <b>In-The-Money</b>; above spot, PE strikes are ITM. ITM option flow is structurally lower-conviction than OTM — it\'s often rollover activity or existing hedges being adjusted, not fresh directional positioning (the real positioning happens OTM, where options are cheap and liquid).<br><br>'
            + 'This shows up two ways: <b>visually</b> — ITM bars/labels are dimmed (further faded if the side is also COV/UNWIND), and ITM strikes are excluded from wall candidacy entirely (see the Walls info). <b>Numerically</b> — an ITM strike\'s contribution to the composite OI/OBV score is halved (the same half-weight discount already used when IV disagrees with OBV), so an ITM CE WRITE sitting below a rising spot no longer drags the composite as hard as a genuine OTM CE WRITE actually resisting the rally.' },
-    'sig-oi-atm':    { icon:'bi-crosshair', title:'ATM Strike',
+    'sig-oi-atm':    { icon:'bi-record-circle', title:'ATM Strike',
         body:'The At-The-Money strike — the option strike closest to the current spot price. The score inside the cell is the sum of CE and PE OI signals at this exact strike. <b style="color:#3fb950">Positive</b> = PE OI being added or CE OI being removed at ATM (bullish). <b style="color:#f85149">Negative</b> = CE OI being added or PE OI being removed (bearish). The ATM strike carries the highest gamma and is the most sensitive to spot movement — watch it closely. Hover the cell for CE/PE signal labels.' },
     'sig-oi-wing':   { icon:'bi-distribute-horizontal', title:'Wing Strikes (ATM±1, ATM±2)',
         body:'Strikes one and two steps away from ATM. Each cell score combines CE and PE OI signals at that strike: <b style="color:#3fb950">green = net bullish OI activity</b> (put writing / call unwinding), <b style="color:#f85149">red = net bearish OI activity</b> (call writing / put unwinding). How to read the pattern:<br><br>'
@@ -8574,9 +8593,9 @@ var GTB_INFO = {
         body:'The strike price at which the total financial loss for all option writers (both CE and PE combined) is the smallest. Near expiry, markets tend to gravitate toward this level because it minimises the payout to option buyers. A large cluster of OI at a strike creates magnetic pull on the spot price.' },
     'mp-col-distance': { icon:'bi-arrows-expand', title:'Distance',
         body:'Spot minus Max Pain, shown as points and %. <b style="color:#3fb950">Positive (+)</b> = spot is above Max Pain — bearish gravity, market may drift down toward Max Pain into expiry. <b style="color:#f85149">Negative (−)</b> = spot is below Max Pain — bullish gravity, market may drift up. The further the distance, the stronger the pull. Small distance (&lt; 0.3%) = spot is near max-pain equilibrium.' },
-    'mp-col-netgex':   { icon:'bi-graph-up-arrow', title:'Net GEX',
+    'mp-col-netgex':   { icon:'bi-graph-up', title:'Net GEX',
         body:'Net Gamma Exposure = Σ (gamma × OI × lot-size) across all strikes, CE minus PE. <b style="color:#3fb950">Positive GEX</b>: market makers are net long gamma — they buy dips and sell rallies to delta-hedge, acting as a natural stabiliser (range-bound action). <b style="color:#f85149">Negative GEX</b>: market makers are net short gamma — they must chase the move to hedge, amplifying trends and causing sharp directional swings. The magnitude indicates how strong this effect is.' },
-    'mp-col-regime':   { icon:'bi-shield-half', title:'GEX Regime',
+    'mp-col-regime':   { icon:'bi-shield-fill-check', title:'GEX Regime',
         body:'A label derived from Net GEX. <b style="color:#3fb950">Stabilising</b> (positive GEX): dealers act as shock absorbers — expect chop, mean reversion, and tight intraday ranges. Good for iron condors and short-premium strategies. <b style="color:#f85149">Trending</b> (negative GEX): dealers amplify moves — expect breakouts, momentum runs, and wider intraday ranges. Good for directional CE/PE buying.' },
     'mp-col-outcome':  { icon:'bi-flag-fill', title:'Outcome',
         body:'A synthesised verdict combining Max Pain pull direction, GEX regime, and proximity to flip zones. Five possible verdicts:<br><br>'
@@ -8600,7 +8619,7 @@ var GTB_INFO = {
     // ── Results Calendar ─────────────────────────────────────────────────────────
     'rc-revenue': { icon:'bi-cash-stack', title:'Revenue / Net Sales',
         body:'Total income / net sales for the reported quarter in ₹ Crore. For banks this is Net Interest Income + Other Income. Sourced from NSE financial results.' },
-    'rc-profit':  { icon:'bi-graph-up-arrow', title:'Net Profit (PAT)',
+    'rc-profit':  { icon:'bi-graph-up', title:'Net Profit (PAT)',
         body:'Profit After Tax for the reported quarter in ₹ Crore. A positive value (green) means the company was profitable; negative (red) means a loss. This is the primary metric for the Outcome verdict.' },
     'rc-yoy':     { icon:'bi-arrow-up-right-circle', title:'Revenue YoY %',
         body:'Year-on-year percentage change in Revenue vs the same quarter last year. Positive = growing revenue. Note: NSE may not always provide prior-year comparisons in the summary API — click + to fetch full quarterly history.' },
@@ -8711,13 +8730,13 @@ jQ(document).on('click', function(e) {
 
 function showNotes() {
     var items = [
-        { i:'bi-1-circle-fill',    t:'9:15 breakout count',  d:'Read the number of ASO/BSO and the 9:15 ASO/BSO together — that combo sets the days bias.' },
+        { i:'bi-hash',    t:'9:15 breakout count',  d:'Read the number of ASO/BSO and the 9:15 ASO/BSO together — that combo sets the days bias.' },
         { i:'bi-arrow-up-circle',  t:'2 ASO',               d:'Two ASO = strong uptrend.' },
         { i:'bi-arrow-down-circle',t:'2 BSO',               d:'Two BSO = strong downtrend.' },
         { i:'bi-dash-circle',      t:'Sensex weighting',    d:'Sensex ASO/BSO does not carry much weight — do not over-rely on it.' },
         { i:'bi-building',         t:'Heavyweights',        d:'Always check RELIANCE and HDFC BANK — they move the index.' },
         { i:'bi-bar-chart-fill',   t:'OI / OBV',            d:'Confirm with the OI/OBV read (support vs resistance walls).' },
-        { i:'bi-activity',         t:'VIX direction',       d:'Check VIX −ve/+ve and whether price is inside the VIX range.' },
+        { i:'bi-thermometer-half',         t:'VIX direction',       d:'Check VIX −ve/+ve and whether price is inside the VIX range.' },
         { i:'bi-distribute-horizontal', t:'ADR',            d:'Check advance/decline breadth across constituents.' },
         { i:'bi-droplet-fill',     t:'Crude oil',           d:'Check CRUDE OIL for risk-on/off cues.' },
         { i:'bi-graph-up',   t:'Futures trend',       d:'Check the futures trend for positioning.' },
@@ -9273,7 +9292,7 @@ jQ(document).on('click', '.gtb-day-chart-btn', async function (e) {
     e.preventDefault(); e.stopPropagation();
     var date = jQ(this).data('date');
     var ov = _gtbDayChartPopup();
-    ov.find('.gtb-daychart-title').html('<i class="bi bi-candlestick"></i> NIFTY 50 &amp; BANK NIFTY — ' + moment(date).format('ddd, DD MMM YYYY'));
+    ov.find('.gtb-daychart-title').html('<i class="bi bi-bar-chart-fill"></i> NIFTY 50 &amp; BANK NIFTY — ' + moment(date).format('ddd, DD MMM YYYY'));
     ov.find('#gtb-daychart-body').html(
         '<div class="gtb-daychart-pair">'
         + '<div><div class="aoi-chart-t">NIFTY 50</div><div id="gtb-daychart-n50" style="width:100%;height:340px;"></div></div>'
@@ -10151,6 +10170,114 @@ function _gtbWallAt(walls, i) {
     return null;
 }
 
+// ── Wall-BUILDING detection (leading, not lagging) ──────────────────────────
+// _gtbFindWalls only sees the CURRENT snapshot — by the time a strike shows
+// strongly negative PE OBV + positive PE OI (support) or negative CE OBV + positive
+// CE OI (resistance), price has usually already reacted and moved off the level.
+// This looks at OBV *velocity* instead — CE_OBV/PE_OBV already carry the full
+// intraday per-candle cumulative series (see calculateOBVFiveMinutesInterval), so
+// "is this wall being built RIGHT NOW" is just comparing the latest value against
+// N candles ago, no new fetch needed. Fires while price is still approaching a
+// strike, not only once it's already bounced off it.
+//
+// tableData: same shape _gtbFindWalls takes. lookback: candles back to diff against
+// (default 3 ≈ 15 min on a 5-min series). multiplier: how many times a strike's own
+// RECENT typical lookback-window swing the current velocity must exceed to count as a
+// real buildup rather than noise (default 2×) — deliberately relative, not a fixed
+// absolute number: OBV magnitude varies hugely by stock/strike liquidity, so a fixed
+// threshold (tried first) would flag routine noise on a liquid name while never firing
+// on a thinly-traded one. Returns { building: [...] }, each entry
+// { strike, side: 'R'|'S', velocity, baseline, multiple }, ranked by |velocity| descending.
+// Shared by _gtbWallVelocity (building) and _gtbWallErosion (weakening) below — velocity
+// over the most recent `lookback` candles, plus a baseline = average of the same
+// lookback-window swing size across the BASELINE_SAMPLES windows just before it. Both
+// functions judge a strike's current OBV move against ITS OWN recent typical pace
+// (relative), not a fixed absolute number — OBV magnitude varies hugely by stock/strike
+// liquidity, so a fixed threshold flags routine noise on a liquid name while never
+// firing on a thinly-traded one.
+var _GTB_OBV_BASELINE_SAMPLES = 8;
+function _gtbObvVelocityInfo(arr, lookback) {
+    if (!arr || arr.length <= lookback) return null;
+    var now = parseFloat(arr[arr.length - 1].obv) || 0;
+    var prev = parseFloat(arr[arr.length - 1 - lookback].obv) || 0;
+    var velocity = now - prev;
+
+    var samples = [];
+    for (var k = 1; k <= _GTB_OBV_BASELINE_SAMPLES; k++) {
+        var endIdx = arr.length - 1 - k, startIdx = endIdx - lookback;
+        if (startIdx < 0) break;
+        samples.push(Math.abs((parseFloat(arr[endIdx].obv) || 0) - (parseFloat(arr[startIdx].obv) || 0)));
+    }
+    // Floor of 1 (same lakh-unit scale as OBV) so a strike with a completely flat/empty
+    // history doesn't get flagged by any tiny nonzero move (baseline 0 × multiplier = 0).
+    var baseline = Math.max(1, samples.length ? samples.reduce(function (a, b) { return a + b; }, 0) / samples.length : 1);
+    return { velocity: velocity, baseline: baseline };
+}
+
+function _gtbWallVelocity(tableData, spot, lookback, multiplier) {
+    lookback = lookback || 3;
+    multiplier = multiplier || 2;
+
+    var out = [];
+    (tableData || []).forEach(function (item) {
+        var strike = parseFloat(item['STRIKE']);
+        var ceArr = item['CE_OBV'], peArr = item['PE_OBV'];
+
+        // CE writers accelerating at an OTM strike above spot = resistance forming
+        if (!_gtbIsITM('CE', strike, spot)) {
+            var ceInfo = _gtbObvVelocityInfo(ceArr, lookback);
+            if (ceInfo && ceInfo.velocity < 0 && Math.abs(ceInfo.velocity) >= ceInfo.baseline * multiplier) {
+                out.push({ strike: strike, side: 'R', velocity: ceInfo.velocity, baseline: ceInfo.baseline, multiple: Math.abs(ceInfo.velocity) / ceInfo.baseline });
+            }
+        }
+        // PE writers accelerating at an OTM strike below spot = support forming
+        if (!_gtbIsITM('PE', strike, spot)) {
+            var peInfo = _gtbObvVelocityInfo(peArr, lookback);
+            if (peInfo && peInfo.velocity < 0 && Math.abs(peInfo.velocity) >= peInfo.baseline * multiplier) {
+                out.push({ strike: strike, side: 'S', velocity: peInfo.velocity, baseline: peInfo.baseline, multiple: Math.abs(peInfo.velocity) / peInfo.baseline });
+            }
+        }
+    });
+    out.sort(function (a, b) { return Math.abs(b.velocity) - Math.abs(a.velocity); });
+    return { building: out };
+}
+
+// ── Wall-WEAKENING detection (inverse of building) ──────────────────────────
+// A wall shown as R1/S1/R2/S2 reflects OI/OBV as of the LAST refresh — it says nothing
+// about whether the writers behind it are still defending it or already covering as
+// price approaches. Real example that prompted this: NIFTY 50 showed a genuine S2
+// support at 24250 (ranked, not fabricated) and price still fell straight through it —
+// most likely because PE writers started unwinding (buying back) as price got close,
+// which a static snapshot can't show. This only checks strikes _gtbFindWalls has
+// ALREADY ranked as a wall (unlike _gtbWallVelocity, which scans every strike for NEW
+// buildup) — erosion is specifically "is this EXISTING wall losing its grip." A positive
+// OBV velocity at a resistance strike (CE premium being bid up, i.e. bought back) or at
+// a support strike (PE premium being bid up) means the side that built the wall is now
+// unwinding, exceeding their own recent typical pace by `multiplier`×.
+// Returns { eroding: [...] }, each entry { strike, side: 'R'|'S', tier, velocity,
+// baseline, multiple }, ranked by |velocity| descending.
+function _gtbWallErosion(tableData, wallsArg, lookback, multiplier) {
+    lookback = lookback || 3;
+    multiplier = multiplier || 2;
+    var out = [];
+
+    function _check(wallList, side, arrField) {
+        (wallList || []).forEach(function (w) {
+            var item = tableData[w.index];
+            if (!item) return;
+            var info = _gtbObvVelocityInfo(item[arrField], lookback);
+            if (info && info.velocity > 0 && info.velocity >= info.baseline * multiplier) {
+                out.push({ strike: w.strike, side: side, tier: w.tier, velocity: info.velocity, baseline: info.baseline, multiple: info.velocity / info.baseline });
+            }
+        });
+    }
+    _check(wallsArg && wallsArg.resistance, 'R', 'CE_OBV');
+    _check(wallsArg && wallsArg.support, 'S', 'PE_OBV');
+
+    out.sort(function (a, b) { return Math.abs(b.velocity) - Math.abs(a.velocity); });
+    return { eroding: out };
+}
+
 // ── Commodities popup — GIFT NIFTY + Crude (chart, OI, futures) ────────────────
 // Renders OI/OBV bar charts into the given containers from cached oiData. Each bar is
 // tinted per-strike: solid = WRITE/BUY (new positions opening, full weight in the score),
@@ -10239,7 +10366,7 @@ function _cmdTrendProb(name, fres) {
             futDetail = 'Cached futures score: '+futScore;
         }} catch(e) {}
     }
-    signals.push({ key:'fut', label:'Futures', icon:'bi-graph-up-arrow', dir:futDir, weight:3, strength:Math.min(1,Math.abs(futScore)), detail:futDetail, value:futLabel });
+    signals.push({ key:'fut', label:'Futures', icon:'bi-graph-up', dir:futDir, weight:3, strength:Math.min(1,Math.abs(futScore)), detail:futDetail, value:futLabel });
 
     // 3. OI/OBV
     var oiScore = 0, oiDir = 'neutral', oiLabel = '--';
@@ -10271,7 +10398,7 @@ function _cmdTrendProb(name, fres) {
         try { vix = parseFloat((_btLtps()['INDIA VIX']||{}).ltp)||0; } catch(e) {}
     }
     var vixMod = vix<13?1.15:vix<18?1.0:vix<25?0.85:0.65;
-    signals.push({ key:'vix', label:vixLabel, icon:'bi-activity', dir:'neutral', weight:0, strength:0, detail:vixLabel+' '+(vix?vix.toFixed(1):'--'), value:vix?vix.toFixed(1):'--', isVix:true, vixMod:vixMod });
+    signals.push({ key:'vix', label:vixLabel, icon:'bi-thermometer-half', dir:'neutral', weight:0, strength:0, detail:vixLabel+' '+(vix?vix.toFixed(1):'--'), value:vix?vix.toFixed(1):'--', isVix:true, vixMod:vixMod });
 
     // Aggregate
     var bW=0, rW=0;
@@ -10859,7 +10986,7 @@ jQ(document).on('click', '#show-commodities', function (e) {
         + '<div class="cmd-twin-grid">'
         // Left: GIFT NIFTY
         +   '<div class="cmd-twin-col">'
-        +     '<div class="cmd-col-hdr"><i class="bi bi-globe-asia-australia"></i> GIFT NIFTY</div>'
+        +     '<div class="cmd-col-hdr"><i class="bi bi-globe2"></i> GIFT NIFTY</div>'
         +     '<div id="cmd-gift-levels" class="gtb-chart-levels" style="min-height:22px;"></div>'
         +     '<div id="cmd-gift-chart"  style="height:180px;"></div>'
         +     '<div class="cmd-fut-prob-cell" style="margin-top:8px;"><div id="cmd-gift-prob"></div></div>'
@@ -10912,7 +11039,7 @@ jQ(document).on('click', '#show-commodities', function (e) {
         +     '<div id="cmd-crude-obv" style="height:130px;"></div>'
         +     '<div id="cmd-crude-oi-table" style="overflow-x:auto;margin-top:8px;"><div class="cmd-load"><i class="bi bi-hourglass-split"></i> Loading OI…</div></div>'
         // OI Signal Strip
-        +     '<div class="cmd-st" style="margin-top:8px;display:flex;align-items:center;gap:6px;"><i class="bi bi-activity"></i> OI SIGNALS</div>'
+        +     '<div class="cmd-st" style="margin-top:8px;display:flex;align-items:center;gap:6px;"><i class="bi bi-thermometer-half"></i> OI SIGNALS</div>'
         +     '<div id="cmd-crude-sig-strip" style="margin-bottom:4px;"><div class="cmd-load"><i class="bi bi-hourglass-split"></i> Loading after OI fetch…</div></div>'
         // Max Pain & GEX
         +     '<div class="cmd-st" style="margin-top:8px;display:flex;align-items:center;gap:6px;">'
@@ -12335,7 +12462,7 @@ function _svBuildPrediction(name, sfx) {
         // indices, crude) — no need for a magnitude-based decimals lookup.
         var peDecimals = 2;
         html += '<div style="background:var(--gtb-surface);padding:10px 12px;margin-bottom:8px;">'
-            + '<div style="font-size:0.55rem;font-weight:800;color:var(--gtb-muted);margin-bottom:6px;letter-spacing:0.05em;"><i class="bi bi-crosshair"></i> PRECISION ENTRY <span style="font-weight:600;color:var(--gtb-muted);text-transform:none;letter-spacing:0;">— OI walls + AVWAP + today\'s price action + strike levels</span></div>';
+            + '<div style="font-size:0.55rem;font-weight:800;color:var(--gtb-muted);margin-bottom:6px;letter-spacing:0.05em;"><i class="bi bi-record-circle"></i> PRECISION ENTRY <span style="font-weight:600;color:var(--gtb-muted);text-transform:none;letter-spacing:0;">— OI walls + AVWAP + today\'s price action + strike levels</span></div>';
         if (pe.side === 'RANGE') {
             html += '<div style="font-size:0.6rem;color:var(--gtb-text);margin-bottom:3px;">No directional edge — nearest levels only:</div>';
             if (pe.supportPrice != null) html += '<div style="font-size:0.6rem;color:var(--gtb-green);margin-bottom:2px;"><span style="color:var(--gtb-muted);">Support → </span><b>' + pe.supportPrice.toFixed(peDecimals) + '</b> <span style="color:var(--gtb-muted);font-size:0.5rem;">(' + pe.supportLabel + ')</span></div>';
@@ -14266,6 +14393,26 @@ function showOIOBVBarChart(name, suffix, _oiDataOverride) {
     let atmSignal = strikeSignals.find(function(s) { return s.isATM; });
     updateScoresOfTrend(name, oiScore, atmSignal ? atmSignal.ceLabel : null, atmSignal ? atmSignal.peLabel : null, suffix);
     let wallsRow = _gtbFindWalls(data, priceChange, spotRow);
+    // Leading counterpart to wallsRow above — wallsRow only sees the CURRENT snapshot
+    // (a wall already built, price often already reacted); this flags strikes where OBV
+    // is actively accelerating RIGHT NOW, drawn as a small marker on the chart instead of
+    // a toast so it stays visible for as long as the buildup is happening.
+    let buildRow = _gtbWallVelocity(data, spotRow, 3);
+    let buildByStrike = {};
+    (buildRow.building || []).forEach(function (b) {
+        var k = String(b.strike);
+        if (!buildByStrike[k]) buildByStrike[k] = [];
+        buildByStrike[k].push(b);
+    });
+    // Inverse of buildRow — an ALREADY-ranked wall (wallsRow) losing its grip, e.g. put
+    // writers unwinding a support strike as price approaches it. See _gtbWallErosion.
+    let erodeRow = _gtbWallErosion(data, wallsRow, 3);
+    let erodeByStrike = {};
+    (erodeRow.eroding || []).forEach(function (e) {
+        var k2 = String(e.strike);
+        if (!erodeByStrike[k2]) erodeByStrike[k2] = [];
+        erodeByStrike[k2].push(e);
+    });
     let ceBarColors = [], peBarColors = [], ceObvColors = [], peObvColors = [];
     jQ.each(data, function (index, item) {
         let strikeV = parseFloat(item['STRIKE']);
@@ -14292,7 +14439,7 @@ function showOIOBVBarChart(name, suffix, _oiDataOverride) {
     // `color` per-bar (solid=WRITE/BUY, faded=COV/UNWIND, dimmed further if ITM).
     // wallsRow marks R1/R2/S1/S2 with a dashed vertical line + label, same as the
     // maximize/crude charts, so the compact row view carries the same wall info.
-    function _svgMiniBar(containerId, seriesList, atmIdx, wallsArg) {
+    function _svgMiniBar(containerId, seriesList, atmIdx, wallsArg, buildArg, erodeArg) {
         let el = document.getElementById(containerId.replace(/^#/, ''));
         if (!el) return;
         // Fixed logical coordinate space — SVG scales via width="100%" so bars always
@@ -14336,6 +14483,37 @@ function showOIOBVBarChart(name, suffix, _oiDataOverride) {
                 svg += '<rect x="' + bx + '" y="' + by + '" width="' + barW + '" height="' + bh + '" fill="' + barColor + '" opacity="0.85" rx="0.5"/>';
             });
             if (i === atmIdx) svg += '<text x="' + slotCx + '" y="' + (H - 1) + '" text-anchor="middle" font-size="5" fill="#fbbf24">▲</text>';
+
+            // Wall-BUILDING marker — a small pulsing amber dot above the slot when OBV is
+            // actively accelerating at this strike right now, independent of whether it's
+            // already ranked as a wallsArg R/S (this fires earlier, while it's still forming).
+            var buildHits = (buildArg && data[i]) ? buildArg[String(data[i]['STRIKE'])] : null;
+            if (buildHits && buildHits.length) {
+                var bSide = buildHits[0].side, bVel = buildHits[0].velocity, bMult = buildHits[0].multiple;
+                var bCol = bSide === 'R' ? '#ff9d3d' : '#3ddc97';
+                var bTitle = (bSide === 'R' ? 'Resistance' : 'Support') + ' building at ' + data[i]['STRIKE']
+                    + ' — ' + bMult.toFixed(1) + 'x this strike\'s recent typical pace (velocity ' + bVel.toFixed(1) + ')';
+                svg += '<circle cx="' + slotCx + '" cy="3" r="2.2" fill="' + bCol + '" opacity="0.9">'
+                    + '<title>' + bTitle + '</title>'
+                    + '<animate attributeName="opacity" values="0.9;0.25;0.9" dur="1.2s" repeatCount="indefinite"/>'
+                    + '</circle>';
+            }
+
+            // Wall-WEAKENING marker — an ALREADY-ranked wall (wallsArg) whose OBV is now
+            // moving the wrong way (writers covering), drawn at the BOTTOM of the slot
+            // (opposite the building marker's top position) as a hollow ring so it reads
+            // distinctly even when both could theoretically hit the same chart.
+            var erodeHits = (erodeArg && data[i]) ? erodeArg[String(data[i]['STRIKE'])] : null;
+            if (erodeHits && erodeHits.length) {
+                var eSide = erodeHits[0].side, eVel = erodeHits[0].velocity, eMult = erodeHits[0].multiple, eTier = erodeHits[0].tier;
+                var eCol = '#f2c14e';
+                var eTitle = (eSide === 'R' ? 'Resistance' : 'Support') + ' (' + eSide + (eTier === 'primary' ? '1' : '2') + ') weakening at ' + data[i]['STRIKE']
+                    + ' — writers covering ' + eMult.toFixed(1) + 'x typical pace, may not hold (velocity +' + eVel.toFixed(1) + ')';
+                svg += '<circle cx="' + slotCx + '" cy="' + (H - 3) + '" r="2.2" fill="none" stroke="' + eCol + '" stroke-width="1.1" opacity="0.9">'
+                    + '<title>' + eTitle + '</title>'
+                    + '<animate attributeName="opacity" values="0.9;0.2;0.9" dur="0.9s" repeatCount="indefinite"/>'
+                    + '</circle>';
+            }
         }
         svg += '</svg>';
         el.innerHTML = svg;
@@ -14344,11 +14522,11 @@ function showOIOBVBarChart(name, suffix, _oiDataOverride) {
     _svgMiniBar('#' + tempName + '-oi' + suffix, [
         { label: 'CH CE OI', color: OI_COLORS.CE_OI, values: oiCECH.slice(1), colors: ceBarColors },
         { label: 'CH PE OI', color: OI_COLORS.PE_OI, values: oiPECH.slice(1), colors: peBarColors },
-    ], atmIndex, wallsRow);
+    ], atmIndex, wallsRow, buildByStrike, erodeByStrike);
     _svgMiniBar('#' + tempName + '-obv' + suffix, [
         { label: 'CE OBV', color: OI_COLORS.CE_OBV, values: oiCEOBV.slice(1), colors: ceObvColors },
         { label: 'PE OBV', color: OI_COLORS.PE_OBV, values: oiPEOBV.slice(1), colors: peObvColors },
-    ], atmIndex, wallsRow);
+    ], atmIndex, wallsRow, buildByStrike, erodeByStrike);
 
     // Shared x-axis labels (strikes) below both charts — rendered once
     (function() {
@@ -17123,7 +17301,7 @@ function _gtbRenderDashboardPane() {
         // Predict is a full-width row on its own, above the OI/OBV grid — not squeezed
         // into one grid cell among the (much shorter) instrument mini-cards.
         h += '<div class="gtb-card gtb-widget" style="margin:0 8px 8px;">'
-        +      '<div class="gtb-card-header"><span class="gtb-card-title"><i class="bi bi-graph-up-arrow"></i> PREDICT (9:15 COMBO)</span></div>'
+        +      '<div class="gtb-card-header"><span class="gtb-card-title"><i class="bi bi-graph-up"></i> PREDICT (9:15 COMBO)</span></div>'
         +      '<div class="gtb-card-body" id="gtb-dash-predict" style="padding:6px 8px;"></div>'
         +    '</div>';
 
@@ -17304,7 +17482,7 @@ function _gtbRenderMetricsPane() {
     h += '<div style="display:flex;align-items:center;gap:8px;padding:6px 12px;border-bottom:1px solid var(--gtb-border);background:var(--gtb-surface);flex-shrink:0;">'
         + '<i class="bi bi-speedometer2" style="color:var(--gtb-accent);"></i>'
         + '<span style="font-size:0.55rem;font-weight:800;color:var(--gtb-muted);text-transform:uppercase;letter-spacing:0.08em;">METRICS</span>'
-        + (_vixVal ? '<span style="font-size:0.46rem;padding:1px 6px;border:1px solid ' + _vixCol + ';color:' + _vixCol + ';background:' + _vixCol + '18;"><i class="bi bi-activity"></i> VIX ' + _vixVal.toFixed(2) + ' · ' + _vixLabel + '</span>' : '')
+        + (_vixVal ? '<span style="font-size:0.46rem;padding:1px 6px;border:1px solid ' + _vixCol + ';color:' + _vixCol + ';background:' + _vixCol + '18;"><i class="bi bi-thermometer-half"></i> VIX ' + _vixVal.toFixed(2) + ' · ' + _vixLabel + '</span>' : '')
         // Sub-view toggle
         + '<div style="display:flex;gap:2px;margin-left:8px;">'
         +   '<button class="gtb-mv-btn' + (_metricsView === 'score'   ? ' gtb-mv-active' : '') + '" data-mv="score"   style="font-size:0.46rem;padding:2px 8px;cursor:pointer;border:1px solid var(--gtb-border);background:' + (_metricsView === 'score'   ? 'var(--gtb-accent)' : 'transparent') + ';color:' + (_metricsView === 'score'   ? '#fff' : 'var(--gtb-muted)') + ';"><i class="bi bi-bar-chart-fill"></i> Scores</button>'
@@ -17361,7 +17539,7 @@ function _gtbRenderMetricsPane() {
 
     // ── Advance / Decline ─────────────────────────────────────────────────────
     var adScore = ALL_ADVANCE_DECLINE_SCORE + NIFTY_50_ADVANCE_DECLINE_SCORE + NIFTY_BANK_ADVANCE_DECLINE_SCORE;
-    h += _section('ADVANCE / DECLINE', 'bi-graph-up-arrow', adScore,
+    h += _section('ADVANCE / DECLINE', 'bi-graph-up', adScore,
         _row('All F&O', ALL_ADVANCE_DECLINE_SCORE, 1)
         + _row('NIFTY 50', NIFTY_50_ADVANCE_DECLINE_SCORE, 1)
         + _row('NIFTY BANK', NIFTY_BANK_ADVANCE_DECLINE_SCORE, 1)
@@ -20279,7 +20457,7 @@ function _gtbShowSignalScanners() {
 
     var html = '<div style="height:100%;display:flex;flex-direction:column;overflow:hidden;">'
         + '<div style="display:flex;align-items:center;border-bottom:1px solid var(--gtb-border);flex-shrink:0;padding:0 4px;">'
-        +   tabBtn('obv',    'bi-activity',        'OBV DIVERGENCE',    true)
+        +   tabBtn('obv',    'bi-thermometer-half',        'OBV DIVERGENCE',    true)
         +   tabBtn('absorb', 'bi-shield-fill-check','STRIKE ABSORPTION', false)
         +   '<button id="ss-refresh" style="margin-left:auto;font-size:0.42rem;padding:2px 8px;'
         +     'background:var(--gtb-surface2);border:1px solid var(--gtb-border);color:var(--gtb-text);cursor:pointer;">↺ Refresh</button>'
@@ -22456,7 +22634,9 @@ function _gtbCreateFloatingBar() {
         { id: 'show-quote-fetch',            icon: 'bi-search',               title: 'Quote Fetch' },
         { id: 'show-ws-subscribe',           icon: 'bi-broadcast',            title: 'WebSocket Subscribe' },
         { id: 'show-backtest-popup',         icon: 'bi-clock-history',        title: 'F&O Backtest' },
-        { id: 'show-option-strike-search',   icon: 'bi-crosshair',            title: 'Option Strike Search' },
+        { id: 'show-option-strike-search',   icon: 'bi-upc-scan',             title: 'Option Strike Search' },
+        { id: 'show-positional-screener',    icon: 'bi-funnel-fill',          title: 'Positional Screener (Swing)' },
+        { id: 'show-data-load-popup',        icon: 'bi-hdd-fill',             title: 'Data Load (Kite Instruments + Strike Intervals)' },
         { id: 'show-help',                   icon: 'bi-question-circle-fill', title: 'Help' },
         { id: 'data-load',                   icon: 'bi-sliders',              title: 'Data Settings' },
     ];
@@ -22499,6 +22679,8 @@ function _gtbCreateFloatingBar() {
             if (id === 'show-ws-subscribe')      { showWebSocketPopup(); return; }
             if (id === 'show-backtest-popup')    { _btShowPopup(); return; }
             if (id === 'show-option-strike-search') { _ossShowPopup(); return; }
+            if (id === 'show-positional-screener') { _psShowPopup(); return; }
+            if (id === 'show-data-load-popup')   { _dlShowPopup(); return; }
             var $el = jQ('#' + id);
             if ($el.length) {
                 $el[0].click();

@@ -50,7 +50,7 @@ function buildHelpHTML() {
         { id: 'score',     icon: 'bi-speedometer',          label: 'Score'        },
         { id: 'pcr',       icon: 'bi-pie-chart-fill',       label: 'PCR'          },
         { id: 'futures',   icon: 'bi-graph-up',  label: 'Futures'      },
-        { id: 'vix',       icon: 'bi-activity',             label: 'VIX Range'    },
+        { id: 'vix',       icon: 'bi-thermometer-half',     label: 'VIX Range'    },
         { id: 'tradeplan', icon: 'bi-journal-check',         label: 'Trade Plan'   },
         { id: 'tools',     icon: 'bi-tools',                 label: 'Tools'        },
         { id: 'exit',      icon: 'bi-door-open-fill',        label: 'Exit Signal'  },
@@ -109,6 +109,10 @@ function buildHelpHTML() {
           <tr><td><i class="bi bi-gear-fill"></i></td><td>Settings</td><td>Theme, row height, refresh interval, display options</td></tr>
           <tr><td><i class="bi bi-question-circle-fill"></i></td><td>Help</td><td>This popup</td></tr>
           <tr><td><i class="bi bi-sliders"></i></td><td>Data Settings</td><td>Trading dates, load prices, clear storage, external links</td></tr>
+          <tr><td><i class="bi bi-clock-history"></i></td><td>F&amp;O Backtest</td><td>Pick a past date/time + previous date, select stocks, see the same Instrument/Predict/OI-OBV/Price Action/Futures rows as Stock Viewer but computed entirely from historical candles — isolated pipeline, doesn't touch live caches. OI/OBV only works for the current expiry (Kite's option chain has no historical token list)</td></tr>
+          <tr><td><i class="bi bi-upc-scan"></i></td><td>Option Strike Search</td><td>Search any F&amp;O underlying → ATM CE/PE strike plus the configured hedge-leg CE/PE strikes (ATM ± the points set in Settings, per NIFTY/BANK NIFTY/stock), with trading symbol, token, and a chart link per leg</td></tr>
+          <tr><td><i class="bi bi-hdd-fill"></i></td><td>Data Load</td><td>Fetches the full Kite instrument master into browser IndexedDB, and NSE's strike-interval CSV into localStorage — both shown in searchable tables, and both merge-refresh the hand-maintained FO_LIST/NSE_STRIKE_DIFF/NSE_FUTURE_STRIKE_DIFF/INSTRUMENT_TOKENS/FUTURE_INTRUMENT_LIST constants in place instead of leaving them to go stale at each monthly rollover</td></tr>
+          <tr><td><i class="bi bi-funnel-fill"></i></td><td>Positional Screener</td><td>Swing-trade screener on <strong>daily</strong> candles (not the 5-min intraday series every other tool uses) — same filter/chip-select/autocomplete UI as Stock Viewer, scores trend (SMA20/50), 20-day breakout, relative strength vs NIFTY 50, and multi-day futures OI buildup into a BUY↔SELL verdict with a structural entry/target/stop/exit plan. See the Tools tab's own section below for the full methodology</td></tr>
         </tbody>
       </table>
     `);
@@ -500,7 +504,7 @@ function buildHelpHTML() {
     `);
 
     // ── VIX RANGE ────────────────────────────────────────────────────────────────
-    h += hlpPanel('vix', '<i class="bi bi-activity"></i> VIX Range', `
+    h += hlpPanel('vix', '<i class="bi bi-thermometer-half"></i> VIX Range', `
       <p class="hlp-intro"><strong>India VIX</strong> (token 264969) represents the market's expected
       <em>annualised volatility</em> in percentage terms. Groot converts this into an expected
       price range for different time horizons.</p>
@@ -583,7 +587,7 @@ function buildHelpHTML() {
         </tbody>
       </table>
 
-      <h4 class="hlp-h4"><i class="bi bi-crosshair"></i> Step 3 — Entry window: 9:45 to 11:30</h4>
+      <h4 class="hlp-h4"><i class="bi bi-record-circle"></i> Step 3 — Entry window: 9:45 to 11:30</h4>
       <p style="font-size:0.72rem;color:#7d8590;margin-bottom:6px;">Enter <strong>only if ALL of these are true</strong>. If even one conflicts — wait for next 5-min refresh.</p>
       <table class="hlp-table">
         <thead><tr><th>Condition</th><th>Long threshold</th><th>Short threshold</th></tr></thead>
@@ -778,6 +782,32 @@ function buildHelpHTML() {
       </ol>
       <p style="font-size:0.72rem;">The <strong>setup card</strong> shows Entry / SL / T1 (POC) / T2 (far value-area edge), plus an <span style="color:var(--gtb-green);font-weight:700;">OI CONFIRMS</span> / <span style="color:var(--gtb-amber);font-weight:700;">OI UNCONFIRMED</span> badge. Below it: a table of every detected sweep (time, level, type, volume ×) and the full watched stop-cluster level map with support/resistance labels relative to LTP.</p>
       <p style="font-size:0.72rem;"><strong>Indices &amp; volume:</strong> NIFTY 50 / BANK NIFTY spot candles carry <em>no volume</em> (an index isn't traded), so both this scanner and the Volume Profile overlay volume from the <strong>index futures</strong> — matched by timestamp onto the spot price candles. Prices/levels stay on spot; the volume-spike filter and profile use real futures volume. SENSEX (no NSE future) can't be scanned this way. The status line notes "volume from futures" when the overlay is used.</p>
+
+      <h4 class="hlp-h4"><i class="bi bi-clock-history"></i> F&amp;O Backtest</h4>
+      <p style="font-size:0.72rem;">Isolated backtest popup — pick a past <strong>current day + time</strong> and a <strong>previous date</strong> manually, select F&amp;O instruments by search, click LOAD. Renders the same Instrument/Predict/OI-OBV/Price Action/Futures row layout Stock Viewer uses, but every value is fetched fresh from historical candles for the dates chosen — it never reads or writes <code>INSTRUMENT_SCORE_MAP</code> or any other live cache, so it can't interfere with the rest of the dashboard.</p>
+      <p style="font-size:0.72rem;"><strong>OI/OBV works for the current expiry only</strong> — Kite's option chain (<code>OPTION_STRIKE_LIST</code>) only lists currently-tradeable contracts, so a backtest date from a past expiry cycle can't get historical option tokens. Price Action and Futures don't have this limit since those instrument tokens persist across expiries. The Predict card's confidence is labelled <strong>"(5-sig)"</strong> — it only computes 5 of the live model's 9 signals (missing OBV flow, level-probability, Max Pain, IV skew), so its number isn't directly comparable to the live dashboard's confidence reading, only the BUY/SELL/WAIT direction is.</p>
+
+      <h4 class="hlp-h4"><i class="bi bi-upc-scan"></i> Option Strike Search</h4>
+      <p style="font-size:0.72rem;">Search any F&amp;O underlying (autocomplete, current-expiry only). Shows ATM CE + ATM PE, plus the <strong>hedge legs</strong>: CE at ATM + your configured points, PE at ATM − your configured points, snapped to the nearest actually-listed strike. Hedge distance is set per NIFTY / BANK NIFTY / stocks in Settings (<code>hedge_diff_nifty</code> / <code>hedge_diff_banknifty</code> / <code>hedge_diff_stocks</code>). Each row shows the trading symbol, instrument token, and a chart link. An LTP-override field lets you search an instrument that hasn't had a live LTP cached yet.</p>
+
+      <h4 class="hlp-h4"><i class="bi bi-hdd-fill"></i> Data Load</h4>
+      <p style="font-size:0.72rem;"><strong>Kite Instruments</strong> — fetches the full Kite instrument master dump (all exchanges/segments) and caches it in browser <strong>IndexedDB</strong>, shown in a searchable table; persists across sessions so reopening the popup doesn't require re-fetching. <strong>Strike Intervals</strong> — fetches NSE's own <code>NSE_FO_SosScheme.csv</code> (the same source <code>NSE_STRIKE_DIFF</code> was originally hand-typed from) and caches per-symbol min/max step values in localStorage.</p>
+      <p style="font-size:0.72rem;">Both loads also <strong>merge-refresh</strong> the hand-maintained constants in <code>constants.js</code> — <code>FO_LIST</code>, <code>NSE_STRIKE_DIFF</code>, <code>NSE_FUTURE_STRIKE_DIFF</code>, <code>INSTRUMENT_TOKENS</code>, <code>FUTURE_INTRUMENT_LIST</code> — in place, since those are <code>let</code> globals every other file already reads. It's a merge (fresh data overwrites matching keys, everything else stays), not a full replace, so indices/commodities the cached data doesn't cover aren't dropped. Runs silently on script init too, picking up whatever was cached in a previous session with no network call.</p>
+
+      <h4 class="hlp-h4"><i class="bi bi-funnel-fill"></i> Positional Screener (Swing)</h4>
+      <p style="font-size:0.72rem;">Screens F&amp;O stocks (+ NIFTY 50 / NIFTY BANK / CRUDEOILM) for <strong>multi-day swing setups</strong> — the one tool in this app that works on <strong>daily</strong> candles instead of the 5-min intraday series everything else uses. Selection UI mirrors Stock Viewer exactly: category filter chips (ALL/ASO/BSO/9:15/NIFTY 50/BANK NIFTY/WEIGHTED/INDEX+MCX) open a chip panel, plus a search-autocomplete box to add any symbol regardless of the active filter. Click SCAN to fetch daily candles for everything selected (rate-limited, can take a few minutes for a large selection).</p>
+      <table class="hlp-table">
+        <thead><tr><th>Signal</th><th>Logic</th><th>Weight</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Trend</strong></td><td>LTP &gt; SMA20 &gt; SMA50 = uptrend (+1); LTP &lt; SMA20 &lt; SMA50 = downtrend (−1); otherwise sideways (0)</td><td>×2</td></tr>
+          <tr><td><strong>Breakout</strong></td><td>Today's close ≥ prior 20-day high (+1, breakout) or ≤ prior 20-day low (−1, breakdown); otherwise inside range (0)</td><td>×1.5</td></tr>
+          <tr><td><strong>Relative Strength</strong></td><td>Stock's own 20-day % change minus NIFTY 50's 20-day % change — ranks movers against the market, not in absolute terms. &gt;+2% = +1, &lt;−2% = −1</td><td>×1</td></tr>
+          <tr><td><strong>Futures OI (5d)</strong></td><td>OI + price direction over ~5 trading days, on daily FUT candles: OI↑+price↑ = LONG BUILDUP (+1); OI↑+price↓ = SHORT BUILDUP (−1); OI↓+price↑ = SHORT COVERING (+0.5); OI↓+price↓ = LONG UNWINDING (−0.5)</td><td>×1.5</td></tr>
+        </tbody>
+      </table>
+      <p style="font-size:0.72rem;">Composite total → verdict: <span style="color:var(--gtb-green);font-weight:700;">STRONG BUY ≥ 3</span>, <span style="color:var(--gtb-green);font-weight:700;">BUY ≥ 1.5</span>, <span style="color:var(--gtb-red);font-weight:700;">STRONG SELL ≤ −3</span>, <span style="color:var(--gtb-red);font-weight:700;">SELL ≤ −1.5</span>, otherwise <strong>WATCH</strong>. The <strong>Top Buy / Top Sell</strong> strip above the table always ranks the full scanned universe, independent of whatever filter/sort/search is applied to the table below it.</p>
+      <p style="font-size:0.72rem;"><strong>Trade plan</strong> (Entry/Target/Stop/R:R, an (i) icon per row for the full exit text) is derived from the same daily levels the score already computed — not a new data source. Entry = LTP; Target = LTP ± 75% of the 20-day high-low range in the trade's direction (a measured-move projection); Stop = the tighter of SMA20 or the 20-day range boundary. This is a <strong>starting structural framework</strong>, not a backtested or validated exit system — the 0.75× target multiplier in particular is a reasonable-looking default with no data behind it yet.</p>
+      <p style="font-size:0.72rem;"><strong>Known limitation:</strong> Futures OI reads <code>FUTURE_INTRUMENT_LIST</code>/<code>COMMODITIES_FUTURE_INSTRUMENT_LIST</code> (both hand-maintained snapshots) for each stock's near-month contract token — if a monthly rollover happened since that list was last regenerated, the OI column shows a specific reason instead of a silent guess: <strong>NO FUT TOKEN</strong> (lookup failed), <strong>FETCH EMPTY</strong> (token found, Kite returned nothing), or <strong>TOO FEW CANDLES (n)</strong> (contract too new). Running <strong>Data Load</strong>'s Kite Instruments sync refreshes these lists directly.</p>
     `);
 
     // ── EXIT SIGNAL ───────────────────────────────────────────────────────────────

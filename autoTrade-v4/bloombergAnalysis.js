@@ -71,7 +71,7 @@ function _btRenderPrediction() {
         var bp = aso / total;
         var dir = bp >= 0.6 ? 'bull' : bp <= 0.4 ? 'bear' : 'neutral';
         signals.push({
-            key: 'zone', label: 'Strike Zone', icon: 'bi-crosshair',
+            key: 'zone', label: 'Strike Zone', icon: 'bi-record-circle',
             dir: dir, weight: 2, strength: Math.abs(bp - 0.5) * 2,
             detail: 'ASO+ ' + aso + ' vs BSO- ' + bso + ' in F&O universe',
             value: 'ASO ' + aso + ' / BSO ' + bso
@@ -122,7 +122,7 @@ function _btRenderPrediction() {
                    : v < 18  ? 'Normal VIX ' + v.toFixed(1) + ' -- balanced conviction'
                    : v < 25  ? 'Elevated VIX ' + v.toFixed(1) + ' -- wider swings, lower conviction'
                               : 'High VIX ' + v.toFixed(1) + ' -- choppy; reducing confidence';
-        signals.push({ key:'vix', label:'VIX Regime', icon:'bi-activity',
+        signals.push({ key:'vix', label:'VIX Regime', icon:'bi-thermometer-half',
             dir:'neutral', weight:0, strength:0,
             detail: detail, value: (v ? v.toFixed(1) : '--'), isVix: true, vixMod: vixMod });
     })();

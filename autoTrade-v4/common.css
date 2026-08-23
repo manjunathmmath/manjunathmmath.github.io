@@ -3960,7 +3960,7 @@ td.details-control {
 }
 
 /* ── Filter bar ───────────────────────────────────────────── */
-#sv-filter-row, #dv-filter-row {
+#sv-filter-row, #dv-filter-row, #ps-filter-row {
   background: var(--gtb-surface);
   border-bottom: 1px solid var(--gtb-border);
   padding: 4px 8px;
@@ -3993,16 +3993,16 @@ td.details-control {
 }
 
 /* ── Chip panel ───────────────────────────────────────────── */
-#sv-chip-panel, #dv-chip-panel {
+#sv-chip-panel, #dv-chip-panel, #ps-chip-panel {
   display: none; flex-shrink: 0;
   background: var(--gtb-surface);
   border-bottom: 1px solid var(--gtb-border);
   padding: 3px 8px 4px;
 }
-#sv-chip-controls, #dv-chip-controls {
-  display: flex; align-items: center; gap: 4px; margin-bottom: 3px;
+#sv-chip-controls, #dv-chip-controls, #ps-chip-controls {
+  display: flex; align-items: center; gap: 4px; margin-bottom: 3px; flex-wrap: wrap;
 }
-#sv-chip-label, #dv-chip-label {
+#sv-chip-label, #dv-chip-label, #ps-chip-label {
   font-size: 0.44rem; color: var(--gtb-muted); font-weight: 800;
   text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap;
 }
@@ -4037,9 +4037,9 @@ td.details-control {
 .sv-autoref-status.sv-autoref-running i { animation: sv-autoref-pulse 1.4s ease-in-out infinite; }
 @keyframes sv-autoref-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 
-#sv-chip-list, #dv-chip-list {
+#sv-chip-list, #dv-chip-list, #ps-chip-list {
   display: flex; flex-wrap: wrap; gap: 2px;
-  max-height: 56px; overflow-y: auto;
+  max-height: 90px; overflow-y: auto;
   scrollbar-width: thin;
 }
 
@@ -5382,6 +5382,80 @@ td.details-control {
 .oss-na { color: var(--gtb-muted); font-style: italic; }
 .oss-chart-link { color: var(--gtb-blue); font-size: 0.7rem; }
 .oss-chart-link:hover { opacity: 0.7; }
+
+/* ── Data Load popup ─────────────────────────────────────────────────────── */
+.popup-custom-style-data-load-popup .popupwindow_content:after { display: none !important; content: none !important; }
+.dl-wrap { display: flex; flex-direction: column; height: 100%; overflow: auto; padding: 10px; gap: 16px; }
+.dl-section-title { font-size: 0.5rem; font-weight: 800; letter-spacing: 0.08em; color: var(--gtb-muted); margin-bottom: 8px; text-transform: uppercase; }
+.dl-row {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--gtb-surface); border: 1px solid var(--gtb-border);
+  padding: 8px 10px; margin-bottom: 6px;
+}
+.dl-row-info { flex: 1; min-width: 0; font-size: 0.6rem; color: var(--gtb-text); }
+.dl-row-sub { font-size: 0.48rem; color: var(--gtb-muted); margin-top: 2px; }
+.dl-search {
+  width: 100%; box-sizing: border-box; margin-bottom: 6px;
+  background: var(--gtb-surface); border: 1px solid var(--gtb-border); color: var(--gtb-text);
+  font-size: 0.58rem; padding: 4px 6px; border-radius: 3px;
+}
+.dl-table { border: 1px solid var(--gtb-border); }
+.dl-table-head, .dl-table-row {
+  display: grid; grid-template-columns: 1.4fr 1.6fr 0.7fr 0.7fr 0.9fr 0.7fr;
+  gap: 4px; padding: 4px 8px;
+}
+.dl-table-head {
+  font-size: 0.44rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--gtb-muted); background: var(--gtb-surface2); border-bottom: 1px solid var(--gtb-border);
+}
+.dl-table-4col .dl-table-head, .dl-table-row-4col { grid-template-columns: 2fr 1fr 1fr 1fr; }
+.dl-table-body { max-height: 260px; overflow-y: auto; }
+.dl-table-row { font-size: 0.56rem; border-bottom: 1px solid var(--gtb-border2); }
+.dl-cell-strong { font-weight: 700; color: var(--gtb-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dl-cell-muted { color: var(--gtb-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dl-table-more { padding: 4px 8px; font-size: 0.46rem; color: var(--gtb-muted); border-top: 1px solid var(--gtb-border); }
+
+/* ── Positional Screener popup ───────────────────────────────────────────── */
+.popup-custom-style-positional-screener .popupwindow_content:after { display: none !important; content: none !important; }
+.ps-wrap { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
+.ps-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px; border-bottom: 1px solid var(--gtb-border); flex: 0 0 auto; }
+.ps-progress { font-size: 0.5rem; color: var(--gtb-muted); white-space: nowrap; }
+.ps-summary { display: inline-flex; align-items: center; gap: 6px; font-size: 0.5rem; font-weight: 800; white-space: nowrap; }
+.ps-summary-buy { color: var(--gtb-green); }
+.ps-summary-sell { color: var(--gtb-red); }
+.ps-summary-watch { color: var(--gtb-amber); }
+.ps-summary-total { color: var(--gtb-muted); font-weight: 500; }
+.ps-table-wrap {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: auto; padding: 8px;
+  /* Hard viewport-relative ceiling as a safety net — a screener can render ~200 rows, so
+     this must never rely purely on the flex chain resolving correctly to get a scrollbar;
+     this guarantees overflow-y kicks in even if some ancestor's height comes out "auto". */
+  max-height: calc(90vh - 140px);
+}
+.ps-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.6rem; }
+.ps-table th {
+  text-align: left; padding: 6px 8px; font-size: 0.44rem; font-weight: 800; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--gtb-muted); border-bottom: 1px solid var(--gtb-border);
+  position: sticky; top: 0; background: var(--gtb-surface2); z-index: 1;
+}
+.ps-table td { padding: 6px 8px; border-bottom: 1px solid var(--gtb-border2); color: var(--gtb-text); white-space: nowrap; }
+.ps-cell-strong { font-weight: 800; }
+.ps-verdict {
+  display: inline-block; font-size: 0.46rem; font-weight: 800; border: 1px solid; border-radius: 3px;
+  padding: 1px 6px; letter-spacing: 0.04em;
+}
+.ps-top-picks { margin-bottom: 10px; display: flex; flex-direction: column; gap: 6px; }
+.ps-top-picks-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.ps-top-picks-label { font-size: 0.46rem; font-weight: 800; letter-spacing: 0.08em; min-width: 62px; }
+.ps-pick-chip {
+  display: inline-flex; align-items: center; gap: 4px; font-size: 0.56rem; font-weight: 700;
+  border: 1px solid; border-radius: 4px; padding: 3px 8px; text-decoration: none;
+  background: var(--gtb-surface);
+}
+.ps-pick-chip:hover { opacity: 0.8; }
+.ps-pick-score { font-family: var(--gtb-mono); font-size: 0.5rem; opacity: 0.85; }
+.ps-exit-icon { color: var(--gtb-muted); cursor: help; font-size: 0.7rem; }
+.ps-exit-icon:hover { color: var(--gtb-accent); }
 
 .gtb-dash-sig-cols {
     display: grid;
