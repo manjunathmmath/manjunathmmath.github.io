@@ -104,11 +104,24 @@ function _dlSplitCsvLine(line) {
 // ── Kite instrument master CSV fetch ────────────────────────────────────────
 // Columns: instrument_token,exchange_token,tradingsymbol,name,last_price,expiry,
 //          strike,tick_size,lot_size,instrument_type,segment,exchange
+//
+// Scans line-by-line via indexOf instead of text.split('\n') — reported failure: Kite
+// Instruments (~10-15MB, 100K+ rows) silently fails to load on a memory-constrained phone
+// (Moto G) while the much smaller NSE Strike Intervals CSV loads fine on the same device —
+// consistent with a memory/OOM issue during parsing, not a network or GM_xmlhttpRequest
+// problem. split('\n') allocates one big array holding 100K+ separate line-strings, all
+// alive in memory simultaneously ALONGSIDE the original multi-MB response string, before
+// any of them can be garbage-collected — roughly double the peak memory this doesn't need.
+// Scanning with indexOf('\n', pos) only ever holds the current line's substring at a time.
 function _dlParseInstrumentsCsv(text) {
-    var lines = text.split('\n');
     var out = [];
-    for (var i = 1; i < lines.length; i++) { // skip header row
-        var line = lines[i];
+    var pos = text.indexOf('\n') + 1; // skip header row (indexOf returns -1 if absent -> pos=0, harmless)
+    var len = text.length;
+    while (pos < len) {
+        var nl = text.indexOf('\n', pos);
+        var end = nl === -1 ? len : nl;
+        var line = text.slice(pos, end);
+        pos = end + 1;
         if (!line || !line.trim()) continue;
         var c = _dlSplitCsvLine(line);
         if (c.length < 12) continue;
@@ -127,15 +140,35 @@ function _dlParseInstrumentsCsv(text) {
     return out;
 }
 
+// Wraps a GM_xmlhttpRequest-backed promise with a manual watchdog timer — reported failure
+// mode on mobile Tampermonkey ports (Kiwi Browser's extension, iOS "Userscripts", etc.):
+// the request silently never completes at all — no onload, no onerror, no ontimeout — most
+// likely because the extension's background/service-worker context gets suspended by the
+// mobile OS partway through a large (~10-15MB) response, dropping the callback outright.
+// GM_xmlhttpRequest's own `timeout` option is ALSO set below so `ontimeout` fires where the
+// engine actually honors it, but this is the fallback for engines that don't even do that —
+// it's the difference between "stuck on Loading… forever with no feedback" (the reported
+// bug) and an actual visible error the user can act on.
+function _dlWithWatchdog(promise, ms, label) {
+    var timer;
+    var watchdog = new Promise(function (_, reject) {
+        timer = setTimeout(function () {
+            reject((label || 'Request') + ' produced no response after ' + Math.round(ms / 1000) + 's — GM_xmlhttpRequest may be silently stalling on this browser/device (seen on some mobile Tampermonkey ports). Try again, or check the network tab / extension logs.');
+        }, ms);
+    });
+    return Promise.race([promise, watchdog]).finally(function () { clearTimeout(timer); });
+}
+
 function _dlFetchKiteInstruments() {
     var apiKey = g_config.get('api_key');
     var accessToken = g_config.get('api_access_token');
-    return new Promise(function (resolve, reject) {
+    var req = new Promise(function (resolve, reject) {
         if (!accessToken) { reject('No Access Token set — open Settings and set api_access_token'); return; }
         GM_xmlhttpRequest({
             method: 'GET',
             url: 'https://api.kite.trade/instruments',
             headers: { 'Authorization': 'token ' + apiKey + ':' + accessToken },
+            timeout: 45000,
             onload: function (res) {
                 if (res.status !== 200) { reject('HTTP ' + res.status + ' — check API Key/Access Token in Settings'); return; }
                 try { resolve(_dlParseInstrumentsCsv(res.responseText)); }
@@ -145,6 +178,7 @@ function _dlFetchKiteInstruments() {
             ontimeout: function () { reject('Request timed out'); },
         });
     });
+    return _dlWithWatchdog(req, 60000, 'Kite Instruments fetch');
 }
 
 // ── NSE strike-interval CSV fetch (NSE_FO_SosScheme.csv) ───────────────────
@@ -194,11 +228,12 @@ function _dlBestStrikeDiff(entry) {
 }
 
 function _dlFetchStrikeIntervals() {
-    return new Promise(function (resolve, reject) {
+    var req = new Promise(function (resolve, reject) {
         GM_xmlhttpRequest({
             method: 'GET',
             url: 'https://nsearchives.nseindia.com/content/fo/NSE_FO_SosScheme.csv',
             headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': '*/*' },
+            timeout: 45000,
             onload: function (res) {
                 if (res.status !== 200) { reject('HTTP ' + res.status); return; }
                 try { resolve(_dlParseStrikeCsv(res.responseText)); }
@@ -208,6 +243,7 @@ function _dlFetchStrikeIntervals() {
             ontimeout: function () { reject('Request timed out'); },
         });
     });
+    return _dlWithWatchdog(req, 60000, 'Strike Intervals fetch');
 }
 
 // ── Popup shell — tab layout (Kite Instruments | Strike Intervals) ─────────────
