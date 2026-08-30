@@ -1007,6 +1007,12 @@ async function scanNineFifteenCandle() {
         if (Object.keys(breakOutNineFifteen).length > 0) {
             localStorage.setItem("VALID_BREAKOUT_NINE_FIFTEEN", JSON.stringify(breakOutNineFifteen));
             _gtbProgress('9:15 scan done ✓', 'green');
+            // Alert once — this scan only ever runs once per session (guarded by the
+            // localStorage cache check above), so there's no risk of repeat alerts on
+            // every refresh. Sound reuses stockViewer.js's existing Web Audio beep
+            // (_svBeep) rather than the unused alertSound.js resource.
+            try { _gtbToast('9:15 scan complete — ' + Object.keys(breakOutNineFifteen).length + ' instruments classified', 'success'); } catch (e) {}
+            try { _svBeep(); } catch (e) {}
         } else {
             _gtbProgress('No candle data yet — try after 9:15 AM', 'orange');
         }
@@ -8442,6 +8448,22 @@ jQ(document).on("click", ".refresh-stock-list", function () {
 // ── Section info popovers ─────────────────────────────────────────────────────
 // Each key maps to a short explanation shown when its (i) icon is clicked.
 var GTB_INFO = {
+    'pred-verdict': { icon:'bi-graph-up', title:'Today\'s Prediction',
+        body:'The primary scenario (BULL/BEAR TREND, RANGE DAY, REVERSAL) with its probability, from the same model below: a base rate from the 9:15 combo\'s historical backtest (if run), nudged by ~10 live signals (futures REMARK, breadth, AVWAP, OI/OBV, Max Pain, IV Skew, PCR, component breadth — see SIGNAL EVIDENCE for the exact weights). <b>Confidence</b> = % of those signals agreeing with the primary direction, dampened further if leading (fast) and lagging (OI-based) signals conflict. <b>Recommended Action</b> only fires BUY CE/PE when that direction is both primary AND &ge;52% — otherwise it\'s WAIT/IRON CONDOR. This is a heuristic probabilistic model, not a backtested guarantee — the 9:15 combo base rate is the only piece with real historical validation.' },
+    'pred-tradeplan': { icon:'bi-map-fill', title:'Trade Plan',
+        body:'Entry/Target/Stop are the NIFTY 50 ASO/AST/BSO/BST strike levels for today, picked based on the Recommended Action above — not a separate calculation. <b>Daily range (VIXL/VIXU)</b> is the expected day range from India VIX and yesterday\'s close, same formula used everywhere else in this app. Only shown when a directional or no-trade recommendation applies; blank levels usually mean the NIFTY 50 open/strike data hasn\'t loaded yet this session.' },
+    't915-summary': { icon:'bi-bar-chart-fill', title:'9:15 Backtest — Overall Summary',
+        body:'Aggregates every trade leg across all ~250 sampled days (each day can produce 1-2 legs — a Buy/Sell day = 1 leg, a Buy/Sell "both sides" day = 2). <b>Win-rate</b> = legs profitable by the 12:00 close vs total legs. <b>Avg P/L</b> is per-leg; <b>Net</b> is the sum across every leg (not compounded, not risk-sized — a raw points total). <b>Avg max-fav/max-adv</b> are the best favourable (MFE) and worst adverse (MAE) point swings from entry, averaged — useful for sizing stops even if you don\'t hold to the theoretical exit. <b>1:1 target hit</b> = how often a one-strike-step target was reached before an equal-distance stop, i.e. the win-rate of the simplest possible fixed exit rule, shown separately from the actual entry/12:00-close P/L above it.' },
+    't915-combo': { icon:'bi-trophy', title:'Per-Combo Edge Table',
+        body:'Groups every sampled day by its exact 9:15 combo (NIFTY-SENSEX-BANK zone) and shows how that combo\'s suggested trade actually performed historically. <b>Bias/Entry Level</b> come from <code>GTB_STRAT_LOOKUP</code> — a fixed rule mapping combo &rarr; suggested direction and entry level, not something backtested per se. <b>Days</b> is the sample size for that combo — rows with very few days (dimmed) are unreliable regardless of how extreme the win-rate looks. <b>Low-VIX/High-VIX</b> splits the same legs at the sample\'s median day-open VIX, so you can see whether a combo\'s edge holds up in both volatility regimes or only one. Today\'s live combo is starred and highlighted. Click any row to see the NIFTY chart for every historical day that combo occurred.' },
+    't915-dow': { icon:'bi-calendar-week', title:'By Day of Week — Strategy Outcome',
+        body:'Same win-rate/P&amp;L/MFE/MAE stats as the summary above, but split by the calendar weekday each day fell on — using the exact same 9:15-combo entry/exit simulation, not a different model. This answers "does the STRATEGY perform differently depending on which weekday it triggers on" — not "does NIFTY itself trend up or down on a given day" (see the Raw Direction table below for that). Every weekday here can include many different 9:15 combos mixed together, so a weekday\'s number is an average across whatever combos happened to occur on that weekday in the sample — it is not isolating a single repeatable setup.' },
+    't915-dow-raw': { icon:'bi-arrow-down-up', title:'Raw Direction by Day of Week',
+        body:'The literal "is Monday bearish?" question — NIFTY\'s own open-to-12:00 direction and % move, grouped by weekday, with <b>no strategy or entry rule involved at all</b> (unlike every other table on this page). <b>Bullish %</b> is the share of sampled days that closed above the day\'s open by noon. With roughly 48-51 samples per weekday, a day needs to clear roughly 63%/37% before it\'s meaningfully outside sampling noise (~&plusmn;7 percentage points at this sample size) — read a 55/45-ish split as "no real edge," not as a bearish/bullish weekday.' },
+    't915-daybyday': { icon:'bi-calendar3', title:'Day-by-Day Detail',
+        body:'One row per sampled trading day — the actual 9:15 close for GIFT/NIFTY/SENSEX/BANK, the resulting strategy combo and entry level, NIFTY\'s move to 12:00, the VIX/VIXU/VIXL context, and the simulated trade\'s result/MFE/MAE/1:1 outcome/entry &amp; peak times. <b>lvl</b> = the entry level (ASO/BSO etc.) was actually reached before 12:00; <b>trd</b> = it never pulled back to the level but the bias still played out, so the entry is simulated at the day\'s open instead. Rows matching today\'s exact 9:15 reading are starred. Click a row\'s chart icon to see that specific day\'s NIFTY candles.' },
+    'pred-915combo': { icon:'bi-alarm', title:'9:15 Combo',
+        body:'Where NIFTY 50/SENSEX/NIFTY BANK\'s first 5-min candle closed relative to their own ASO/AST/BSO/BST strike levels (GIFT NIFTY shown as a pre-market reference, not part of the combo key). The 3-letter combo looks up a Buy/Sell/Sideways bias + suggested entry level in <code>GTB_STRAT_LOOKUP</code>. <b>Historical win rate</b> comes from the 9:15 Backtest tool\'s cached ~250-day results for this exact combo — click this panel to open that backtest and see the full per-combo breakdown, day-by-day detail, and day-of-week splits.' },
     'ps-overview': { icon:'bi-funnel-fill', title:'Positional Screener — how it works',
         body:'Swing-trade screener on <b>daily</b> candles (not the 5-min intraday series every other tool here uses). Scores four independent signals per instrument: <b>Trend</b> (LTP vs SMA20 vs SMA50, &times;2) &middot; <b>20-day Breakout/Breakdown</b> (today\'s close vs the prior 20-day high/low, &times;1.5) &middot; <b>Relative Strength</b> (the stock\'s own 20-day % change minus NIFTY 50\'s, &times;1 — ranks movers against the market, not in absolute terms) &middot; <b>Futures OI buildup</b> (OI + price direction over ~5 trading days on daily FUT candles, &times;1.5).'
             + '<br><br>Composite total &rarr; verdict: <b style="color:var(--gtb-green)">STRONG BUY &ge; 3</b>, <b style="color:var(--gtb-green)">BUY &ge; 1.5</b>, <b style="color:var(--gtb-red)">STRONG SELL &le; &minus;3</b>, <b style="color:var(--gtb-red)">SELL &le; &minus;1.5</b>, otherwise <b>WATCH</b>.'
@@ -9166,6 +9188,7 @@ function _render915Trend(rows) {
          +  'still ran, its a <b>trd</b> entry taken at the open. Evaluated in the <b>morning session till 12:00</b> (pre-Europe); P/L marked at the 12:00 close. '
          +  '<b>Max Fav</b>/<b>Max Adv</b> are the best favourable (MFE) and worst adverse (MAE) swings from the entry; '
          +  '<b>1:1 TP/SL</b> is whether a one-strike-step (' + (rows[0] && rows[0].legs[0] ? rows[0].legs[0].target : 's1') + '-pt) target was hit before an equal stop.</div>';
+    html += '<div class="gtb-t915-combo-h"><i class="bi bi-bar-chart-fill"></i> Overall Summary' + _ii('t915-summary') + '</div>';
     html += '<div class="gtb-t915-stats">'
          +  '<span class="gtb-t915-stat win">✓ ' + win + ' profit</span>'
          +  '<span class="gtb-t915-stat loss">✗ ' + loss + ' loss</span>'
@@ -9181,7 +9204,7 @@ function _render915Trend(rows) {
 
     // ── Per-combo edge table ────────────────────────────────────────────────────
     var vixTxt = vixThresh != null ? vixThresh.toFixed(2) : '—';
-    html += '<div class="gtb-t915-combo-h"><i class="bi bi-trophy"></i> Per-combo edge '
+    html += '<div class="gtb-t915-combo-h"><i class="bi bi-trophy"></i> Per-combo edge' + _ii('t915-combo') + ' '
          +  '<span style="font-weight:400;color:var(--gtb-muted);">(NIFTY-SENSEX-BANK  *  sorted by win-rate  *  low N = unreliable  *  VIX split at median ' + vixTxt + ')</span></div>';
     if (hasToday) html += '<div class="gtb-t915-today-note"><i class="bi bi-star-fill"></i> Today\&#39;s 9:15 combo: <b>' + todayKey + '</b> — highlighted below</div>';
     html += '<table class="gtb-t915-table gtb-t915-combo"><thead><tr>'
@@ -9214,8 +9237,80 @@ function _render915Trend(rows) {
     });
     html += '</tbody></table>';
 
+    // ── By day of week — measured, not folklore ─────────────────────────────────
+    // Generic "Monday effect"/"Friday selloff" claims aren't reliable for a liquid,
+    // heavily-arbitraged index — this instead measures NIFTY's actual win-rate/avg P/L
+    // per weekday over the same sample this whole backtest already fetched, using the
+    // same leg simulation (_gtbSimLeg) as everything else here. No new data source.
+    var DOW_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    var dow = {}; // 1..5 -> { days, legs, win, pnl, mfe, mae }
+    rows.forEach(function (r) {
+        var d = moment(r.date).day();
+        if (d < 1 || d > 5) return; // guard against any stray weekend row
+        if (!dow[d]) dow[d] = { days: 0, legs: 0, win: 0, pnl: 0, mfe: 0, mae: 0 };
+        var c = dow[d]; c.days++;
+        (r.legs || []).forEach(function (lg) {
+            c.legs++; c.pnl += lg.pnl; c.mfe += (lg.mfe || 0); c.mae += (lg.mae || 0);
+            if (lg.win) c.win++;
+        });
+    });
+    html += '<div class="gtb-t915-combo-h"><i class="bi bi-calendar-week"></i> By day of week' + _ii('t915-dow') + ' '
+         +  '<span style="font-weight:400;color:var(--gtb-muted);">(same sample as above, same entry/exit rules — not a generic seasonality claim)</span></div>';
+    html += '<table class="gtb-t915-table gtb-t915-combo"><thead><tr>'
+         +  '<th>Day</th><th>Days sampled</th><th>Win-rate</th><th>Avg P/L</th><th>Avg Max-Fav</th><th>Avg Max-Adv</th></tr></thead><tbody>';
+    [1, 2, 3, 4, 5].forEach(function (d) {
+        var c = dow[d];
+        if (!c || !c.legs) { html += '<tr><td class="gtb-t915-date">' + DOW_NAMES[d] + '</td><td class="gtb-t915-date" colspan="5" style="color:var(--gtb-muted);">No data</td></tr>'; return; }
+        var wp = Math.round(c.win / c.legs * 100);
+        var avgP = c.pnl / c.legs, avgMfe = c.mfe / c.legs, avgMae = c.mae / c.legs;
+        var wc = wp >= 60 ? 'var(--gtb-green)' : wp <= 40 ? 'var(--gtb-red)' : 'var(--gtb-amber)';
+        html += '<tr>'
+            + '<td class="gtb-t915-date" style="font-weight:700;">' + DOW_NAMES[d] + '</td>'
+            + '<td class="gtb-t915-date">' + c.days + '</td>'
+            + '<td style="color:' + wc + ';font-weight:800;font-family:var(--gtb-mono);">' + wp + '%</td>'
+            + '<td style="color:' + (avgP >= 0 ? 'var(--gtb-green)' : 'var(--gtb-red)') + ';font-family:var(--gtb-mono);">' + (avgP >= 0 ? '+' : '') + avgP.toFixed(1) + '</td>'
+            + '<td style="color:var(--gtb-green);font-family:var(--gtb-mono);">+' + avgMfe.toFixed(1) + '</td>'
+            + '<td style="color:var(--gtb-red);font-family:var(--gtb-mono);">-' + avgMae.toFixed(1) + '</td>'
+            + '</tr>';
+    });
+    html += '</tbody></table>';
+
+    // ── Raw directional bias by day of week (index only — no strategy involved) ──
+    // The table above measures the 9:15-combo STRATEGY's outcome per weekday. This one
+    // answers the more literal question — does NIFTY itself tend to close up or down by
+    // noon on a given weekday — using r.move/r.movePct (open → 12:00 close), independent
+    // of any entry/exit rule.
+    var dowDir = {}; // 1..5 -> { days, up, sumMovePct }
+    rows.forEach(function (r) {
+        var d = moment(r.date).day();
+        if (d < 1 || d > 5) return;
+        if (!dowDir[d]) dowDir[d] = { days: 0, up: 0, sumMovePct: 0 };
+        var c = dowDir[d]; c.days++; c.sumMovePct += (r.movePct || 0);
+        if (r.move === 'UP') c.up++;
+    });
+    html += '<div class="gtb-t915-combo-h"><i class="bi bi-arrow-down-up"></i> Raw direction by day of week' + _ii('t915-dow-raw') + ' '
+         +  '<span style="font-weight:400;color:var(--gtb-muted);">(NIFTY open → 12:00 close, no strategy/entry rules — the literal "is Monday bearish?" question)</span></div>';
+    html += '<table class="gtb-t915-table gtb-t915-combo"><thead><tr>'
+         +  '<th>Day</th><th>Days sampled</th><th>Bullish %</th><th>Bearish %</th><th>Avg Move</th></tr></thead><tbody>';
+    [1, 2, 3, 4, 5].forEach(function (d) {
+        var c = dowDir[d];
+        if (!c || !c.days) { html += '<tr><td class="gtb-t915-date">' + DOW_NAMES[d] + '</td><td class="gtb-t915-date" colspan="4" style="color:var(--gtb-muted);">No data</td></tr>'; return; }
+        var upPct = Math.round(c.up / c.days * 100), dnPct = 100 - upPct;
+        var avgMove = c.sumMovePct / c.days;
+        var dirCol = upPct >= 60 ? 'var(--gtb-green)' : upPct <= 40 ? 'var(--gtb-red)' : 'var(--gtb-amber)';
+        html += '<tr>'
+            + '<td class="gtb-t915-date" style="font-weight:700;">' + DOW_NAMES[d] + '</td>'
+            + '<td class="gtb-t915-date">' + c.days + '</td>'
+            + '<td style="color:' + dirCol + ';font-weight:800;font-family:var(--gtb-mono);">' + upPct + '%</td>'
+            + '<td style="color:var(--gtb-muted);font-family:var(--gtb-mono);">' + dnPct + '%</td>'
+            + '<td style="color:' + (avgMove >= 0 ? 'var(--gtb-green)' : 'var(--gtb-red)') + ';font-family:var(--gtb-mono);">' + (avgMove >= 0 ? '+' : '') + avgMove.toFixed(2) + '%</td>'
+            + '</tr>';
+    });
+    html += '</tbody></table>';
+    html += '<div style="font-size:0.5rem;color:var(--gtb-muted);padding:4px 0 8px;">A day here needs to clear ~63%/37% (roughly 2 standard errors on ~50 samples) before "bullish/bearish on this day" is more than noise — read the split above with that in mind rather than as a settled rule.</div>';
+
     var _matchN = hasTodayRaw ? rows.filter(function (r) { return (r.n + '-' + r.s + '-' + r.b) === todayKeyRaw; }).length : 0;
-    html += '<div class="gtb-t915-combo-h"><i class="bi bi-calendar3"></i> Day-by-day'
+    html += '<div class="gtb-t915-combo-h"><i class="bi bi-calendar3"></i> Day-by-day' + _ii('t915-daybyday')
          +  (hasTodayRaw ? '<span style="font-weight:400;color:var(--gtb-muted);"> — ★ ' + _matchN + ' day(s) exactly matched today\&#39;s 9:15 (' + todayKeyRaw + ')</span>' : '')
          +  '</div>';
     html += '<table class="gtb-t915-table"><thead><tr>'
@@ -9288,6 +9383,10 @@ async function _gtbShow915Backtest() {
     }
 }
 jQ(document).on('click', '#show-915-backtest', function (e) { e.preventDefault(); _gtbShow915Backtest(); });
+// 9:15 Combo block in the Predict card (Dashboard/Metrics) — clicking it opens the same
+// full backtest popup as the floating-toolbar icon, since the block already summarizes
+// exactly what that popup breaks down in detail.
+jQ(document).on('click', '.gtb-pred-915-open', function (e) { e.preventDefault(); _gtbShow915Backtest(); });
 
 // Clear cached backtest data (per-day rows + strike-prob) and rebuild fresh.
 jQ(document).on('click', '#gtb-915-clear', function (e) {
@@ -17461,7 +17560,7 @@ function _gtbBuildPrediction(threeCol) {
         // Top: prediction + action
         + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px;">'
         + '<div>'
-        +   '<div style="font-size:0.5rem;color:var(--gtb-muted);margin-bottom:2px;">TODAY\'S PREDICTION</div>'
+        +   '<div style="font-size:0.5rem;color:var(--gtb-muted);margin-bottom:2px;">TODAY\'S PREDICTION' + _ii('pred-verdict') + '</div>'
         +   '<div style="font-size:1.1rem;font-weight:900;color:' + tradeColor + ';">' + primaryScenario.label + '</div>'
         + '</div>'
         + '<div style="margin-left:auto;text-align:right;">'
@@ -17492,7 +17591,7 @@ function _gtbBuildPrediction(threeCol) {
     // ── Trade plan ────────────────────────────────────────────────────────────
     if (tradeEntry || tradeTarget || tradeStop) {
         html += '<div style="background:var(--gtb-surface);padding:10px 12px;margin-bottom:8px;">'
-            + '<div style="font-size:0.55rem;font-weight:800;color:var(--gtb-muted);margin-bottom:6px;letter-spacing:0.05em;"><i class="bi bi-map-fill"></i> TRADE PLAN</div>'
+            + '<div style="font-size:0.55rem;font-weight:800;color:var(--gtb-muted);margin-bottom:6px;letter-spacing:0.05em;"><i class="bi bi-map-fill"></i> TRADE PLAN' + _ii('pred-tradeplan') + '</div>'
             + (tradeEntry  ? '<div style="font-size:0.6rem;margin-bottom:3px;color:var(--gtb-text);"><span style="color:var(--gtb-muted);">Entry → </span>' + tradeEntry  + '</div>' : '')
             + (tradeTarget ? '<div style="font-size:0.6rem;margin-bottom:3px;color:var(--gtb-green);"><span style="color:var(--gtb-muted);">Target → </span>' + tradeTarget + '</div>' : '')
             + (tradeStop   ? '<div style="font-size:0.6rem;margin-bottom:3px;color:var(--gtb-red);"><span style="color:var(--gtb-muted);">Stop → </span>'   + tradeStop   + '</div>' : '')
@@ -17500,9 +17599,9 @@ function _gtbBuildPrediction(threeCol) {
             + '</div>';
     }
 
-    // ── 9:15 Combo block ──────────────────────────────────────────────────────
-    html += '<div style="background:var(--gtb-surface);padding:10px 12px;margin-bottom:8px;">'
-        + '<div style="font-size:0.55rem;font-weight:800;color:var(--gtb-muted);margin-bottom:6px;letter-spacing:0.05em;"><i class="bi bi-alarm"></i> 9:15 COMBO — ' + comboKey + '</div>'
+    // ── 9:15 Combo block — clickable, opens the full 9:15 Backtest popup ────────
+    html += '<div class="gtb-pred-915-open" style="background:var(--gtb-surface);padding:10px 12px;margin-bottom:8px;cursor:pointer;" title="Click to open the full 9:15 Backtest — per-combo breakdown, day-by-day detail, day-of-week splits">'
+        + '<div style="font-size:0.55rem;font-weight:800;color:var(--gtb-muted);margin-bottom:6px;letter-spacing:0.05em;"><i class="bi bi-alarm"></i> 9:15 COMBO — ' + comboKey + _ii('pred-915combo') + '</div>'
         + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px;">'
         + [
             { name: 'NIFTY 50',   z: n915raw },
