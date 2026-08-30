@@ -170,15 +170,29 @@ function _dlFetchKiteInstruments() {
             headers: { 'Authorization': 'token ' + apiKey + ':' + accessToken },
             timeout: 45000,
             onload: function (res) {
+                _dlSetProgress('Response received — HTTP ' + res.status + ', ' + (res.responseText ? res.responseText.length.toLocaleString() : 0) + ' chars. Parsing…');
                 if (res.status !== 200) { reject('HTTP ' + res.status + ' — check API Key/Access Token in Settings'); return; }
                 try { resolve(_dlParseInstrumentsCsv(res.responseText)); }
                 catch (e) { reject('Failed to parse instruments CSV: ' + e.message); }
             },
-            onerror: function () { reject('Request failed (network error or CORS still blocked)'); },
+            onerror: function (e) { reject('Request failed (network error or CORS still blocked)' + (e && e.error ? ' — ' + e.error : '')); },
             ontimeout: function () { reject('Request timed out'); },
+            onprogress: function (e) {
+                if (e && e.lengthComputable) _dlSetProgress('Downloading… ' + (e.loaded / 1048576).toFixed(1) + 'MB' + (e.total ? ' / ' + (e.total / 1048576).toFixed(1) + 'MB' : ''));
+                else if (e) _dlSetProgress('Downloading… ' + (e.loaded / 1048576).toFixed(1) + 'MB');
+            },
         });
     });
     return _dlWithWatchdog(req, 60000, 'Kite Instruments fetch');
+}
+
+// On-screen diagnostic — console.log is useless here (reported: no devtools access on
+// mobile Edge/Android where this whole investigation started), so every step of the load
+// writes directly into the visible #dl-instr-sub line instead. This is the only way to see
+// WHERE it's actually failing (never starts downloading? downloads but never finishes?
+// downloads fully but crashes on parse?) without remote debugging tools.
+function _dlSetProgress(msg) {
+    try { jQ('#dl-instr-sub').text(msg); } catch (e) {}
 }
 
 // ── NSE strike-interval CSV fetch (NSE_FO_SosScheme.csv) ───────────────────
@@ -390,7 +404,14 @@ var _DL_STRIKES = null;
 
 jQ(document).on('click', '#dl-instr-load', function () {
     var $btn = jQ(this).prop('disabled', true).html('<i class="bi bi-hourglass-split"></i> Loading…');
+    // Every step writes to the visible #dl-instr-sub line — no console.log reliance (no
+    // devtools access on mobile Edge/Android, where "click Load, button just re-enables,
+    // no message at all" was reported). This is the only way to see WHERE it actually
+    // fails: never starts? downloads but never finishes? downloads fully but crashes on
+    // parse/IndexedDB write? Each is a different root cause needing a different fix.
+    _dlSetProgress('Starting request…');
     _dlFetchKiteInstruments().then(function (rows) {
+        _dlSetProgress('Parsed ' + rows.length.toLocaleString() + ' rows — writing to IndexedDB…');
         return _dlPutInstruments(rows).then(function () {
             _DL_INSTRUMENTS = rows;
             jQ('#dl-instr-sub').text(rows.length.toLocaleString() + ' instruments — ' + _dlInstrSubText());
@@ -399,7 +420,11 @@ jQ(document).on('click', '#dl-instr-load', function () {
             _gtbToast('Kite instruments loaded (' + rows.length.toLocaleString() + ' rows)', 'success');
         });
     }).catch(function (err) {
-        _gtbToast('Instrument load failed: ' + err, 'error');
+        // Written to the same visible line the progress updates used, so this survives
+        // even if the toast library itself fails to render on this device/viewport.
+        var msg = 'FAILED: ' + err;
+        _dlSetProgress(msg);
+        try { _gtbToast('Instrument load failed: ' + err, 'error'); } catch (toastErr) {}
     }).finally(function () {
         $btn.prop('disabled', false).html('<i class="bi bi-cloud-download"></i> Load');
     });
