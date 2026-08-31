@@ -678,14 +678,18 @@ function callSackBarInfo(message) {
 // index: unique popup ID (e.g. "oi-viewer-scanner")
 // html: content HTML, title: title bar text, width/height: initial dimensions
 // Destroys any existing popup with the same index before creating a new one.
-function showPopUpWindow(index, html, title, width, height) {
+// opts (optional) — extra PopupWindow settings merged in, e.g. { left: 16, top: 70 } to
+// override the library's default centered position (settings.left/top default to "auto",
+// which centers — see popupwindow.js). Every existing caller omits this and keeps the
+// unchanged centered default.
+function showPopUpWindow(index, html, title, width, height, opts) {
     var divId = "pop-up-window-" + index;
     if (jQ("#" + divId).PopupWindow("getState")) jQ("#" + divId).PopupWindow("destroy");
     jQ("body").find("#" + divId).remove()
     var popupCustomClass = 'popup-custom-style-' + index;
     var markup = '<div id="' + divId + '">' + html + '</div>'
     jQ("body").append(markup);
-    jQ("#" + divId).PopupWindow({
+    jQ("#" + divId).PopupWindow(Object.assign({
         title: title, modal: false, customClass: popupCustomClass,
         buttons: { close: true, maximize: true, collapse: true, minimize: true },
         buttonsPosition: "right",
@@ -693,7 +697,7 @@ function showPopUpWindow(index, html, title, width, height) {
                         minimize: "Minimize", unminimize: "Show", collapse: "Collapse", uncollapse: "Expand" },
         draggable: true, dragOpacity: 1, statusBar: true,
         width: width, height: height, resizable: true, resizeOpacity: 1, mouseMoveEvents: true
-    });
+    }, opts || {}));
     jQ.PopupWindowMinimizedArea({ position: "bottom right", direction: "vertical" });
     jQ("#" + divId).on("minimize.popupwindow",   function () { jQ("." + popupCustomClass + " .pop-title-extra").hide(); });
     jQ("#" + divId).on("unminimize.popupwindow", function () { jQ("." + popupCustomClass + " .pop-title-extra").show(); });

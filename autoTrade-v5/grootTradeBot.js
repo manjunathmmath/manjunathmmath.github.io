@@ -390,11 +390,17 @@ function _gtbRenderNowTrade() {
     var avwapVal = (INSTRUMENT_SCORE_MAP['NIFTY 50'] || {}).avwap || 0;
     var ltpAboveAVWAP = (avwapVal && ltp) ? (ltp > avwapVal) : null;
 
-    // Strike levels
+    // Strike levels — anchored to the real 9:15 session open (generateTrend), NOT
+    // INSTRUMENT_SCORE_MAP['NIFTY 50'].open, which despite its name actually holds the last
+    // LIVE LTP (showTopChart sets it to the last chart candle's close, not the true open —
+    // see that assignment's own comment). Using it here silently re-centered the whole ASO/
+    // AST/BSO/BST ladder on whatever the current price happened to be at last chart render,
+    // drifting throughout the day and disagreeing with the correct levels shown everywhere
+    // else in the app — the reported "ASO/BST levels are wrong" bug.
     var aso, ast, bso, bst, vixu, vixl;
     try {
-        var sm = INSTRUMENT_SCORE_MAP['NIFTY 50'] || {};
-        var openP = parseFloat(sm.open) || ltp;
+        var openP = ltp;
+        try { openP = parseFloat(generateTrend('NIFTY 50').open) || ltp; } catch (eOpen) {}
         var sd = getStrikeDetails({ price: openP }, 'NIFTY 50');
         aso = parseFloat(sd.ustrikeOne); ast = parseFloat(sd.ustrikeTwo);
         bso = parseFloat(sd.bstrikeOne); bst = parseFloat(sd.bstrikeTwo);
@@ -407,25 +413,19 @@ function _gtbRenderNowTrade() {
 
     if (!aso || !bso) { el.innerHTML = '<div style="font-size:0.5rem;color:var(--gtb-muted);padding:8px;">Strike levels not ready — wait for chart refresh.</div>'; return; }
 
-    // Direction from composite score + market signal
-    var b9 = {};
-    try { b9 = JSON.parse(localStorage.getItem('VALID_BREAKOUT_NINE_FIFTEEN') || '{}'); } catch(e) {}
-    var _includeLagging = localStorage.getItem('GTB_INCLUDE_LAGGING') !== '0';
-    var SCORE = ALL_9_15_CLOSE_SCORE + NIFTY_50_9_15_CLOSE_SCORE + NIFTY_BANK_9_15_CLOSE_SCORE +
-        GIFT_NIFTY_9_15_CLOSE_SCORE + SENSEX_9_15_CLOSE_SCORE + RELIANCE_9_15_CLOSE_SCORE + HDFCBANK_9_15_CLOSE_SCORE +
-        ALL_ADVANCE_DECLINE_SCORE + NIFTY_50_ADVANCE_DECLINE_SCORE + NIFTY_BANK_ADVANCE_DECLINE_SCORE +
-        ALL_FUTURES_TREND_SCORE + NIFTY_50_FUTURES_TREND_SCORE + NIFTY_BANK_FUTURES_TREND_SCORE +
-        (_includeLagging ? (NIFTY_50_OI_OBV_SCORE + NIFTY_BANK_OI_OBV_SCORE + RELIANCE_OI_OBV_SCORE + HDFCBANK_OI_OBV_SCORE + ICICIBANK_OI_OBV_SCORE +
-            NIFTY_50_MAX_PAIN_SCORE + NIFTY_BANK_MAX_PAIN_SCORE + RELIANCE_MAX_PAIN_SCORE + HDFCBANK_MAX_PAIN_SCORE + ICICIBANK_MAX_PAIN_SCORE +
-            NIFTY_50_IV_SKEW_SCORE + NIFTY_BANK_IV_SKEW_SCORE + RELIANCE_IV_SKEW_SCORE + HDFCBANK_IV_SKEW_SCORE + ICICIBANK_IV_SKEW_SCORE +
-            NIFTY_50_COMPONENT_SCORE + NIFTY_BANK_COMPONENT_SCORE) : 0);
-    var ms = null;
-    try { ms = getMarketSignal(parseFloat(SCORE.toFixed(2)), b9); } catch(e) {}
-    var sig = ms ? ms.signal : 'WAIT';
-
-    var dir = (sig === 'BUY' || sig === 'STRONG BUY') ? 'LONG'
-            : (sig === 'SELL' || sig === 'STRONG SELL') ? 'SHORT'
-            : 'WAIT';
+    // Direction from NIFTY 50's OWN composite score (sc.total) — NOT the broad multi-
+    // instrument market-wide SCORE this used to read via getMarketSignal(). That was a real
+    // bug: this card is titled "NOW TRADE · NIFTY 50" and its confluence tally counts
+    // NIFTY 50's own 6 sub-scores (the same six shown as pills below), but the direction
+    // itself came from a completely different composite (a sum across ~15 global score
+    // variables spanning NIFTY 50, NIFTY BANK, SENSEX, RELIANCE, HDFCBANK, ICICIBANK...).
+    // That let the two disagree — e.g. showing SHORT (from the broad market composite)
+    // while only 3 of NIFTY 50's own 6 sub-scores were actually bearish, an internally
+    // inconsistent-looking "3/6" confluence badge next to a directional call. Using sc.total
+    // for both makes the direction and its own confluence count consistent by construction.
+    // Same ±3 threshold _cmdBuildVerdict already uses elsewhere for "is there a real edge".
+    var bias = sc.total >= 3 ? 1 : sc.total <= -3 ? -1 : 0;
+    var dir = bias > 0 ? 'LONG' : bias < 0 ? 'SHORT' : 'WAIT';
 
     // Confluence: how many of 6 sub-scores agree with direction
     var subs = [sc.nine_fifteen, sc.current_trend, sc.futures_trend, sc.oi_obv, sc.max_pain, sc.iv_skew];
@@ -448,7 +448,7 @@ function _gtbRenderNowTrade() {
 
     if (dir === 'WAIT') {
         el.innerHTML = '<div style="padding:6px 0;">'
-            + '<div style="font-size:0.62rem;font-weight:800;color:var(--gtb-amber);margin-bottom:6px;"><i class="bi bi-hourglass-split"></i> WAIT — ' + (ms ? ms.reason : 'Signals not aligned') + '</div>'
+            + '<div style="font-size:0.62rem;font-weight:800;color:var(--gtb-amber);margin-bottom:6px;"><i class="bi bi-hourglass-split"></i> WAIT — NIFTY 50 composite score ' + (sc.total >= 0 ? '+' : '') + sc.total.toFixed(1) + ' — no clear edge (needs &plusmn;3)</div>'
             + '<div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:4px;">' + pills + '</div>'
             + '</div>';
         return;
@@ -6619,7 +6619,10 @@ function _gtbCreateInstrDetailPopup(minimal) {
     var pw = minimal ? Math.min(winW - 40, 640) : Math.min(winW - 40, 1400);
     var ph = Math.min(winH - 60, 860);
 
-    showPopUpWindow('gtb-instr-detail', body, 'Instrument Detail View', pw, ph);
+    // Minimal mode (chart-page landing) opens pinned near the left edge instead of the
+    // library's default centered position — centered sits on top of the chart's own price
+    // axis/candles; left-aligned keeps more of the actual chart visible alongside it.
+    showPopUpWindow('gtb-instr-detail', body, 'Instrument Detail View', pw, ph, minimal ? { left: 16, top: 70 } : undefined);
 
     var isLight = jQ('#main-trade-bot-container').hasClass('gtb-light')
                || (localStorage.getItem('GTB_THEME') || 'dark') === 'light';
@@ -7009,8 +7012,15 @@ function setScore() {
     computeComponentScores();
 
     // Update OI matrix mini-tables and weightage bars in the instrument panel
+    // SENSEX was missing from this list — its #SENSEX-oimatrix panel in the Overview tab
+    // never got re-rendered on refresh, so it kept showing whatever wall level it last
+    // happened to render (possibly from a much earlier session), while the Dashboard tab's
+    // copy (driven by a separate, complete instrument loop) stayed current — exactly the
+    // "different R1 for SENSEX in Dashboard vs Overview" symptom reported. Same root-cause
+    // class as the earlier SENSEX-missing-from-_phase2 OI/OBV fetch bug, different list.
     try { _gtbRenderOIMatrix('NIFTY 50'); } catch(e) {}
     try { _gtbRenderOIMatrix('NIFTY BANK'); } catch(e) {}
+    try { _gtbRenderOIMatrix('SENSEX'); } catch(e) {}
     try { _gtbRenderOIMatrix('RELIANCE'); } catch(e) {}
     try { _gtbRenderOIMatrix('HDFCBANK'); } catch(e) {}
     try { _gtbRenderOIMatrix('ICICIBANK'); } catch(e) {}
@@ -8463,7 +8473,8 @@ var GTB_INFO = {
     't915-daybyday': { icon:'bi-calendar3', title:'Day-by-Day Detail',
         body:'One row per sampled trading day — the actual 9:15 close for GIFT/NIFTY/SENSEX/BANK, the resulting strategy combo and entry level, NIFTY\'s move to 12:00, the VIX/VIXU/VIXL context, and the simulated trade\'s result/MFE/MAE/1:1 outcome/entry &amp; peak times. <b>lvl</b> = the entry level (ASO/BSO etc.) was actually reached before 12:00; <b>trd</b> = it never pulled back to the level but the bias still played out, so the entry is simulated at the day\'s open instead. Rows matching today\'s exact 9:15 reading are starred. Click a row\'s chart icon to see that specific day\'s NIFTY candles.' },
     'pred-915combo': { icon:'bi-alarm', title:'9:15 Combo',
-        body:'Where NIFTY 50/SENSEX/NIFTY BANK\'s first 5-min candle closed relative to their own ASO/AST/BSO/BST strike levels (GIFT NIFTY shown as a pre-market reference, not part of the combo key). The 3-letter combo looks up a Buy/Sell/Sideways bias + suggested entry level in <code>GTB_STRAT_LOOKUP</code>. <b>Historical win rate</b> comes from the 9:15 Backtest tool\'s cached ~250-day results for this exact combo — click this panel to open that backtest and see the full per-combo breakdown, day-by-day detail, and day-of-week splits.' },
+        body:'Where NIFTY 50/SENSEX/NIFTY BANK\'s first 5-min candle closed relative to their own ASO/AST/BSO/BST strike levels (GIFT NIFTY shown as a pre-market reference, not part of the combo key). The 3-letter combo looks up a Buy/Sell/Sideways bias + suggested entry level in <code>GTB_STRAT_LOOKUP</code> — a fixed, <b>hand-authored</b> rule table covering all 27 possible combos, not something derived from data.'
+            + '<br><br><b>Historical win rate</b> comes separately from the 9:15 Backtest tool\'s cached ~250-day results for this exact combo. The two are independent: a combo can have a Strategy line here even if it has <b>never occurred</b> in the actual 250-day sample — when that happens this panel shows an <b style="color:var(--gtb-amber);">UNVALIDATED</b> tag instead of a win-rate, meaning the Strategy shown is an untested heuristic guess, not a backtested signal. Click this panel to open the full backtest and see the per-combo breakdown, day-by-day detail, and day-of-week splits.' },
     'ps-overview': { icon:'bi-funnel-fill', title:'Positional Screener — how it works',
         body:'Swing-trade screener on <b>daily</b> candles (not the 5-min intraday series every other tool here uses). Scores four independent signals per instrument: <b>Trend</b> (LTP vs SMA20 vs SMA50, &times;2) &middot; <b>20-day Breakout/Breakdown</b> (today\'s close vs the prior 20-day high/low, &times;1.5) &middot; <b>Relative Strength</b> (the stock\'s own 20-day % change minus NIFTY 50\'s, &times;1 — ranks movers against the market, not in absolute terms) &middot; <b>Futures OI buildup</b> (OI + price direction over ~5 trading days on daily FUT candles, &times;1.5).'
             + '<br><br>Composite total &rarr; verdict: <b style="color:var(--gtb-green)">STRONG BUY &ge; 3</b>, <b style="color:var(--gtb-green)">BUY &ge; 1.5</b>, <b style="color:var(--gtb-red)">STRONG SELL &le; &minus;3</b>, <b style="color:var(--gtb-red)">SELL &le; &minus;1.5</b>, otherwise <b>WATCH</b>.'
@@ -17585,6 +17596,7 @@ function _gtbBuildPrediction(threeCol) {
         + '<span style="font-size:0.5rem;color:var(--gtb-muted);">Confidence: <b style="color:' + confColor + ';">' + confLabel + ' (' + confidence + '%)</b></span>'
         + '<span style="font-size:0.5rem;color:var(--gtb-muted);">VIX: <b style="color:' + vixColor + ';">' + (_vixVal ? _vixVal.toFixed(2) + ' · ' + vixRegime : '—') + '</b></span>'
         + (leadLagConflict ? '<span style="font-size:0.5rem;color:var(--gtb-amber);"><i class="bi bi-exclamation-triangle-fill"></i> Lead/Lag conflict</span>' : '')
+        + (!comboStats ? '<span style="font-size:0.5rem;color:var(--gtb-amber);" title="Today\'s 9:15 combo has no historical backtest match — the base rate behind this prediction is a hand-authored heuristic, not measured data"><i class="bi bi-exclamation-triangle-fill"></i> Combo unvalidated</span>' : '')
         + '</div>'
         + '</div>';
 
@@ -17617,10 +17629,12 @@ function _gtbBuildPrediction(threeCol) {
                  + '</div>';
         }).join('')
         + '</div>'
-        + '<div style="font-size:0.55rem;color:var(--gtb-text);">Strategy: <b style="color:' + tradeColor + ';">' + strat.outcome + '</b> — ' + strat.level + '</div>'
+        + '<div style="font-size:0.55rem;color:var(--gtb-text);">Strategy: <b style="color:' + tradeColor + ';">' + strat.outcome + '</b> — ' + strat.level
+        + (!comboStats ? ' <span style="font-size:0.44rem;color:var(--gtb-amber);border:1px solid var(--gtb-amber);padding:0 4px;">UNVALIDATED</span>' : '')
+        + '</div>'
         + (comboStats
             ? '<div style="font-size:0.52rem;color:var(--gtb-muted);margin-top:3px;">Historical: <b style="color:' + (comboStats.winPct >= 55 ? 'var(--gtb-green)' : comboStats.winPct <= 45 ? 'var(--gtb-red)' : 'var(--gtb-amber)') + ';">' + comboStats.winPct + '% win rate</b> over ' + comboStats.legs + ' legs from 250-day backtest</div>'
-            : '<div style="font-size:0.52rem;color:var(--gtb-muted);margin-top:3px;"><i class="bi bi-info-circle"></i> Run 9:15 Backtest to load historical win rates for this combo</div>')
+            : '<div style="font-size:0.52rem;color:var(--gtb-amber);margin-top:3px;"><i class="bi bi-exclamation-triangle-fill"></i> This exact combo hasn\'t occurred in the last 250 trading days — the Strategy line above is a hand-authored heuristic guess, not a backtested signal. Treat it accordingly.</div>')
         + '</div>';
 
     // ── Signal evidence table — collapsed by default, click header to expand ────
@@ -23529,6 +23543,9 @@ function _gtbCreateFloatingBar() {
         // different trigger paths); kept the one with the fuller title, dropped the
         // redundant 'data-load' entry below.
         { id: 'show-data-load-popup',        icon: 'bi-hdd-fill',             title: 'Data Load (Kite Instruments + Strike Intervals)' },
+        { id: 'show-premarket-brief',        icon: 'bi-sunrise-fill',         title: 'Pre-Market Brief' },
+        { id: 'show-quick-oi-obv',           icon: 'bi-speedometer2',         title: 'Quick OI/OBV (NIFTY 50 + BANK, no full sweep)' },
+        { id: 'show-level-fade-scanner',     icon: 'bi-signpost-split-fill',  title: 'Level Fade Scanner (EOD wall scan + pre-market check)' },
         { id: 'show-master-scanner',         icon: 'bi-binoculars-fill',      title: 'Master Scanner (Carry + Profile + SL-Hunt)' },
         { id: 'show-trade-ideas',            icon: 'bi-compass-fill',         title: 'Trade Ideas (Context / Location / Confirmation)' },
         { id: 'show-opportunities',          icon: 'bi-lightning-charge-fill', title: 'Opportunities' },
@@ -23593,6 +23610,9 @@ function _gtbCreateFloatingBar() {
             if (id === 'show-carry-scanner')     { _gtbShowCarryScanner(); return; }
             if (id === 'show-vol-profile')       { _gtbShowVolumeProfile(); return; }
             if (id === 'show-liq-scanner')       { _gtbShowLiquidityScanner(); return; }
+            if (id === 'show-premarket-brief')   { _gtbShowPreMarketBrief(); return; }
+            if (id === 'show-quick-oi-obv')      { _gtbQuickOIOBV(['NIFTY 50', 'NIFTY BANK']); return; }
+            if (id === 'show-level-fade-scanner') { _gtbShowLevelFadeScanner(); return; }
             if (id === 'show-master-scanner')    { _gtbShowMasterScanner(); return; }
             if (id === 'show-trade-ideas')       { _gtbShowTradeIdeas(); return; }
             if (id === 'show-opportunities')     { _gtbShowOpportunitiesPopup(); return; }

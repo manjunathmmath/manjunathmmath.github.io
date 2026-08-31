@@ -313,6 +313,66 @@ async function scanLtpPrice() {
     }
 }
 
+// Quick, targeted OI/OBV check for a small set of instruments (e.g. NIFTY 50 + NIFTY BANK)
+// BEFORE the full ~215-217 instrument sweep (loadOpenPrice + scanLtpPrice) completes.
+// showPrictionProbabilty(name) → generateTrend(name) only needs THIS instrument's entry in
+// INSTRUMENT_LIST_GLOBAL (open/prevClose) + INSTRUMENT_LTP_PRICE (live LTP) — it has no
+// dependency on the 9:15 scan (scanNineFifteenCandle/VALID_BREAKOUT_NINE_FIFTEEN) at all.
+// loadOpenPrice() fetches ALL instruments sequentially (one `await` per instrument in a for
+// loop) and scanLtpPrice() fetches all of them in parallel but still queued through the shared
+// rate limiter — either way NIFTY 50/BANK NIFTY's own price has often already moved by the time
+// their turn comes up in a 215-instrument pass. This fetches ONLY the requested names (typically
+// 2), merges the result into the SAME two localStorage objects those functions write (so it
+// never clobbers data already collected for other instruments), then opens the existing
+// Instrument Detail View popup for each — reusing the same OI/OBV pipeline, no new UI needed.
+async function _gtbQuickOIOBV(names) {
+    try {
+        if (typeof _gtbProgress === 'function') _gtbProgress('Quick OI/OBV: fetching ' + names.join(', ') + '…');
+        let listGlobal = JSON.parse(localStorage.getItem("INSTRUMENT_LIST_GLOBAL")) || {};
+        let ltpObj = JSON.parse(localStorage.getItem("INSTRUMENT_LTP_PRICE")) || {};
+        let toTime = (typeof _gtbCurrDayTo === 'function') ? _gtbCurrDayTo() : CURRENT_DAY;
+
+        await Promise.all(names.map(async function (name) {
+            let token = INSTRUMENT_TOKENS[name];
+            if (!token) return;
+            try {
+                let dayRes = await getHistoricalDataUsingPromise(token, PREVIOUS_DAY, CURRENT_DAY, 'day');
+                let dayCandles = dayRes && dayRes.data && dayRes.data.candles;
+                if (dayCandles && dayCandles.length >= 2) {
+                    let previous = dayCandles[0];
+                    let current = dayCandles[1];
+                    listGlobal[name] = {
+                        name: name,
+                        price: current[1],
+                        prevPrice: previous[4],
+                        perc: parseFloat(current[1] - previous[4]).toFixed(2)
+                    };
+                }
+            } catch (e) { console.log('Quick OI/OBV: day-candle fetch failed for ' + name, e); }
+
+            try {
+                let ltpRes = await getHistoricalDataUsingPromise(token, CURRENT_DAY, toTime, '5minute');
+                let raw = ltpRes && ltpRes.data && ltpRes.data.candles;
+                let candles = (typeof _gtbTrimCandles === 'function') ? _gtbTrimCandles(raw) : raw;
+                if (candles && candles.length) {
+                    ltpObj[name] = { name: name, ltp: parseFloat(candles[candles.length - 1][4]).toFixed(2) };
+                }
+            } catch (e) { console.log('Quick OI/OBV: LTP fetch failed for ' + name, e); }
+        }));
+
+        localStorage.setItem("INSTRUMENT_LIST_GLOBAL", JSON.stringify(listGlobal));
+        localStorage.setItem("INSTRUMENT_LTP_PRICE", JSON.stringify(ltpObj));
+        if (typeof _gtbProgress === 'function') _gtbProgress('Quick OI/OBV ready', 'green');
+
+        names.forEach(function (name) {
+            if (typeof _gtbOpenInstrDetailFor === 'function') _gtbOpenInstrDetailFor(name, false);
+        });
+    } catch (err) {
+        console.log('Quick OI/OBV failed', err);
+        if (typeof callSackBar === 'function') callSackBar('Quick OI/OBV failed — see console');
+    }
+}
+
 // .ready() callback must stay a plain (non-async) function here — confirmed live that an
 // `async function` passed directly to jQ(document).ready(...) never fires its callback at
 // all on this page (Kite's chart page specifically), while a plain function does. The

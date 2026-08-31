@@ -596,4 +596,529 @@ function _psRenderTable() {
     jQ('#ps-table-wrap').html(html);
 }
 jQ(document).on('change', '#ps-filter, #ps-sort', _psRenderTable);
+
+// ─── Pre-Market Brief ───────────────────────────────────────────────────────
+// Live-fetches everything on one button click — no reliance on whatever happens to
+// already be cached, and no deferral to the 9:15 combo. Two inputs feed one combined
+// trend verdict:
+//   1. Global cues — GIFT NIFTY, CRUDEOILM, USDINR: each freshly fetched via
+//      _psFetchDaily's 'day'-interval candles, whose LAST candle (today) always reflects
+//      the true live state (same property documented for scanLtpPrice elsewhere in this
+//      app) — so candles[len-1].close = live price, candles[len-2].close = prior close,
+//      with no dependency on any other tab/popup having been opened first.
+//   2. OI Carryover Shortlist — reuses _psComputeSetup (positionalScreener.js's own pure
+//      scoring function, same one the main Positional Screener uses) to find NIFTY 50/BANK
+//      NIFTY top-10 weighted constituents carrying a LONG BUILDUP or SHORT BUILDUP futures
+//      OI read vs ~5 trading days ago.
+// Combined trend: GIFT NIFTY's % change (weight 2, the primary global cue) plus the net
+// buildup count (long stocks minus short stocks, weight 0.5 each) — simple, transparent,
+// shown with its own components broken out rather than a hidden black-box number.
+function _gtbShowPreMarketBrief() {
+    var _cls = 'popup-custom-style-premarket-brief';
+    var html = '<div id="pmb-wrap" style="height:100%;overflow:auto;padding:10px;background:var(--gtb-bg);color:var(--gtb-text);font-size:0.65rem;">'
+        + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">'
+        + '<span style="font-size:0.5rem;color:var(--gtb-muted);">Fetches GIFT NIFTY/Crude/USDINR live + scans NIFTY 50/BANK NIFTY top-10 for OI carryover.</span>'
+        + '<button id="pmb-scan-btn" style="margin-left:auto;padding:4px 14px;font-size:0.65rem;background:var(--gtb-accent,#58a6ff);color:#fff;border:none;border-radius:3px;cursor:pointer;font-weight:700;"><i class="bi bi-lightning-fill"></i> Fetch Live</button>'
+        + '</div>'
+        + '<div id="pmb-progress" style="font-size:0.55rem;color:var(--gtb-muted);min-height:16px;margin-bottom:6px;"></div>'
+        + '<div id="pmb-trend"></div>'
+        + '<div id="pmb-cues"><div style="padding:16px;text-align:center;color:var(--gtb-muted);">Click <b>Fetch Live</b> to load today\'s pre-market read.</div></div>'
+        + '<div style="display:flex;align-items:center;gap:8px;margin:12px 0 6px;">'
+        + '<span style="font-size:0.6rem;font-weight:800;color:var(--gtb-muted);letter-spacing:0.05em;"><i class="bi bi-arrow-repeat"></i> OI CARRYOVER SHORTLIST</span>'
+        + '</div>'
+        + '<div id="pmb-results"></div>'
+        + '</div>';
+
+    showPopUpWindow('premarket-brief', html, 'Pre-Market Brief', 640, 620);
+    var _title = '<div style="display:flex;align-items:center;gap:6px;width:100%;">'
+        + '<i class="bi bi-sunrise-fill" style="font-size:0.75rem;"></i>'
+        + '<span style="font-weight:800;font-size:0.7rem;">PRE-MARKET BRIEF</span>'
+        + popupWinControls(_cls) + '</div>';
+    jQ('.' + _cls).find('.popupwindow_titlebar_text').html(_title);
+    hideNativePopupButtons(_cls);
+    jQ('.' + _cls).find('.popupwindow_titlebar').removeClass('popupwindow_titlebar_draggable');
+    jQ('.' + _cls).toggleClass('gtb-light', (localStorage.getItem('GTB_THEME') || 'dark') === 'light');
+}
+
+// Live change% for any NSE/MCX instrument via a fresh 'day'-interval fetch — candles[len-1]
+// is today (always live for a 'day' candle), candles[len-2] is the prior close.
+async function _pmbLiveChange(token) {
+    if (!token) return null;
+    var candles = await _psFetchDaily(token, 6);
+    if (!candles || candles.length < 2) return null;
+    // Kite only returns a 'day' candle for today once that exchange's session has actually
+    // started — before that, candles[last] is silently still YESTERDAY's candle, which
+    // would otherwise get misread as "today's live move" (a real gap found while explaining
+    // this to the user: checking before MCX/CDS session start, or before GIFT NIFTY's own
+    // session opens, would compare yesterday-vs-day-before and call it today with no
+    // indication anything was off). Verify the last candle's own date before trusting it.
+    var todayStr = (typeof CURRENT_DAY !== 'undefined' && CURRENT_DAY) ? CURRENT_DAY : moment().format('YYYY-MM-DD');
+    var lastDateStr = moment(candles[candles.length - 1][0]).format('YYYY-MM-DD');
+    if (lastDateStr !== todayStr) {
+        return { notOpen: true, lastDate: lastDateStr, lastClose: parseFloat(candles[candles.length - 1][4]) };
+    }
+    var todayClose = parseFloat(candles[candles.length - 1][4]);
+    var prevClose = parseFloat(candles[candles.length - 2][4]);
+    if (!prevClose) return null;
+    return { chg: (todayClose - prevClose) / prevClose * 100, ltp: todayClose };
+}
+
+jQ(document).on('click', '#pmb-scan-btn', async function () {
+    var $btn = jQ(this).prop('disabled', true).html('<i class="bi bi-hourglass-split"></i> Fetching…');
+
+    // ── 1. Global cues — live ────────────────────────────────────────────────
+    jQ('#pmb-progress').text('Fetching GIFT NIFTY / Crude / USDINR…');
+    var giftTok = (typeof INSTRUMENT_TOKENS !== 'undefined') ? INSTRUMENT_TOKENS['GIFT NIFTY'] : null;
+    var crudeEntry = _psFutEntryFor('CRUDEOILM');
+    var usdinrEntry = _psFutEntryFor('USDINR');
+    var gift = null, crude = null, usdinr = null;
+    try { gift = await _pmbLiveChange(giftTok); } catch (e) {}
+    try { crude = await _pmbLiveChange(crudeEntry && crudeEntry.instrument_token); } catch (e) {}
+    try { usdinr = await _pmbLiveChange(usdinrEntry && usdinrEntry.instrument_token); } catch (e) {}
+
+    function _cueRow(label, r, note) {
+        if (!r) return '<div style="display:flex;justify-content:space-between;padding:5px 8px;border-bottom:1px solid var(--gtb-border);"><span style="color:var(--gtb-muted);">' + label + '</span><span style="color:var(--gtb-muted);">No data</span></div>';
+        if (r.notOpen) {
+            return '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 8px;border-bottom:1px solid var(--gtb-border);">'
+                + '<span>' + label + '</span>'
+                + '<span style="font-size:0.46rem;color:var(--gtb-amber);" title="Last available candle is dated ' + r.lastDate + ', not today — this market/session hasn\'t started yet"><i class="bi bi-clock-history"></i> Not open yet (last: ' + r.lastClose.toFixed(2) + ' on ' + r.lastDate + ')</span>'
+                + '</div>';
+        }
+        var col = r.chg > 0.05 ? 'var(--gtb-green)' : r.chg < -0.05 ? 'var(--gtb-red)' : 'var(--gtb-muted)';
+        var arrow = r.chg > 0.05 ? '▲' : r.chg < -0.05 ? '▼' : '—';
+        return '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 8px;border-bottom:1px solid var(--gtb-border);">'
+            + '<span>' + label + (note ? ' <span style="font-size:0.46rem;color:var(--gtb-muted);">' + note + '</span>' : '') + '</span>'
+            + '<span style="font-weight:800;font-family:var(--gtb-mono);color:' + col + ';">' + arrow + ' ' + (r.chg >= 0 ? '+' : '') + r.chg.toFixed(2) + '% <span style="color:var(--gtb-muted);font-weight:400;">(' + r.ltp.toFixed(2) + ')</span></span>'
+            + '</div>';
+    }
+    jQ('#pmb-cues').html('<div style="background:var(--gtb-surface);border:1px solid var(--gtb-border);">'
+        + _cueRow('GIFT NIFTY', gift, '— global cue for NIFTY\'s likely gap')
+        + _cueRow('CRUDEOILM', crude)
+        + _cueRow('USDINR', usdinr)
+        + '</div>');
+
+    // ── 2. OI carryover shortlist — live ─────────────────────────────────────
+    var names = Object.keys(Object.assign({}, (typeof NIFTY_50_WEIGHTED_STOCKS !== 'undefined' ? NIFTY_50_WEIGHTED_STOCKS : {}),
+                                              (typeof NIFTY_BANK_WEIGHTED_STOCKS !== 'undefined' ? NIFTY_BANK_WEIGHTED_STOCKS : {})));
+    var results = [];
+    for (var i = 0; i < names.length; i++) {
+        var name = names[i];
+        jQ('#pmb-progress').text('Scanning ' + name + ' (' + (i + 1) + '/' + names.length + ')…');
+        try {
+            var priceTok = _psPriceTokenFor(name);
+            var futEntry = _psFutEntryFor(name);
+            if (!priceTok || !futEntry) continue;
+            var daysToExp = _psDaysToExpiry(futEntry.expiry);
+            var candlesP = await _psFetchDaily(priceTok, 40);
+            var futCandlesP = await _psFetchDaily(futEntry.instrument_token, 40);
+            var setup = _psComputeSetup(candlesP, futCandlesP, 0, futEntry.instrument_token, daysToExp);
+            if (setup && (setup.oiLabel === 'LONG BUILDUP' || setup.oiLabel === 'SHORT BUILDUP')) {
+                results.push({ name: name, oiLabel: setup.oiLabel, oiScore: setup.oiScore, ltp: setup.ltp });
+            }
+        } catch (e) {}
+    }
+    jQ('#pmb-progress').text('Done — ' + results.length + ' of ' + names.length + ' showing fresh OI buildup.');
+    $btn.prop('disabled', false).html('<i class="bi bi-lightning-fill"></i> Fetch Live');
+
+    var longs = results.filter(function (r) { return r.oiLabel === 'LONG BUILDUP'; });
+    var shorts = results.filter(function (r) { return r.oiLabel === 'SHORT BUILDUP'; });
+
+    function _list(rows, color) {
+        if (!rows.length) return '<div style="font-size:0.5rem;color:var(--gtb-muted);padding:4px 0;">None</div>';
+        return rows.map(function (r) {
+            var link = _psChartLink(r.name, _psPriceTokenFor(r.name));
+            return '<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 6px;border-bottom:1px solid var(--gtb-border);">'
+                + '<a href="' + link + '" target="_blank" rel="noopener" style="color:' + color + ';font-weight:700;">' + r.name + '</a>'
+                + '<span style="font-family:var(--gtb-mono);color:var(--gtb-muted);">' + r.ltp.toFixed(1) + '</span>'
+                + '</div>';
+        }).join('');
+    }
+    jQ('#pmb-results').html(
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">'
+        + '<div><div style="font-size:0.52rem;font-weight:800;color:var(--gtb-green);margin-bottom:4px;">▲ LONG BUILDUP (' + longs.length + ')</div>' + _list(longs, 'var(--gtb-green)') + '</div>'
+        + '<div><div style="font-size:0.52rem;font-weight:800;color:var(--gtb-red);margin-bottom:4px;">▼ SHORT BUILDUP (' + shorts.length + ')</div>' + _list(shorts, 'var(--gtb-red)') + '</div>'
+        + '</div>'
+    );
+
+    // ── 3. Combined trend verdict ─────────────────────────────────────────────
+    // netScore = GIFT NIFTY change% × 2 (primary global cue) + (long count − short count) × 0.5
+    // Purely a weighted sum of the two components above — shown broken out, not hidden.
+    // GIFT NIFTY not open yet -> no live cue to weigh in; net score falls back to the
+    // buildup count alone rather than silently treating "no data" as "flat/0%".
+    var giftOpen = gift && !gift.notOpen;
+    var giftChg = giftOpen ? gift.chg : 0;
+    var netScore = giftChg * 2 + (longs.length - shorts.length) * 0.5;
+    var trendLabel, trendCol;
+    if (netScore >= 1.5) { trendLabel = 'BULLISH'; trendCol = 'var(--gtb-green)'; }
+    else if (netScore <= -1.5) { trendLabel = 'BEARISH'; trendCol = 'var(--gtb-red)'; }
+    else { trendLabel = 'MIXED / NEUTRAL'; trendCol = 'var(--gtb-amber)'; }
+
+    // Deliberately NOT gated on "is NSE cash open right now" — GIFT NIFTY trades an extended
+    // ~21-hour session specifically so it can serve as a forward cue for the NEXT session at
+    // any time of day, and once today's OI buildup candle finalizes at close, that's the
+    // COMPLETE carryover picture into tomorrow, not stale data. So this is always framed as
+    // "cue for the next session," whether that's in 5 minutes or in 16 hours — GIFT NIFTY's
+    // own change vs ITS OWN previous close (via _pmbLiveChange) is what makes that valid
+    // continuously, not a fixed market-hours cutoff.
+    jQ('#pmb-trend').html(
+        '<div style="background:var(--gtb-surface);border-left:4px solid ' + trendCol + ';padding:10px 12px;margin-bottom:10px;">'
+        + '<div style="font-size:0.5rem;color:var(--gtb-muted);margin-bottom:2px;">TREND FOR THE NEXT TRADING SESSION</div>'
+        + '<div style="font-size:1rem;font-weight:900;color:' + trendCol + ';margin-bottom:4px;">' + trendLabel + '</div>'
+        + '<div style="font-size:0.48rem;color:var(--gtb-muted);">GIFT NIFTY ' + (giftOpen ? ((giftChg >= 0 ? '+' : '') + giftChg.toFixed(2) + '% ×2') : '<span style="color:var(--gtb-amber);">not open yet — excluded</span>') + ' &nbsp;+&nbsp; Buildup net ' + (longs.length - shorts.length >= 0 ? '+' : '') + (longs.length - shorts.length) + ' (' + longs.length + ' long − ' + shorts.length + ' short) ×0.5 &nbsp;=&nbsp; <b style="color:' + trendCol + ';">' + (netScore >= 0 ? '+' : '') + netScore.toFixed(2) + '</b></div>'
+        + '<div style="font-size:0.44rem;color:var(--gtb-muted);margin-top:4px;">GIFT NIFTY\'s change is always vs its OWN previous close, so this stays a forward cue for the next session at any time of day — not a validated signal, just a live-computed lean.</div>'
+        + '</div>'
+    );
+});
 jQ(document).on('input', '#ps-search', _psRenderTable);
+
+// ── Level Fade Scanner ───────────────────────────────────────────────────────
+// Two-part workflow the user runs by hand at two points in the day:
+//   1. EOD SCAN (run after market close) — for every instrument with cached OI/OBV data
+//      (INSTRUMENT_SCORE_MAP[name].oiData from today's last refresh), checks whether today's
+//      CLOSE sits right on a ranked OI wall (_gtbFindWalls, OBV-ranked, not just nearest
+//      strike) and that wall is still intact (_gtbWallErosion says the writers behind it
+//      haven't started unwinding). Close near an intact support -> tradable LONG for the next
+//      session; close near an intact resistance -> tradable SHORT. Saved to localStorage keyed
+//      by date so it survives into tomorrow.
+//   2. PRE-MARKET CHECK (run next session, once today's open print exists) — reloads
+//      yesterday's saved shortlist and compares TODAY's open against the SAME wall level:
+//      still holding near it -> CONFIRMED; gapped through it -> INVALIDATED; gapped away from
+//      it -> flagged stale rather than silently carried over.
+// Deliberately reuses the existing wall-ranking/erosion primitives (already built for the
+// dashboard's chart annotations) instead of re-deriving support/resistance from scratch —
+// same reasoning as every other scanner in this app: one source of truth for "what is a wall."
+var _LVS_PROX_PCT = 0.4; // % distance from a wall to count as "price is AT this level"
+
+// Pure, cache-only: does `name`'s current spot sit on an intact OI wall? Returns null if no
+// cached OI data, no wall within range, or the nearby wall is actively eroding (writers
+// covering — don't fade a wall that's already failing).
+function _lvsWallCheck(name) {
+    var sm = (typeof INSTRUMENT_SCORE_MAP !== 'undefined') ? INSTRUMENT_SCORE_MAP[name] : null;
+    if (!sm || !sm.oiData || !sm.oiData.tableData || !sm.oiData.tableData.length) return null;
+    var td = sm.oiData.tableData;
+
+    // spot MUST be the real live/last-traded price, not the ATM-strike row's own strike —
+    // the two can disagree by a wide margin whenever the option chain's ATM was picked off a
+    // stale INSTRUMENT_LTP_PRICE (e.g. from earlier in the session, before the EOD scan's own
+    // fresh scanLtpPrice() call), and even with a fresh LTP the strike itself is only the
+    // nearest listed strike (₹10+ gaps on names like HDFCBANK) — using it as "spot" silently
+    // rounds every distance-to-wall calc and mislabels the row's displayed "Close" price.
+    var priceChange = 0, spot = 0;
+    try { var t = generateTrend(name); spot = parseFloat(t.ltp) || 0; priceChange = t.change || 0; } catch (e) {}
+    if (!spot) {
+        // Fallback only if live LTP truly isn't available for this name.
+        td.forEach(function (item) { if (item['ATM_STRIKE']) spot = parseFloat(item['STRIKE']) || 0; });
+    }
+    if (!spot) return null;
+
+    var walls, erosion;
+    try {
+        walls = _gtbFindWalls(td, priceChange, spot);
+        erosion = _gtbWallErosion(td, walls);
+    } catch (e) { return null; }
+
+    function _nearest(list) {
+        var best = null;
+        (list || []).forEach(function (w) {
+            var dist = Math.abs(spot - w.strike) / spot * 100;
+            if (dist <= _LVS_PROX_PCT && (!best || dist < best.dist)) best = { strike: w.strike, dist: dist, tier: w.tier };
+        });
+        return best;
+    }
+    var nearRes = _nearest(walls.resistance);
+    var nearSup = _nearest(walls.support);
+    if (!nearRes && !nearSup) return null;
+
+    var side, pick;
+    if (nearSup && (!nearRes || nearSup.dist <= nearRes.dist)) { side = 'S'; pick = nearSup; }
+    else { side = 'R'; pick = nearRes; }
+
+    var eroding = (erosion.eroding || []).some(function (e) { return e.side === side && e.strike === pick.strike; });
+    if (eroding) {
+        return { name: name, spot: spot, side: side === 'S' ? 'support' : 'resistance', wallStrike: pick.strike,
+            distPct: pick.dist, tier: pick.tier, bias: null, eroding: true,
+            reason: (side === 'S' ? 'Support' : 'Resistance') + ' ' + pick.strike + ' is eroding — writers unwinding, no trade' };
+    }
+    var bias = side === 'S' ? 'LONG' : 'SHORT';
+    return { name: name, spot: spot, side: side === 'S' ? 'support' : 'resistance', wallStrike: pick.strike,
+        distPct: pick.dist, tier: pick.tier, bias: bias, eroding: false,
+        reason: 'Closed near ' + (side === 'S' ? 'support' : 'resistance') + ' ' + pick.strike
+            + ' (' + pick.dist.toFixed(2) + '% away), wall intact' };
+}
+
+// Full universe for the EOD scan: every F&O stock (FO_LIST, populated by dataLoad.js from
+// Kite's real instrument list — the ~200+ names the user actually wants covered, not just
+// whatever happens to already be sitting in cache) plus the core indices/stocks that don't
+// live in FO_LIST under the same name. _gtbAllOIInstruments() (cache-only) was the wrong tool
+// here — it only reports what SOME popup happened to fetch earlier in the session, silently
+// skipping any of the 200+ stocks nobody clicked into today.
+function _lvsFullUniverse() {
+    var list = [];
+    try { list = (typeof FO_LIST !== 'undefined' && FO_LIST.length) ? FO_LIST.slice() : []; } catch (e) {}
+    ['NIFTY 50', 'NIFTY BANK', 'SENSEX', 'RELIANCE', 'HDFCBANK', 'ICICIBANK'].forEach(function (n) {
+        if (list.indexOf(n) === -1) list.push(n);
+    });
+    return list;
+}
+
+// Actively fetches OI/OBV for every name in `names` (ATM ±2 strikes — same trade-off already
+// used by fetchWeightedStocksOIScore: enough signal without a full-width fetch per stock),
+// writing straight into INSTRUMENT_SCORE_MAP[name].oiData/oi_obv/pcr/chPcr so _lvsWallCheck can
+// read it immediately after. Needs INSTRUMENT_LIST_GLOBAL/INSTRUMENT_LTP_PRICE already populated
+// for these names (i.e. run this AFTER the normal end-of-day "Load Prices" + refresh has
+// completed for the full ~215-217 instrument universe) — showTrendingOI's generateTrend() call
+// depends on that, same precondition every other OI fetch in this app has.
+// CONC=4 matches fetchWeightedStocksOIScore's own concurrency choice (balances speed vs Kite
+// rate limits) — with 200+ names this still takes a few minutes, which is fine run once after
+// close, not time-critical the way an intraday refresh is.
+async function _lvsActiveFetchOI(names, onProgress) {
+    var CONC = 4;
+    var done = 0;
+    async function _scanOne(name) {
+        try {
+            var oiData = await showTrendingOI(name, 2);
+            done++;
+            if (onProgress) onProgress(name, done, names.length);
+            if (!oiData || !oiData.tableData) return;
+            if (!INSTRUMENT_SCORE_MAP[name]) INSTRUMENT_SCORE_MAP[name] = {};
+            INSTRUMENT_SCORE_MAP[name].oi_obv = computeOIScoreFromData(oiData);
+            INSTRUMENT_SCORE_MAP[name].pcr    = oiData.pcr;
+            INSTRUMENT_SCORE_MAP[name].chPcr  = oiData.chPcr;
+            INSTRUMENT_SCORE_MAP[name].oiData = oiData;
+            try { _gtbComputeOIExtras(name, oiData); } catch (e2) {}
+        } catch (e) {
+            done++;
+            if (onProgress) onProgress(name, done, names.length);
+        }
+    }
+    for (var i = 0; i < names.length; i += CONC) {
+        await Promise.all(names.slice(i, i + CONC).map(_scanOne));
+    }
+}
+
+async function _gtbRunEodLevelScan(onProgress, onPhase) {
+    // Force a fresh LTP snapshot for the WHOLE instrument universe right before fetching OI —
+    // otherwise showTrendingOI() (via generateTrend) picks the ATM strike off whatever
+    // INSTRUMENT_LTP_PRICE happened to be last written, which can be an hour or more stale if
+    // scanLtpPrice() hasn't run since. Real bug hit while building this: a stock's "Close" in
+    // the shortlist showed a price from ~12:15 (last LTP refresh) while the actual 15:10 close
+    // was ~1.4% away — not just ATM-strike rounding, an outright stale-cache read.
+    if (onPhase) onPhase('Refreshing LTP for all instruments…');
+    try { await scanLtpPrice(); } catch (e) { console.log('EOD level scan: LTP refresh failed', e); }
+
+    var universe = _lvsFullUniverse();
+    if (onPhase) onPhase('Fetching OI/OBV for ' + universe.length + ' instruments…');
+    await _lvsActiveFetchOI(universe, onProgress);
+    var results = [];
+    universe.forEach(function (name) {
+        var r = _lvsWallCheck(name);
+        if (r && r.bias) results.push(r);
+    });
+    var dateStr = (typeof CURRENT_DAY !== 'undefined' && CURRENT_DAY) ? CURRENT_DAY : _psDateStr(new Date());
+    localStorage.setItem('GTB_LEVEL_SCAN_' + dateStr, JSON.stringify({ date: dateStr, results: results, savedAt: Date.now() }));
+    return { date: dateStr, results: results };
+}
+
+// Most recent saved EOD scan strictly before `dateStr` (ISO date keys sort lexically).
+function _lvsFindLatestScanBefore(dateStr) {
+    var prefix = 'GTB_LEVEL_SCAN_';
+    var keys = Object.keys(localStorage).filter(function (k) { return k.indexOf(prefix) === 0; });
+    var before = keys.filter(function (k) { return k.slice(prefix.length) < dateStr; }).sort();
+    if (!before.length) return null;
+    try { return JSON.parse(localStorage.getItem(before[before.length - 1])); } catch (e) { return null; }
+}
+
+// Turns a resolved openPx into the same CONFIRMED/INVALIDATED/STALE verdict either data
+// source (WebSocket tick or historical day-candle) produces — kept as one function so the
+// two sources can never silently drift into different thresholds.
+function _lvsVerdictFor(r, openPx) {
+    var distPct = Math.abs(openPx - r.wallStrike) / r.wallStrike * 100;
+    var holding = distPct <= _LVS_PROX_PCT * 2;
+    var throughLevel = r.bias === 'LONG' ? (openPx < r.wallStrike) : (openPx > r.wallStrike);
+    if (throughLevel) return { status: 'INVALIDATED — gapped through ' + r.side, statusCol: 'var(--gtb-red)' };
+    if (holding) return { status: 'CONFIRMED — open holding near ' + r.side, statusCol: 'var(--gtb-green)' };
+    return { status: 'STALE — gapped away (' + distPct.toFixed(2) + '%), thesis no longer at the level', statusCol: 'var(--gtb-muted)' };
+}
+
+// Reads today's open straight off the live ticker (quoteWs.js) instead of a historical
+// 'day'-candle fetch. Per live observation, the WebSocket's 'full' mode packet already
+// carries a real Open during the 9:00-9:08 pre-open session (screenshot showed SENSEX/NIFTY
+// 50/NIFTY FIN SERVICE all populated well before 9:15) — the historical day-candle approach
+// can't do that (Kite's day-candle for "today" doesn't exist until the regular session has
+// actually started, same limitation _pmbLiveChange documents for GIFT NIFTY/Crude/USDINR).
+// Whether the plain REST Quote API also reflects pre-open is unconfirmed here, so this reads
+// the ticker the user already verified works, not the Quote API.
+// Requires the WebSocket Subscribe popup to have been connected at least once and LEFT OPEN
+// (closing it disconnects — see showWebSocketPopup's close.popupwindow handler) — _QW_WS/
+// _QW_SUBSCRIBED/_QW_LAST_TICK are module-level globals in quoteWs.js, so they stay valid
+// even while that popup isn't the frontmost window, as long as it hasn't been closed.
+function _lvsReadFromWs(names) {
+    if (typeof _QW_WS === 'undefined' || !_QW_WS || _QW_WS.readyState !== WebSocket.OPEN) return null;
+
+    // Seed the WebSocket popup's own full default list (INDICES + all weighted constituents)
+    // FIRST if nothing is subscribed yet — otherwise adding just this shortlist's handful of
+    // names here leaves _QW_SUBSCRIBED non-empty, which then silently blocks
+    // showWebSocketPopup()'s own "seed default list if empty" check the next time that popup
+    // is opened, stranding the user with only 2-3 tickers instead of the full default set.
+    var subscribedNew = false;
+    if (!Object.keys(_QW_SUBSCRIBED).length && typeof _qwDefaultSubscribeList === 'function') {
+        _qwDefaultSubscribeList();
+        subscribedNew = true; // _qwDefaultSubscribeList only populates the local map — still needs sending below
+    }
+
+    names.forEach(function (name) {
+        var tok = (typeof INSTRUMENT_TOKENS !== 'undefined') ? INSTRUMENT_TOKENS[name] : null;
+        if (tok && !_QW_SUBSCRIBED[tok]) { _QW_SUBSCRIBED[tok] = name; subscribedNew = true; }
+    });
+    if (subscribedNew) _qwWsSubscribeAll();
+    var out = {};
+    names.forEach(function (name) {
+        var tok = (typeof INSTRUMENT_TOKENS !== 'undefined') ? INSTRUMENT_TOKENS[name] : null;
+        var tick = tok ? _QW_LAST_TICK[tok] : null;
+        out[name] = (tick && tick.open) ? { open: tick.open, justSubscribed: subscribedNew } : null;
+    });
+    return out;
+}
+
+// Compares yesterday's saved shortlist against TODAY's open — WebSocket tick first (works
+// pre-9:15, see _lvsReadFromWs), falling back to the historical day-candle fetch (only valid
+// once the regular session has started) when the WS isn't connected.
+async function _gtbRunPreMarketLevelCheck() {
+    var today = (typeof CURRENT_DAY !== 'undefined' && CURRENT_DAY) ? CURRENT_DAY : _psDateStr(new Date());
+    var prev = _lvsFindLatestScanBefore(today);
+    if (!prev || !prev.results || !prev.results.length) return { date: prev ? prev.date : null, rows: [] };
+
+    var names = prev.results.map(function (r) { return r.name; });
+    var wsData = _lvsReadFromWs(names);
+    var usedWs = !!wsData;
+
+    var rows = await Promise.all(prev.results.map(async function (r) {
+        var openPx = null, waitingForTick = false;
+        if (usedWs) {
+            var w = wsData[r.name];
+            if (w) openPx = w.open;
+            else waitingForTick = true;
+        } else {
+            try {
+                var token = _psPriceTokenFor(r.name);
+                var candles = await _psFetchDaily(token, 3);
+                if (candles && candles.length) {
+                    var last = candles[candles.length - 1];
+                    var lastDateStr = moment(last[0]).format('YYYY-MM-DD');
+                    if (lastDateStr === today) openPx = parseFloat(last[1]);
+                }
+            } catch (e) {}
+        }
+
+        if (openPx == null) {
+            var msg = usedWs ? 'WAITING FOR TICK' + (waitingForTick ? ' (just subscribed)' : '') : 'NOT OPEN YET';
+            return Object.assign({}, r, { openPx: null, status: msg, statusCol: 'var(--gtb-amber)' });
+        }
+        var verdict = _lvsVerdictFor(r, openPx);
+        return Object.assign({}, r, { openPx: openPx, status: verdict.status, statusCol: verdict.statusCol });
+    }));
+    return { date: prev.date, rows: rows, usedWs: usedWs };
+}
+
+function _lvsRowHtml(r, showOpen) {
+    var link = _psChartLink(r.name, _psPriceTokenFor(r.name));
+    var biasCol = r.bias === 'LONG' ? 'var(--gtb-green)' : 'var(--gtb-red)';
+    var priceCell = showOpen
+        ? (r.openPx != null ? 'Open ' + r.openPx.toFixed(2) : '—') + ' <span style="color:var(--gtb-muted);">vs wall ' + r.wallStrike + '</span>'
+        : 'Close ' + r.spot.toFixed(2) + ' <span style="color:var(--gtb-muted);">vs wall ' + r.wallStrike + '</span>';
+    var statusHtml = showOpen
+        ? '<span style="color:' + r.statusCol + ';font-weight:700;">' + r.status + '</span>'
+        : '<span style="color:var(--gtb-muted);">' + r.reason + '</span>';
+    return '<div style="display:grid;grid-template-columns:110px 55px 1fr 1fr;gap:6px;align-items:center;padding:4px 6px;border-bottom:1px solid var(--gtb-border);font-size:0.5rem;">'
+        + '<a href="' + link + '" target="_blank" rel="noopener" style="font-weight:800;color:var(--gtb-text);">' + r.name + '</a>'
+        + '<span style="font-weight:800;color:' + biasCol + ';">' + r.bias + '</span>'
+        + '<span style="font-family:var(--gtb-mono);">' + priceCell + '</span>'
+        + statusHtml
+        + '</div>';
+}
+
+function _gtbShowLevelFadeScanner() {
+    var _cls = 'popup-custom-style-level-fade-scanner';
+    var html = '<div id="lvs-wrap" style="height:100%;overflow:auto;padding:10px;background:var(--gtb-bg);color:var(--gtb-text);font-size:0.65rem;">'
+        + '<div style="font-size:0.5rem;color:var(--gtb-muted);margin-bottom:8px;">Fades price sitting on an intact OI wall (OBV-ranked support/resistance, not just the nearest strike) — skips a wall that\'s already eroding.</div>'
+
+        + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">'
+        + '<span style="font-size:0.58rem;font-weight:800;color:var(--gtb-muted);letter-spacing:0.05em;"><i class="bi bi-moon-stars-fill"></i> 1 · EOD SCAN — full F&amp;O (run after close)</span>'
+        + '<button id="lvs-eod-btn" style="margin-left:auto;padding:4px 12px;font-size:0.6rem;background:var(--gtb-accent,#58a6ff);color:#fff;border:none;border-radius:3px;cursor:pointer;font-weight:700;"><i class="bi bi-play-fill"></i> Run EOD Scan</button>'
+        + '</div>'
+        + '<div style="font-size:0.46rem;color:var(--gtb-muted);margin-bottom:4px;">Actively fetches OI/OBV for every FO_LIST stock (200+), not just whatever\'s already cached — takes a few minutes. Run "Load Prices" + a refresh first so today\'s open/LTP is populated for all of them.</div>'
+        + '<div id="lvs-eod-progress" style="font-size:0.5rem;color:var(--gtb-muted);min-height:14px;margin-bottom:4px;"></div>'
+        + '<div id="lvs-eod-results" style="margin-bottom:14px;"></div>'
+
+        + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">'
+        + '<span style="font-size:0.58rem;font-weight:800;color:var(--gtb-muted);letter-spacing:0.05em;"><i class="bi bi-sunrise-fill"></i> 2 · PRE-MARKET CHECK (run next session)</span>'
+        + '<button id="lvs-pm-btn" style="margin-left:auto;padding:4px 12px;font-size:0.6rem;background:var(--gtb-accent,#58a6ff);color:#fff;border:none;border-radius:3px;cursor:pointer;font-weight:700;"><i class="bi bi-play-fill"></i> Check vs Today\'s Open</button>'
+        + '</div>'
+        + '<div style="font-size:0.46rem;color:var(--gtb-muted);margin-bottom:4px;">Reads today\'s open from the live WebSocket ticker if connected (works pre-9:15) — open <b>WebSocket Subscribe</b> and click Connect first, then leave it open. Falls back to a historical fetch (post-9:15 only) if not connected.</div>'
+        + '<div id="lvs-pm-results"></div>'
+        + '</div>';
+
+    showPopUpWindow('level-fade-scanner', html, 'Level Fade Scanner', 640, 560);
+    var _title = '<div style="display:flex;align-items:center;gap:6px;width:100%;">'
+        + '<i class="bi bi-water" style="font-size:0.75rem;"></i>'
+        + '<span style="font-weight:800;font-size:0.7rem;">LEVEL FADE SCANNER</span>'
+        + popupWinControls(_cls) + '</div>';
+    jQ('.' + _cls).find('.popupwindow_titlebar_text').html(_title);
+    hideNativePopupButtons(_cls);
+    jQ('.' + _cls).find('.popupwindow_titlebar').removeClass('popupwindow_titlebar_draggable');
+    jQ('.' + _cls).toggleClass('gtb-light', (localStorage.getItem('GTB_THEME') || 'dark') === 'light');
+
+    // Restore today's already-run EOD scan (if any) without re-running it.
+    var todayStr = (typeof CURRENT_DAY !== 'undefined' && CURRENT_DAY) ? CURRENT_DAY : _psDateStr(new Date());
+    try {
+        var cached = JSON.parse(localStorage.getItem('GTB_LEVEL_SCAN_' + todayStr));
+        if (cached && cached.results) _lvsRenderEodResults(cached);
+    } catch (e) {}
+}
+
+function _lvsRenderEodResults(scan) {
+    if (!scan.results.length) {
+        jQ('#lvs-eod-results').html('<div style="padding:10px;text-align:center;color:var(--gtb-muted);">No instrument closed on an intact OI wall today.</div>');
+        return;
+    }
+    var longs = scan.results.filter(function (r) { return r.bias === 'LONG'; });
+    var shorts = scan.results.filter(function (r) { return r.bias === 'SHORT'; });
+    jQ('#lvs-eod-results').html('<div style="font-size:0.46rem;color:var(--gtb-muted);margin-bottom:4px;">Saved for ' + scan.date + ' — ' + longs.length + ' long / ' + shorts.length + ' short setups.</div>'
+        + '<div style="background:var(--gtb-surface);border:1px solid var(--gtb-border);">'
+        + scan.results.map(function (r) { return _lvsRowHtml(r, false); }).join('')
+        + '</div>');
+}
+
+jQ(document).on('click', '#lvs-eod-btn', async function () {
+    var $btn = jQ(this).prop('disabled', true).html('<i class="bi bi-hourglass-split"></i> Scanning…');
+    jQ('#lvs-eod-progress').text('Starting full F&O scan…');
+    var scan = await _gtbRunEodLevelScan(function (name, done, total) {
+        jQ('#lvs-eod-progress').text('OI/OBV: ' + done + '/' + total + ' (' + name + ')');
+    }, function (phase) {
+        jQ('#lvs-eod-progress').text(phase);
+    });
+    jQ('#lvs-eod-progress').text('Done — scanned ' + _lvsFullUniverse().length + ' instruments, ' + scan.results.length + ' setups found.');
+    _lvsRenderEodResults(scan);
+    $btn.prop('disabled', false).html('<i class="bi bi-play-fill"></i> Run EOD Scan');
+});
+
+jQ(document).on('click', '#lvs-pm-btn', async function () {
+    var $btn = jQ(this).prop('disabled', true).html('<i class="bi bi-hourglass-split"></i> Checking…');
+    var out = await _gtbRunPreMarketLevelCheck();
+    $btn.prop('disabled', false).html('<i class="bi bi-play-fill"></i> Check vs Today\'s Open');
+    if (!out.date) {
+        jQ('#lvs-pm-results').html('<div style="padding:10px;text-align:center;color:var(--gtb-muted);">No saved EOD scan from a prior session yet — run step 1 after today\'s close first.</div>');
+        return;
+    }
+    if (!out.rows.length) {
+        jQ('#lvs-pm-results').html('<div style="padding:10px;text-align:center;color:var(--gtb-muted);">Last saved scan (' + out.date + ') had no setups.</div>');
+        return;
+    }
+    var srcNote = out.usedWs
+        ? '<span style="color:var(--gtb-green);">live WebSocket ticker</span>'
+        : '<span style="color:var(--gtb-amber);">historical fetch (WebSocket not connected — open/Connect it first for pre-9:15 reads)</span>';
+    jQ('#lvs-pm-results').html('<div style="font-size:0.46rem;color:var(--gtb-muted);margin-bottom:4px;">Comparing vs EOD scan saved on ' + out.date + ' — source: ' + srcNote + '.</div>'
+        + '<div style="background:var(--gtb-surface);border:1px solid var(--gtb-border);">'
+        + out.rows.map(function (r) { return _lvsRowHtml(r, true); }).join('')
+        + '</div>');
+});
