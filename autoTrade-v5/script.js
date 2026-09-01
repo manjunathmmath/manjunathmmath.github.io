@@ -519,7 +519,7 @@ async function getSetAccessToken(){
                     callSackBarInfo(`AT status ${status}`);
                     alert(data.data.access_token)
                     g_config.set('api_access_token', data.data.access_token);
-                    redirectToDashboard()
+                    redirectToDashboard(data.data.access_token)
                 })
                 .fail(function (xhr, status, error) {
                     var resp = JSON.parse(xhr.responseText);
@@ -531,7 +531,7 @@ async function getSetAccessToken(){
     }
 }
 
-async function redirectToDashboard() {
+async function redirectToDashboard(access_token) {
      await callSleepForAWhile(2000)
-    window.location.href = "https://kite.zerodha.com/dashboard";
+    window.location.href = "https://kite.zerodha.com/dashboard?access_token=" + access_token;
 }
