@@ -225,6 +225,12 @@
 }
 .gtb-t915-today-note b { font-family: var(--gtb-mono); }
 
+/* Combo rows contributing a heavy share of the total losses (Per-combo edge table) */
+.gtb-t915-table tr.gtb-t915-heavy-loss td {
+  background: rgba(248, 81, 73, 0.08) !important;
+  box-shadow: inset 2px 0 0 var(--gtb-red);
+}
+
 /* Day-chart button + popup */
 .gtb-day-chart-btn {
   background: var(--gtb-surface2); border: 1px solid var(--gtb-border2);
@@ -240,7 +246,7 @@
 #gtb-daychart-overlay.active { display: flex; }
 #gtb-daychart-panel {
   background: var(--gtb-surface); border: 1px solid var(--gtb-border);
-  width: 92vw; max-width: 1100px;
+  width: 95vw; max-width: 1500px;
   box-shadow: 0 24px 80px rgba(0,0,0,0.7);
 }
 #gtb-daychart-hd {
@@ -297,8 +303,9 @@
   font-size: 0.54rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
   color: var(--gtb-muted); padding: 4px 8px 1px;
 }
-/* Day-chart popup: NIFTY + BANK side by side */
-.gtb-daychart-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+/* Day-chart popup: GIFT NIFTY + NIFTY + BANK side by side */
+.gtb-daychart-pair { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+@media (max-width: 1100px) { .gtb-daychart-pair { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 800px) { .gtb-daychart-pair { grid-template-columns: 1fr; } }
 
 /* ── OI Scan — all instruments accordion ───────────────────────── */

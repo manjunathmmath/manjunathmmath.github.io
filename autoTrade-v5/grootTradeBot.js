@@ -980,8 +980,22 @@ async function scanNineFifteenCandle() {
                 let historical = await getHistoricalDataUsingPromise(INSTRUMENT_TOKENS[name], _gtbCurrDay(), _gtbCurrDayTo(), '5minute');
                 // Use the actual first candle's OPEN from the API as strike reference,
                 // not the stored "load price" value (which may be a pre-market LTP before 9:15).
-                let firstCandleOpen  = historical.data.candles[0][1];
-                let firstCandleClose = historical.data.candles[0][4];
+                // GIFT NIFTY is the one exception: its session starts ~6:30 AM, well before
+                // NIFTY/SENSEX/BANK's own 9:15 candle — anchoring GIFT's own ASO/AST/BSO/BST
+                // to candles[0] (6:30 open) measures a different, earlier moment than every
+                // other instrument's 9:15 combo, so a "does GIFT NIFTY confirm today's combo"
+                // comparison would silently compare two different reference times. Anchor GIFT
+                // NIFTY to ITS OWN 9:15 candle instead — same convention the 9:15 backtest's
+                // GIFT NIFTY confirmation check already uses (_gtbBuild915Trend).
+                let anchorCandle = historical.data.candles[0];
+                if (name === 'GIFT NIFTY') {
+                    var _g915c = historical.data.candles.find(function (c) {
+                        var m = moment(c[0]); return m.hour() === 9 && m.minute() === 15;
+                    });
+                    if (_g915c) anchorCandle = _g915c;
+                }
+                let firstCandleOpen  = anchorCandle[1];
+                let firstCandleClose = anchorCandle[4];
                 let strikeData = getStrikeDetails({ price: firstCandleOpen }, name);
                 let astPrice = parseFloat(strikeData['ustrikeTwo']);
                 let asoPrice = parseFloat(strikeData['ustrikeOne']);
@@ -1000,6 +1014,15 @@ async function scanNineFifteenCandle() {
                 } else {
                     breakOutNineFifteen[name]['CLOSE_9_15'] = 'B/W';
                 }
+                // Persist the actual numeric levels too (previously discarded after
+                // classification) — needed to live-check "has price come back past this
+                // instrument's own level since 9:15", e.g. the Level Confirmation card's
+                // GIFT NIFTY check.
+                breakOutNineFifteen[name]['ast'] = astPrice;
+                breakOutNineFifteen[name]['aso'] = asoPrice;
+                breakOutNineFifteen[name]['bso'] = bsoPrice;
+                breakOutNineFifteen[name]['bst'] = bstPrice;
+                breakOutNineFifteen[name]['anchor'] = parseFloat(firstCandleOpen);
             } catch (e) {
                 console.log(e)
             }
@@ -3043,6 +3066,18 @@ async function commonShowPopupWindow() {
                     var res = await showFutureDetails(name); setFutureDetails(name, res);
                     if (res) {
                         if (!INSTRUMENT_SCORE_MAP[name]) INSTRUMENT_SCORE_MAP[name] = {};
+                        // BUG FIX: this leg previously only saved avwap/vwapBullishDaily from
+                        // the futures fetch — .futures_trend/.futures_trend_remark, which
+                        // computeInstrumentScore() reads directly for its Futures sub-score,
+                        // were NEVER set here. _gtbRefreshOneInstrument (used only for
+                        // dynamically-added custom instruments) already did this correctly;
+                        // this core refresh path — the one that actually runs for NIFTY 50/
+                        // BANK/RELIANCE/HDFCBANK/ICICIBANK every cycle — was silently leaving
+                        // the Futures sub-score at 0 for all of them, everywhere
+                        // computeInstrumentScore() is used (Pre-Trade Checklist's Instrument
+                        // Scores table included), not just the Level Confirmation card.
+                        INSTRUMENT_SCORE_MAP[name].futures_trend = getFuturesTrendScore(res['REMARK']);
+                        INSTRUMENT_SCORE_MAP[name].futures_trend_remark = res['REMARK'];
                         INSTRUMENT_SCORE_MAP[name].avwap = res['vwapPrice'] || 0;
                         INSTRUMENT_SCORE_MAP[name].vwapBullishDaily = res['vwapBullishDaily'] !== undefined ? res['vwapBullishDaily'] : null;
                     }
@@ -6578,7 +6613,19 @@ function _gtbCreateInstrDetailPopup(minimal) {
 
     var $existing = jQ('#' + popId);
     if ($existing.length) {
-        if ($existing.is(':visible')) { try { $existing.PopupWindow('show'); } catch(ex) {} return false; }
+        // $existing.is(':visible') only reflects the OUTER popup window — minimize only
+        // hides the INNER .popupwindow_content (see the .popup-win-minimize handler and
+        // .gtb-popupwin-minimized in common.css), so the outer window still reads ":visible"
+        // while minimized. Re-entering this branch while minimized called the library's own
+        // PopupWindow('show'), which re-shows everything including content — but never reset
+        // our custom minimize class/icon, leaving the button stuck showing "Restore" (chevron)
+        // while the content was actually visible again. Force both back in sync here, since
+        // re-invoking this function at all implies the caller wants the popup visible.
+        if ($existing.is(':visible')) {
+            try { $existing.PopupWindow('show'); } catch(ex) {}
+            if (typeof _gtbSetPopupMinimized === 'function') _gtbSetPopupMinimized($existing, false);
+            return false;
+        }
         try { $existing.PopupWindow('destroy'); } catch(ex) {}
         $existing.remove();
     }
@@ -6665,8 +6712,14 @@ setInterval(function () {
     try {
         var $pop = jQ('.popup-custom-style-gtb-instr-detail');
         if (!$pop.length) return;
-        var content = $pop.find('.popupwindow_content');
-        if (content.is(':visible')) $pop.find('.popup-win-minimize').trigger('click');
+        // Check the CLASS, not content.is(':visible') + .trigger('click') — simulating a
+        // click re-reads :visible itself at that moment, so two of these firing close
+        // together (or one firing right as a real user click lands) could race and leave
+        // the icon/class out of sync with the actual content visibility. Calling the shared
+        // setter directly with an explicit target state has no such ambiguity.
+        if (!$pop.hasClass('gtb-popupwin-minimized') && typeof _gtbSetPopupMinimized === 'function') {
+            _gtbSetPopupMinimized($pop, true);
+        }
     } catch (e) {}
 }, 500);
 
@@ -8019,6 +8072,12 @@ jQ(document).on("click", ".popup-win-restore", function () {
     // All other popups: use library maximize
     let isMax = popEl.data('maximized') || false;
     popEl.find('.popupwindow_titlebar_button_maximize').trigger('click');
+    // The library re-renders its own titlebar on maximize/restore, which UNDOES
+    // hideNativePopupButtons()'s earlier .hide() — confirmed live: after maximizing, the
+    // library's own minimize/restore/close buttons reappeared alongside our custom row, and
+    // only the native one still worked (ours was left pointing at now-stale DOM). Re-hide
+    // them immediately after triggering the native maximize so only our row is visible.
+    hideNativePopupButtons(cls);
     popEl.data('maximized', !isMax);
     if (isMax) {
         btn.find('i').removeClass('bi-fullscreen-exit').addClass('bi-fullscreen');
@@ -8027,11 +8086,52 @@ jQ(document).on("click", ".popup-win-restore", function () {
         btn.find('i').removeClass('bi-fullscreen').addClass('bi-fullscreen-exit');
         btn.attr('title', 'Restore').addClass('is-active');
     }
-    btn.closest('[data-popup]').find('.popup-win-minimize')
-        .removeClass('is-active').find('i').removeClass('bi-chevron-up').addClass('bi-dash');
-    popEl.find('.popupwindow_content').show();
-    popEl.css({ height: '', 'min-height': '', overflow: '' });
+    // Maximizing always implies "not minimized" — route through the same shared setter
+    // instead of hand-resetting the icon, so this can't drift from the class either.
+    _gtbSetPopupMinimized(popEl, false);
 });
+
+// Single source of truth for minimize/restore state on any popup other than the Groot main
+// window (that one has its own topbar-strip logic above). Previously the state lived in TWO
+// disconnected places — content.is(':visible') (read at click time to decide which way to
+// toggle) and the gtb-popupwin-minimized class + button icon (written at click time) — which
+// could drift apart under any rapid/duplicate trigger (the auto-minimize poll firing, or this
+// same popup being re-opened while already minimized, both call into this independently of a
+// user click). Driving everything off the CLASS instead of :visible, and funnelling every
+// caller through this one function, removes that drift entirely.
+function _gtbSetPopupMinimized(popEl, minimize) {
+    // Delegate to the PopupWindow library's OWN minimize state machine
+    // (.PopupWindow('minimize'/'unminimize') → its internal _Minimize/_Unminimize) instead of
+    // reimplementing hide/show + sizing ourselves. This is the same class of API already used
+    // elsewhere in this app (.PopupWindow('show'), .PopupWindow('destroy')) and, critically,
+    // it's the library's own tracked data("minimized") state — every OTHER call into this
+    // library (including our own .PopupWindow('show') when re-opening an existing popup)
+    // reads that same internal state, so keeping it in sync here is what actually fixes the
+    // drift the custom hide/show approach kept re-introducing.
+    try { popEl.PopupWindow(minimize ? 'minimize' : 'unminimize'); } catch (e) {}
+    // Same issue as the maximize button: _Minimize/_Unminimize re-render the library's own
+    // titlebar buttons, undoing hideNativePopupButtons()'s earlier .hide() — confirmed live,
+    // the native row reappeared alongside our custom one after minimizing too, not just after
+    // maximizing. Re-hide immediately after the native call, every time.
+    var cls = null;
+    try { cls = (popEl.attr('class') || '').split(/\s+/).filter(function (c) { return c.indexOf('popup-custom-style-') === 0; })[0]; } catch (e2) {}
+    if (cls) { try { hideNativePopupButtons(cls); } catch (e3) {} }
+    // Still layered on top as a belt-and-suspenders fallback — this is the ORIGINAL reason
+    // this class/CSS exists: the library's own plain (non-!important) hide can still lose to
+    // Kite's own page CSS on some routes (confirmed on /markets/ext/chart/). The native state
+    // call above now does the real work; this just guarantees it holds even there.
+    if (minimize) popEl.addClass('gtb-popupwin-minimized');
+    else popEl.removeClass('gtb-popupwin-minimized');
+
+    var btn = popEl.find('.popup-win-minimize');
+    if (minimize) {
+        btn.find('i').removeClass('bi-dash').addClass('bi-chevron-up');
+        btn.attr('title', 'Restore').addClass('is-active');
+    } else {
+        btn.find('i').removeClass('bi-chevron-up').addClass('bi-dash');
+        btn.attr('title', 'Minimize').removeClass('is-active');
+    }
+}
 
 jQ(document).on("click", ".popup-win-minimize", function () {
     let btn   = jQ(this);
@@ -8061,29 +8161,10 @@ jQ(document).on("click", ".popup-win-minimize", function () {
         return;
     }
 
-    // All other popups: hide/show popupwindow_content
-    let content = popEl.find('.popupwindow_content');
-    if (content.is(':visible')) {
-        content.hide();
-        popEl.addClass('gtb-popupwin-minimized'); // !important fallback — see common.css;
-        // plain .hide() (inline, non-important) can lose to the host page's own CSS on
-        // some Kite routes (confirmed on /markets/ext/chart/, the chart-page popup).
-        btn.find('i').removeClass('bi-dash').addClass('bi-chevron-up');
-        btn.attr('title', 'Restore').addClass('is-active');
-        // min-height alone doesn't shrink the window — the PopupWindow library sets an
-        // explicit inline `height` (px) on the popup at init/resize time, which still
-        // forces the old size even with content hidden and min-height cleared. That's
-        // why minimize only ever hid the content while the window itself stayed the same
-        // size (the reported bug). Clearing height too lets it collapse to the titlebar's
-        // own natural height once .popupwindow_content is display:none.
-        popEl.css({ height: 'auto', 'min-height': '0', overflow: 'hidden' });
-    } else {
-        content.show();
-        popEl.removeClass('gtb-popupwin-minimized');
-        btn.find('i').removeClass('bi-chevron-up').addClass('bi-dash');
-        btn.attr('title', 'Minimize').removeClass('is-active');
-        popEl.css({ height: '', 'min-height': '', overflow: '' });
-    }
+    // All other popups: toggle off the class (single source of truth), not content.is(':visible')
+    // — the outer popup can still read ":visible" while minimized (only the inner content is
+    // hidden), which was the root of the drift between this button's icon and the actual state.
+    _gtbSetPopupMinimized(popEl, !popEl.hasClass('gtb-popupwin-minimized'));
 });
 
 // ── Window control buttons ───────────────────────────────────────────────────
@@ -8465,13 +8546,19 @@ var GTB_INFO = {
     't915-summary': { icon:'bi-bar-chart-fill', title:'9:15 Backtest — Overall Summary',
         body:'Aggregates every trade leg across all ~250 sampled days (each day can produce 1-2 legs — a Buy/Sell day = 1 leg, a Buy/Sell "both sides" day = 2). <b>Win-rate</b> = legs profitable by the 12:00 close vs total legs. <b>Avg P/L</b> is per-leg; <b>Net</b> is the sum across every leg (not compounded, not risk-sized — a raw points total). <b>Avg max-fav/max-adv</b> are the best favourable (MFE) and worst adverse (MAE) point swings from entry, averaged — useful for sizing stops even if you don\'t hold to the theoretical exit. <b>1:1 target hit</b> = how often a one-strike-step target was reached before an equal-distance stop, i.e. the win-rate of the simplest possible fixed exit rule, shown separately from the actual entry/12:00-close P/L above it.' },
     't915-combo': { icon:'bi-trophy', title:'Per-Combo Edge Table',
-        body:'Groups every sampled day by its exact 9:15 combo (NIFTY-SENSEX-BANK zone) and shows how that combo\'s suggested trade actually performed historically. <b>Bias/Entry Level</b> come from <code>GTB_STRAT_LOOKUP</code> — a fixed rule mapping combo &rarr; suggested direction and entry level, not something backtested per se. <b>Days</b> is the sample size for that combo — rows with very few days (dimmed) are unreliable regardless of how extreme the win-rate looks. <b>Low-VIX/High-VIX</b> splits the same legs at the sample\'s median day-open VIX, so you can see whether a combo\'s edge holds up in both volatility regimes or only one. Today\'s live combo is starred and highlighted. Click any row to see the NIFTY chart for every historical day that combo occurred.' },
+        body:'Groups every sampled day by its exact 9:15 combo (NIFTY-SENSEX-BANK zone) and shows how that combo\'s suggested trade actually performed historically.'
+            + '<br><br><b>Combo</b> is the 3-letter NIFTY-SENSEX-BANK zone key (e.g. <code>ASO-BSO-ASO</code>) each instrument\'s 9:15 close was classified into. <b>Bias/Entry Level</b> come from <code>GTB_STRAT_LOOKUP</code> — a fixed, hand-authored rule mapping combo &rarr; suggested direction and entry level, <b>not</b> something derived from this backtest\'s own data (a combo can appear here with a Bias even if it has very few — or zero — actual historical days, see <b>Days</b>). <b>Win-rate</b> is this combo\'s legs (Buy/Sell = 1 leg, Buy/Sell "both sides" = 2) that were profitable by the 12:00 close, out of all its legs. <b>Days</b> is the sample size — rows dimmed with very few days are statistically unreliable regardless of how extreme the win-rate looks (a 100% win-rate on 2 days means nothing). <b>Low-VIX/High-VIX</b> re-splits the same legs at the sample\'s median day-open VIX, so you can see whether a combo\'s edge holds in both volatility regimes or is really just a calm-market or high-VIX artifact. <b>Avg P/L</b> and <b>Avg Max-Fav</b> are per-leg point averages (Avg P/L can be negative even at a high win-rate if losing legs lose big; Avg Max-Fav is always ≥0, showing how much room the trade typically had if you didn\'t hold to the fixed exit).'
+            + '<br><br>Today\'s live combo is starred (★) and highlighted. Click any row to open a per-day chart grid — every historical day that exact combo occurred, showing <b>GIFT NIFTY, NIFTY 50, and NIFTY BANK</b> side by side with that day\'s leg result printed above each chart, so you can visually check whether the combo\'s reasoning (e.g. "Sensex lag, Nifty+Bank agree") actually held up candle-by-candle.' },
     't915-dow': { icon:'bi-calendar-week', title:'By Day of Week — Strategy Outcome',
         body:'Same win-rate/P&amp;L/MFE/MAE stats as the summary above, but split by the calendar weekday each day fell on — using the exact same 9:15-combo entry/exit simulation, not a different model. This answers "does the STRATEGY perform differently depending on which weekday it triggers on" — not "does NIFTY itself trend up or down on a given day" (see the Raw Direction table below for that). Every weekday here can include many different 9:15 combos mixed together, so a weekday\'s number is an average across whatever combos happened to occur on that weekday in the sample — it is not isolating a single repeatable setup.' },
     't915-dow-raw': { icon:'bi-arrow-down-up', title:'Raw Direction by Day of Week',
         body:'The literal "is Monday bearish?" question — NIFTY\'s own open-to-12:00 direction and % move, grouped by weekday, with <b>no strategy or entry rule involved at all</b> (unlike every other table on this page). <b>Bullish %</b> is the share of sampled days that closed above the day\'s open by noon. With roughly 48-51 samples per weekday, a day needs to clear roughly 63%/37% before it\'s meaningfully outside sampling noise (~&plusmn;7 percentage points at this sample size) — read a 55/45-ish split as "no real edge," not as a bearish/bullish weekday.' },
     't915-daybyday': { icon:'bi-calendar3', title:'Day-by-Day Detail',
-        body:'One row per sampled trading day — the actual 9:15 close for GIFT/NIFTY/SENSEX/BANK, the resulting strategy combo and entry level, NIFTY\'s move to 12:00, the VIX/VIXU/VIXL context, and the simulated trade\'s result/MFE/MAE/1:1 outcome/entry &amp; peak times. <b>lvl</b> = the entry level (ASO/BSO etc.) was actually reached before 12:00; <b>trd</b> = it never pulled back to the level but the bias still played out, so the entry is simulated at the day\'s open instead. Rows matching today\'s exact 9:15 reading are starred. Click a row\'s chart icon to see that specific day\'s NIFTY candles.' },
+        body:'One row per sampled trading day, in reverse-chronological order.'
+            + '<br><br><b>GIFT/NIFTY/SENSEX/BANK</b> are each instrument\'s actual 9:15 zone that day (AST/ASO/B-W/BSO/BST). GIFT NIFTY is a <b>reference column, not part of the combo key</b> — NIFTY-SENSEX-BANK alone determine the <b>Strategy/Entry Level</b> looked up from <code>GTB_STRAT_LOOKUP</code>. <b>Nifty &rarr;12pm</b> is NIFTY\'s raw open-to-noon move (no entry rule). <b>VIX/VIXU/VIXL</b> are the day-open India VIX and the expected daily range band derived from it and the previous day\'s close.'
+            + '<br><br><b>Result (P/L)</b> is the simulated NIFTY trade(s) for that day\'s strategy — <b>L</b>/<b>S</b> tag the leg direction, ✓/✗ shows win/loss, and <b>lvl</b> vs <b>trd</b> shows how it was entered: <b>lvl</b> = price actually pulled back to the ASO/BSO/etc. level before 12:00 and was entered there; <b>trd</b> = it never pulled back, so the bias is simulated as entered at the day\'s open instead (a trend-following fallback, not a real level fill). <b>Max Fav/Max Adv</b> are the best-favourable and worst-adverse point swings from that entry; <b>1:1 TP/SL</b> shows whether a one-strike-step target was hit before an equal-distance stop; <b>Entry @/Peak @</b> are the clock times those happened.'
+            + '<br><br><b>GIFT Confirm</b> (rightmost column) runs the exact same touch-and-simulate logic <b>on GIFT NIFTY itself</b>, testing whether GIFT NIFTY independently confirms the same day\'s NIFTY/SENSEX/BANK strategy — anchored to <b>GIFT NIFTY\'s own 9:15 candle</b> (not its ~6:30 AM session open, which would measure a different, earlier moment). A Sell-at-ASO/AST day checks whether GIFT NIFTY also touched its own ASO/AST and then moved down (✓) or broke through and kept rising (✗); a Buy-at-BSO/BST day checks the mirror case. A blank/— cell means GIFT NIFTY had no 9:15 candle that day (e.g. missing data), not a loss.'
+            + '<br><br>Rows matching today\'s exact 9:15 reading are starred (★). Click a row\'s <i class="bi bi-bar-chart-line"></i> icon to see that specific day\'s GIFT NIFTY, NIFTY 50, and NIFTY BANK candles together.' },
     'pred-915combo': { icon:'bi-alarm', title:'9:15 Combo',
         body:'Where NIFTY 50/SENSEX/NIFTY BANK\'s first 5-min candle closed relative to their own ASO/AST/BSO/BST strike levels (GIFT NIFTY shown as a pre-market reference, not part of the combo key). The 3-letter combo looks up a Buy/Sell/Sideways bias + suggested entry level in <code>GTB_STRAT_LOOKUP</code> — a fixed, <b>hand-authored</b> rule table covering all 27 possible combos, not something derived from data.'
             + '<br><br><b>Historical win rate</b> comes separately from the 9:15 Backtest tool\'s cached ~250-day results for this exact combo. The two are independent: a combo can have a Strategy line here even if it has <b>never occurred</b> in the actual 250-day sample — when that happens this panel shows an <b style="color:var(--gtb-amber);">UNVALIDATED</b> tag instead of a win-rate, meaning the Strategy shown is an untested heuristic guess, not a backtested signal. Click this panel to open the full backtest and see the per-combo breakdown, day-by-day detail, and day-of-week splits.' },
@@ -8908,18 +8995,20 @@ function _gtbClassify915(name, dayOpen, closeNineFifteen) {
 //     still ran; treated as entering at the OPEN and riding the trend. P/L vs open.
 //     (Sell that just closed below, or Buy that just closed above, still counts.)
 // Returns { dir, entryType, entry, exit, pnl, pnlPct, win }.
-function _gtbSimLeg(dir, cands, open) {
+function _gtbSimLeg(dir, cands, open, name, cutoffHour) {
+    name = name || 'NIFTY 50';
+    cutoffHour = (cutoffHour == null) ? 12 : cutoffHour;  // default preserves NIFTY's existing pre-Europe cutoff exactly
     if (!cands || cands.length < 2 || !open) return null;
-    var sd = getStrikeDetails({ price: open }, 'NIFTY 50');
+    var sd = getStrikeDetails({ price: open }, name);
     var ASO = parseFloat(sd.ustrikeOne), BSO = parseFloat(sd.bstrikeOne);
     var isLong = dir === 'long';
     var level = isLong ? BSO : ASO;
-    var openTs = cands[0][0];                             // the 9:15 candle timestamp
+    var openTs = cands[0][0];                             // the anchor candle timestamp
     var filled = false, fillIdx = -1, exit = open, exitTs = openTs, favOpen = 0, favLevel = 0;
     var entryTs = null, favOpenTs = openTs, favLevelTs = null;
-    for (var k = 1; k < cands.length; k++) {            // after the 9:15 candle
+    for (var k = 1; k < cands.length; k++) {            // after the anchor candle
         var ts = cands[k][0];
-        if (moment(ts).hour() >= 12) break;              // morning session only — cutoff at 12:00 (pre-Europe)
+        if (moment(ts).hour() >= cutoffHour) break;      // cutoffHour: 12 for NIFTY (pre-Europe); crude passes a later hour since it trades a much longer session
         var hi = parseFloat(cands[k][2]), lo = parseFloat(cands[k][3]);
         exit = parseFloat(cands[k][4]); exitTs = ts;     // running close → ends at the 12:00 close
         // best favourable move from the open (used if it never pulls back → trend entry)
@@ -8937,13 +9026,13 @@ function _gtbSimLeg(dir, cands, open) {
 
     // ── MAE (max adverse) + sequenced target/stop from the entry ────────────────
     // Target & stop = one strike step (s1) → a transparent 1:1 R bracket.
-    var sdiff = getStrikeDiff('NIFTY 50').split(',');
+    var sdiff = getStrikeDiff(name).split(',');
     var s1 = parseInt(sdiff[0]) || 50;
     var target = s1, stop = s1;
     var startK = filled ? fillIdx : 1;
     var maxAdv = 0, tpsl = 'OPEN';
     for (var j = startK; j >= 1 && j < cands.length; j++) {
-        if (moment(cands[j][0]).hour() >= 12) break;
+        if (moment(cands[j][0]).hour() >= cutoffHour) break;
         var hj = parseFloat(cands[j][2]), lj = parseFloat(cands[j][3]);
         var favN = isLong ? (hj - entry) : (entry - lj);
         var advN = isLong ? (entry - lj) : (hj - entry);
@@ -8995,7 +9084,7 @@ async function _gtbBuild915Trend(lookback) {
     var instruments = ['NIFTY 50', 'SENSEX', 'NIFTY BANK', 'GIFT NIFTY'];
     // Computed rows are cacheable per day (past days don't change) — avoids re-fetching
     // ~16 chunked requests on every open.
-    var ckey = 'GTB_915TREND_' + moment().format('YYYY-MM-DD') + '_' + lookback + '_v4';  // v4 = + vixu_bank/vixl_bank
+    var ckey = 'GTB_915TREND_' + moment().format('YYYY-MM-DD') + '_' + lookback + '_v5';  // v5 = + giftLegs (GIFT NIFTY confirmation)
     try { var cached = localStorage.getItem(ckey); if (cached) return JSON.parse(cached); } catch (e) {}
 
     var toM   = moment();
@@ -9058,6 +9147,32 @@ async function _gtbBuild915Trend(lookback) {
         var legs = _gtbLegsFor(strat.outcome).map(function (dir) { return _gtbSimLeg(dir, n.cands, n.open); }).filter(Boolean);
         var vix = (vixMap[d] != null && !isNaN(vixMap[d])) ? vixMap[d] : null;
 
+        // ── GIFT NIFTY confirmation ──────────────────────────────────────────────
+        // Tests whether GIFT NIFTY — which is already trading well before 9:15 and keeps
+        // trading through the Indian session — actually confirms the same day's NIFTY/
+        // SENSEX/BANK combo bias: does GIFT NIFTY touch ITS OWN ASO/AST (Sell bias) or
+        // BSO/BST (Buy bias) and then move in the strategy's favor (reversal/continuation
+        // as the strategy defines it), same win/loss math _gtbSimLeg already does for NIFTY.
+        // Anchored to GIFT NIFTY's OWN 9:15 candle price, NOT its ~6:30 AM session open —
+        // the combo/strategy itself is a 9:15 signal, so the level GIFT NIFTY is tested
+        // against has to reference the same moment in time, not 2h45m earlier when GIFT
+        // NIFTY may have already drifted well away from its session open.
+        var giftLegs = [];
+        if (g && g.cands && g.cands.length) {
+            var gIdx915 = -1;
+            for (var gi = 0; gi < g.cands.length; gi++) {
+                var gm = moment(g.cands[gi][0]);
+                if (gm.hour() === 9 && gm.minute() === 15) { gIdx915 = gi; break; }
+            }
+            if (gIdx915 !== -1) {
+                var giftCandsFrom915 = g.cands.slice(gIdx915);
+                var giftAnchor = parseFloat(giftCandsFrom915[0][1]); // GIFT NIFTY's own 9:15 candle open
+                giftLegs = _gtbLegsFor(strat.outcome)
+                    .map(function (dir) { return _gtbSimLeg(dir, giftCandsFrom915, giftAnchor, 'GIFT NIFTY'); })
+                    .filter(Boolean);
+            }
+        }
+
         // VIXU / VIXL: computed from each instrument's own PREVIOUS day close × (VIX/100 / sqrt(252))
         var vixu = null, vixl = null, vixu_bank = null, vixl_bank = null;
         var dIdx = niftyDates.indexOf(d);
@@ -9079,6 +9194,7 @@ async function _gtbBuild915Trend(lookback) {
 
         return { date: d, n: n.cls, s: s.cls, b: b.cls, g: g ? g.cls : '—', key: key,
                  outcome: strat.outcome, level: strat.level, move: move, movePct: movePct, legs: legs,
+                 giftLegs: giftLegs,
                  vix: vix, vixu: vixu, vixl: vixl, vixu_bank: vixu_bank, vixl_bank: vixl_bank };
     });
     try { localStorage.setItem(ckey, JSON.stringify(rows)); } catch (e) {}
@@ -9115,6 +9231,16 @@ function _render915Trend(rows) {
             if (lg.entryType === 'level') levelN++; else trendN++;
         });
     });
+    // GIFT NIFTY confirmation — same win/loss math as NIFTY's own legs, but run against
+    // GIFT NIFTY's own candles anchored to ITS 9:15 price (see _gtbBuild915Trend).
+    var giftWin = 0, giftLoss = 0, giftLegCount = 0;
+    rows.forEach(function (r) {
+        (r.giftLegs || []).forEach(function (lg) {
+            giftLegCount++; if (lg.win) giftWin++; else giftLoss++;
+        });
+    });
+    var giftWinPct = giftLegCount ? Math.round(giftWin / giftLegCount * 100) : 0;
+
     var winPct = legCount ? Math.round(win / legCount * 100) : 0;
     var avgPnl = legCount ? (totPnl / legCount) : 0;
     var avgMfe = legCount ? (totMfe / legCount) : 0;
@@ -9212,6 +9338,15 @@ function _render915Trend(rows) {
          +  '<span class="gtb-t915-stat">1:1 target hit <b>' + tpPct + '%</b> (' + tpN + ' TP / ' + slN + ' SL)</span>'
          +  '<span class="gtb-t915-stat">' + levelN + ' lvl  *  ' + trendN + ' trd entries</span>'
          +  '</div>';
+    html += '<div class="gtb-t915-combo-h"><i class="bi bi-globe2"></i> GIFT NIFTY confirmation'
+         +  '<span style="font-weight:400;color:var(--gtb-muted);" title="Same win/loss test run on GIFT NIFTY itself, anchored to GIFT NIFTY\'s own 9:15 price — does GIFT NIFTY touch its own ASO/AST (Sell days) or BSO/BST (Buy days) and then move the strategy\'s way, on the SAME days NIFTY/SENSEX/BANK gave this combo?"> (i)</span></div>';
+    html += '<div class="gtb-t915-stats">'
+         +  '<span class="gtb-t915-stat win">✓ ' + giftWin + '</span>'
+         +  '<span class="gtb-t915-stat loss">✗ ' + giftLoss + '</span>'
+         +  '<span class="gtb-t915-stat">GIFT win-rate <b style="color:' + (giftWinPct >= 60 ? 'var(--gtb-green)' : giftWinPct <= 40 ? 'var(--gtb-red)' : 'var(--gtb-amber)') + '">' + giftWinPct + '%</b>'
+         +  ' <span style="color:var(--gtb-muted);">vs NIFTY\'s own ' + winPct + '%</span></span>'
+         +  '<span class="gtb-t915-stat" style="color:var(--gtb-muted);">' + giftLegCount + ' legs (' + rows.filter(function(r){return r.giftLegs && r.giftLegs.length;}).length + ' of ' + rows.length + ' days had a GIFT 9:15 candle)</span>'
+         +  '</div>';
 
     // ── Per-combo edge table ────────────────────────────────────────────────────
     var vixTxt = vixThresh != null ? vixThresh.toFixed(2) : '—';
@@ -9220,9 +9355,19 @@ function _render915Trend(rows) {
     if (hasToday) html += '<div class="gtb-t915-today-note"><i class="bi bi-star-fill"></i> Today\&#39;s 9:15 combo: <b>' + todayKey + '</b> — highlighted below</div>';
     html += '<table class="gtb-t915-table gtb-t915-combo"><thead><tr>'
          +  '<th>Combo</th><th>Bias</th><th>Entry Level</th><th>Days</th><th>Win-rate</th>'
+         +  '<th title="Legs that lost, out of total legs — click to view every day">Losses</th>'
          +  '<th title="Win-rate on days with VIX ≤ ' + vixTxt + '">Low-VIX</th>'
          +  '<th title="Win-rate on days with VIX > ' + vixTxt + '">High-VIX</th>'
          +  '<th>Avg P/L</th><th>Avg Max-Fav</th></tr></thead><tbody>';
+    // Sorted purely to find the single worst-contributor combo for the note below —
+    // display order (comboRows) stays win-rate-sorted, unaffected.
+    var lossRanked = comboRows.slice().sort(function (a, b) { return (b.legs - b.win) - (a.legs - a.win); });
+    var worstLossCombo = lossRanked.length && (lossRanked[0].legs - lossRanked[0].win) > 0 ? lossRanked[0] : null;
+    if (worstLossCombo) {
+        html += '<div class="gtb-t915-today-note" style="color:var(--gtb-red);">'
+             +  '<i class="bi bi-exclamation-triangle-fill" style="color:var(--gtb-red);"></i> Biggest single contributor to the ' + loss + ' losses: <b style="color:var(--gtb-red);">' + worstLossCombo.key + '</b> '
+             +  '(' + (worstLossCombo.legs - worstLossCombo.win) + ' of its ' + worstLossCombo.legs + ' legs lost) — click its row below to see every day.</div>';
+    }
     function _vixCell(pct, n) {
         if (pct === null) return '<td class="gtb-t915-date" style="color:var(--gtb-muted);">—</td>';
         var col = pct >= 60 ? 'var(--gtb-green)' : pct <= 40 ? 'var(--gtb-red)' : 'var(--gtb-amber)';
@@ -9231,7 +9376,12 @@ function _render915Trend(rows) {
     comboRows.forEach(function (c) {
         var wc = c.winPct >= 60 ? 'var(--gtb-green)' : c.winPct <= 40 ? 'var(--gtb-red)' : 'var(--gtb-amber)';
         var isToday = hasToday && c.key === todayKey;
-        var cls = 'gtb-combo-row' + (isToday ? ' gtb-t915-today' : '');
+        var comboLosses = c.legs - c.win;
+        // Flag rows contributing a meaningful share of the total losses (≥15%) even if their
+        // own win-rate looks fine — a combo can have a decent win-rate and STILL be the
+        // biggest source of losing legs simply by having a lot of days.
+        var isHeavyLossContributor = loss > 0 && (comboLosses / loss) >= 0.15;
+        var cls = 'gtb-combo-row' + (isToday ? ' gtb-t915-today' : '') + (isHeavyLossContributor ? ' gtb-t915-heavy-loss' : '');
         var lowN = (!isToday && c.days < 4) ? ' style="opacity:0.5;"' : '';
         html += '<tr class="' + cls + '" data-key="' + c.key + '" title="Click to view the NIFTY chart for every day with this combo"' + lowN + '>'
             + '<td class="gtb-t915-date" style="font-family:var(--gtb-mono);">' + (isToday ? '★ ' : '') + c.key + ' <i class="bi bi-grid-3x3-gap" style="opacity:0.6;"></i></td>'
@@ -9239,6 +9389,8 @@ function _render915Trend(rows) {
             + '<td class="gtb-t915-lvl">' + (c.level || '—') + '</td>'
             + '<td class="gtb-t915-date">' + c.days + '</td>'
             + '<td style="color:' + wc + ';font-weight:800;font-family:var(--gtb-mono);">' + c.winPct + '%</td>'
+            + '<td style="color:' + (isHeavyLossContributor ? 'var(--gtb-red)' : 'var(--gtb-muted)') + ';font-weight:' + (isHeavyLossContributor ? '800' : '400') + ';font-family:var(--gtb-mono);">'
+            + comboLosses + ' / ' + c.legs + (isHeavyLossContributor ? ' <i class="bi bi-exclamation-triangle-fill" title="' + (Math.round(comboLosses / loss * 100)) + '% of all losses"></i>' : '') + '</td>'
             + _vixCell(c.loPct, c.loLegs)
             + _vixCell(c.hiPct, c.hiLegs)
             + '<td style="color:' + (c.avgPnl >= 0 ? 'var(--gtb-green)' : 'var(--gtb-red)') + ';font-family:var(--gtb-mono);">'
@@ -9321,15 +9473,22 @@ function _render915Trend(rows) {
     html += '<div style="font-size:0.5rem;color:var(--gtb-muted);padding:4px 0 8px;">A day here needs to clear ~63%/37% (roughly 2 standard errors on ~50 samples) before "bullish/bearish on this day" is more than noise — read the split above with that in mind rather than as a settled rule.</div>';
 
     var _matchN = hasTodayRaw ? rows.filter(function (r) { return (r.n + '-' + r.s + '-' + r.b) === todayKeyRaw; }).length : 0;
-    html += '<div class="gtb-t915-combo-h"><i class="bi bi-calendar3"></i> Day-by-day' + _ii('t915-daybyday')
+    html += '<div class="gtb-t915-combo-h" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;">'
+         +  '<span><i class="bi bi-calendar3"></i> Day-by-day' + _ii('t915-daybyday')
          +  (hasTodayRaw ? '<span style="font-weight:400;color:var(--gtb-muted);"> — ★ ' + _matchN + ' day(s) exactly matched today\&#39;s 9:15 (' + todayKeyRaw + ')</span>' : '')
+         +  '</span>'
+         +  '<span>'
+         +    '<button class="oic-mode-btn gtb-t915-day-filter active" data-filter="all">All (' + rows.length + ')</button>'
+         +    '<button class="oic-mode-btn gtb-t915-day-filter" data-filter="loss" style="margin-left:4px;">Losses only (' + loss + ')</button>'
+         +  '</span>'
          +  '</div>';
-    html += '<table class="gtb-t915-table"><thead><tr>'
+    html += '<table class="gtb-t915-table" id="gtb-t915-daybyday-table"><thead><tr>'
          +  '<th>Date</th><th>GIFT</th><th>NIFTY</th><th>SENSEX</th><th>BANK</th><th>Strategy</th><th>Entry Level</th><th>Nifty →12pm</th>'
          +  '<th title="India VIX day-open">VIX</th>'
          +  '<th title="VIX upper band (prev close + daily range)">VIXU</th>'
          +  '<th title="VIX lower band (prev close − daily range)">VIXL</th>'
          +  '<th>Result (P/L)</th><th>Max Fav</th><th>Max Adv</th><th>1:1 TP/SL</th><th>Entry @</th><th>Peak @</th>'
+         +  '<th title="GIFT NIFTY tested against the SAME strategy, anchored to GIFT NIFTY\'s own 9:15 price">GIFT Confirm</th>'
          +  '</tr></thead><tbody>';
     rows.forEach(function (r) {
         var mvColor = r.move === 'UP' ? 'var(--gtb-green)' : 'var(--gtb-red)';
@@ -9340,7 +9499,9 @@ function _render915Trend(rows) {
         var tpslHtml= (r.legs && r.legs.length) ? r.legs.map(_legTpsl).join(' ') : empty;
         var entHtml = (r.legs && r.legs.length) ? r.legs.map(function (lg) { return _legTime(lg, 'entryTime'); }).join(' ') : empty;
         var pkHtml  = (r.legs && r.legs.length) ? r.legs.map(function (lg) { return _legTime(lg, 'peakTime'); }).join(' ') : empty;
+        var giftHtml = (r.giftLegs && r.giftLegs.length) ? r.giftLegs.map(_leg).join(' ') : empty;
         var rowMatch = hasTodayRaw && (r.n + '-' + r.s + '-' + r.b) === todayKeyRaw;
+        var rowHasLoss = (r.legs || []).some(function (lg) { return !lg.win; });
 
         // VIX band cells
         var vixCell = r.vix != null
@@ -9361,7 +9522,7 @@ function _render915Trend(rows) {
             vixlCell = '<td style="color:var(--gtb-muted);">—</td>';
         }
 
-        html += '<tr' + (rowMatch ? ' class="gtb-t915-today"' : '') + '>'
+        html += '<tr data-has-loss="' + (rowHasLoss ? '1' : '0') + '"' + (rowMatch ? ' class="gtb-t915-today"' : '') + '>'
             + '<td class="gtb-t915-date">' + (rowMatch ? '★ ' : '') + moment(r.date).format('DD MMM')
             + ' <button class="gtb-day-chart-btn" data-date="' + r.date + '" title="View NIFTY chart for this day"><i class="bi bi-bar-chart-line"></i></button></td>'
             + '<td>' + _cls(r.g) + '</td><td>' + _cls(r.n) + '</td><td>' + _cls(r.s) + '</td><td>' + _cls(r.b) + '</td>'
@@ -9376,6 +9537,7 @@ function _render915Trend(rows) {
             + '<td>' + tpslHtml + '</td>'
             + '<td>' + entHtml + '</td>'
             + '<td>' + pkHtml + '</td>'
+            + '<td>' + giftHtml + '</td>'
             + '</tr>';
     });
     html += '</tbody></table></div>';
@@ -9413,6 +9575,19 @@ jQ(document).on('click', '#gtb-915-clear', function (e) {
     _gtbShow915Backtest();   // rebuild from fresh candles
 });
 
+// Day-by-day filter — "Losses only" hides every row with no losing leg, so the specific
+// combos/dates behind the Overall Summary's loss count are easy to find without scrolling
+// through the full ~250-day table.
+jQ(document).on('click', '.gtb-t915-day-filter', function (e) {
+    e.preventDefault(); e.stopPropagation();
+    var filter = jQ(this).data('filter');
+    jQ(this).siblings('.gtb-t915-day-filter').addBack().removeClass('active');
+    jQ(this).addClass('active');
+    var $rows = jQ('#gtb-t915-daybyday-table tbody tr');
+    if (filter === 'loss') $rows.filter('[data-has-loss="0"]').hide();
+    else $rows.show();
+});
+
 // ── Day chart popup (from the 9:15 day-by-day table) ──────────────────────────
 function _gtbDayChartPopup() {
     var el = document.getElementById('gtb-daychart-overlay');
@@ -9444,12 +9619,22 @@ async function _gtbRenderDayChart(name, date, containerId, height) {
     var candles = (res && res.data && res.data.candles) ? res.data.candles : [];
     if (!candles.length) { jQ('#' + containerId).html('<div class="cmd-load" style="color:var(--gtb-red);">no data</div>'); return; }
     var open = parseFloat(candles[0][1]);
-    var sd = getStrikeDetails({ price: open }, name);
+    // GIFT NIFTY: anchor ASO/AST/BSO/BST to its OWN 9:15 candle (its session starts ~6:30 AM,
+    // well before NIFTY/SENSEX/BANK's 9:15 reference) — same convention as showTopChart's live
+    // chart and the backtest's GIFT NIFTY confirmation check (_gtbBuild915Trend).
+    var strikeAnchor = open;
+    var giftAnchor = null;
+    if (name === 'GIFT NIFTY') {
+        var g915c = candles.find(function (c) { var m = moment(c[0]); return m.hour() === 9 && m.minute() === 15; });
+        if (g915c) { giftAnchor = parseFloat(g915c[1]); strikeAnchor = giftAnchor; }
+    }
+    var sd = getStrikeDetails({ price: strikeAnchor }, name);
     var refLines = [
         { key: 'OPEN', value: open },
         { key: 'AST', value: sd.ustrikeTwo }, { key: 'ASO', value: sd.ustrikeOne },
         { key: 'BSO', value: sd.bstrikeOne }, { key: 'BST', value: sd.bstrikeTwo },
     ];
+    if (giftAnchor != null) refLines.push({ key: '915', value: giftAnchor, text: '9:15 ' + giftAnchor });
 
     // Add VIXU / VIXL from the cached backtest rows — values use each instrument's own
     // PREVIOUS day close (not today's open), so the range is correct.
@@ -9468,13 +9653,15 @@ jQ(document).on('click', '.gtb-day-chart-btn', async function (e) {
     e.preventDefault(); e.stopPropagation();
     var date = jQ(this).data('date');
     var ov = _gtbDayChartPopup();
-    ov.find('.gtb-daychart-title').html('<i class="bi bi-bar-chart-fill"></i> NIFTY 50 &amp; BANK NIFTY — ' + moment(date).format('ddd, DD MMM YYYY'));
+    ov.find('.gtb-daychart-title').html('<i class="bi bi-bar-chart-fill"></i> GIFT NIFTY, NIFTY 50 &amp; BANK NIFTY — ' + moment(date).format('ddd, DD MMM YYYY'));
     ov.find('#gtb-daychart-body').html(
         '<div class="gtb-daychart-pair">'
+        + '<div><div class="aoi-chart-t">GIFT NIFTY</div><div id="gtb-daychart-gn" style="width:100%;height:340px;"></div></div>'
         + '<div><div class="aoi-chart-t">NIFTY 50</div><div id="gtb-daychart-n50" style="width:100%;height:340px;"></div></div>'
         + '<div><div class="aoi-chart-t">NIFTY BANK</div><div id="gtb-daychart-bn" style="width:100%;height:340px;"></div></div>'
         + '</div>');
     ov.addClass('active');
+    try { await _gtbRenderDayChart('GIFT NIFTY', date, 'gtb-daychart-gn', 340); } catch (e0) {}
     try { await _gtbRenderDayChart('NIFTY 50', date, 'gtb-daychart-n50', 340); } catch (e1) {}
     try { await _gtbRenderDayChart('NIFTY BANK', date, 'gtb-daychart-bn', 340); } catch (e2) {}
 });
@@ -9521,10 +9708,15 @@ jQ(document).on('click', '.gtb-combo-row', async function (e) {
             var t = lg.dir === 'long' ? 'L' : 'S';
             return '<span style="color:' + (lg.win ? 'var(--gtb-green)' : 'var(--gtb-red)') + ';">' + t + ' ' + (lg.pnl >= 0 ? '+' : '') + lg.pnl.toFixed(0) + '</span>';
         }).join('  *  ');
+        var giftRes = (r.giftLegs || []).map(function (lg) {
+            var t = lg.dir === 'long' ? 'L' : 'S';
+            return '<span style="color:' + (lg.win ? 'var(--gtb-green)' : 'var(--gtb-red)') + ';">' + t + ' ' + (lg.pnl >= 0 ? '+' : '') + lg.pnl.toFixed(0) + '</span>';
+        }).join('  *  ');
         grid += '<div class="gtb-combochart-cell">'
             + '<div class="gtb-combochart-lbl"><b>' + moment(r.date).format('DD MMM YY') + '</b>'
             + ' <span style="color:' + mc + ';font-family:var(--gtb-mono);">' + (r.move === 'UP' ? '▲' : '▼') + ' ' + (r.movePct >= 0 ? '+' : '') + r.movePct.toFixed(2) + '%</span>'
             + (res ? ' &nbsp;' + res : '') + '</div>'
+            + '<div class="gtb-combochart-sublbl">GIFT NIFTY' + (giftRes ? ' &nbsp;' + giftRes : '') + '</div><div id="gtb-cchart-' + i + '-g" class="gtb-combochart-canvas"></div>'
             + '<div class="gtb-combochart-sublbl">NIFTY 50</div><div id="gtb-cchart-' + i + '-n" class="gtb-combochart-canvas"></div>'
             + '<div class="gtb-combochart-sublbl">NIFTY BANK</div><div id="gtb-cchart-' + i + '-b" class="gtb-combochart-canvas"></div>'
             + '</div>';
@@ -9532,8 +9724,9 @@ jQ(document).on('click', '.gtb-combo-row', async function (e) {
     grid += '</div>';
     ov.find('#gtb-combochart-body').html(grid);
 
-    // Fetch + render each days NIFTY + BANK charts sequentially (avoids hammering the API)
+    // Fetch + render each days GIFT + NIFTY + BANK charts sequentially (avoids hammering the API)
     for (var j = 0; j < show.length; j++) {
+        try { await _gtbRenderDayChart('GIFT NIFTY', show[j].date, 'gtb-cchart-' + j + '-g', 175); } catch (e0) {}
         try { await _gtbRenderDayChart('NIFTY 50',   show[j].date, 'gtb-cchart-' + j + '-n', 175); } catch (e1) {}
         try { await _gtbRenderDayChart('NIFTY BANK', show[j].date, 'gtb-cchart-' + j + '-b', 175); } catch (e2) {}
     }
@@ -11061,6 +11254,366 @@ function _gtbLevelProb(name) {
     return out;
 }
 
+// ── Level Confirmation card (Dashboard tab) ──────────────────────────────────
+// Answers the live pre-trade question: today's 9:15 combo says Sell-at-ASO/AST (or
+// Buy-at-BSO/BST) — is THIS occurrence more likely one of the historical win-rate's wins,
+// or one of its losses? A combo's backtested win-rate (e.g. 74%) is an average across every
+// day it fired; the losses in that sample are disproportionately the days where other live
+// signals disagreed with the combo's direction. This runs 5 independent live checks — GIFT
+// NIFTY's own level reaction, a real OI/OBV wall at the specific level (not just the
+// composite score), which index is genuinely weak/strong (not just relatively so), Level
+// Probability's live-signal lean, and whether the weighted components are fading/accelerating
+// the move — plus the historical base rate as separate context (not counted in the tally,
+// since it's not a live signal). Deliberately reuses existing scoring primitives
+// (_gtbFindWalls/_gtbWallErosion/_gtbLevelProb/computeInstrumentScore) rather than
+// re-deriving any of them — same "one source of truth" reasoning as every other scanner here.
+//
+// side: 'resistance' (Sell-at-ASO/AST) or 'support' (Buy-at-BSO/BST).
+function _gtbGiftLevelCheck(side) {
+    try {
+        var b915 = JSON.parse(localStorage.getItem('VALID_BREAKOUT_NINE_FIFTEEN') || '{}');
+        var g = b915['GIFT NIFTY'];
+        if (!g || g.aso == null) return { ok: false, reason: 'GIFT NIFTY 9:15 levels not available yet — run the 9:15 scan' };
+        var ltpObj = JSON.parse(localStorage.getItem('INSTRUMENT_LTP_PRICE') || '{}');
+        var ltp = ltpObj['GIFT NIFTY'] ? parseFloat(ltpObj['GIFT NIFTY'].ltp) : null;
+        if (!ltp) return { ok: false, reason: 'GIFT NIFTY live LTP not loaded yet' };
+        // How far GIFT NIFTY has pulled back from its own intraday extreme since 9:15 — the
+        // piece a bare current-LTP-vs-level check can't see. Reused by both sides below to
+        // tell "touched the level and is now reversing back" apart from "still sitting at the
+        // extreme"/"never even got there," which otherwise look identical (both just "ltp is
+        // between the two levels").
+        var maxSince = g.maxSince915, minSince = g.minSince915;
+
+        if (side === 'resistance') {
+            // Below ASO confirms outright — no breakout pressure.
+            if (ltp <= g.aso) return { ok: true, confirmed: true, ltp: ltp, level: g.aso, text: 'At/below its own ASO ' + g.aso + ' — no breakout pressure' };
+            // Currently still above AST — still extended right now, regardless of history.
+            if (g.ast != null && ltp > g.ast) return { ok: true, confirmed: false, ltp: ltp, level: g.ast, text: 'Currently above its own AST ' + g.ast + ' — still extended, contradicts the sell' };
+            // Between ASO and AST right now — the ambiguous zone. Check whether it got here by
+            // touching/exceeding AST and pulling back (a real reversal, confirms) or by never
+            // reaching AST at all / sitting right at its high (no reversal yet, doesn't confirm).
+            if (maxSince != null && g.ast != null && maxSince > g.ast) {
+                return { ok: true, confirmed: true, ltp: ltp, level: g.ast, text: 'Touched ' + maxSince.toFixed(1) + ' (above its own AST ' + g.ast + ') and has pulled back to ' + ltp + ' — reversal, confirms the sell' };
+            }
+            return { ok: true, confirmed: false, ltp: ltp, level: g.aso, text: 'Between its own ASO ' + g.aso + ' and AST' + (g.ast != null ? ' ' + g.ast : '') + ' without having reversed from a higher extreme — still extended, contradicts the sell' };
+        } else {
+            // Mirror for support.
+            if (ltp >= g.bso) return { ok: true, confirmed: true, ltp: ltp, level: g.bso, text: 'At/above its own BSO ' + g.bso + ' — support holding' };
+            if (g.bst != null && ltp < g.bst) return { ok: true, confirmed: false, ltp: ltp, level: g.bst, text: 'Currently below its own BST ' + g.bst + ' — already broken, contradicts the buy' };
+            if (minSince != null && g.bst != null && minSince < g.bst) {
+                return { ok: true, confirmed: true, ltp: ltp, level: g.bst, text: 'Touched ' + minSince.toFixed(1) + ' (below its own BST ' + g.bst + ') and has bounced back to ' + ltp + ' — reversal, confirms the buy' };
+            }
+            return { ok: true, confirmed: false, ltp: ltp, level: g.bso, text: 'Between its own BSO ' + g.bso + ' and BST' + (g.bst != null ? ' ' + g.bst : '') + ' without having bounced from a lower extreme — already broken, contradicts the buy' };
+        }
+    } catch (e) { return { ok: false, reason: 'error' }; }
+}
+
+// Is there a real OI-ranked wall SPECIFICALLY AT the given level price (not just the
+// strongest-ranked wall anywhere on that side of the chain — a strike far from ASO/AST that
+// happens to be the biggest wall overall is not what "wall @ ASO/AST" should mean), and is
+// it still intact (not eroding — see _gtbWallErosion)? levelPrice (optional) is the actual
+// ASO/BSO price to match against; without it, falls back to the old "strongest wall on this
+// side, wherever it is" behavior — kept only so this function still degrades gracefully if a
+// caller has no numeric level to check against.
+function _gtbLevelWallCheck(name, side, levelPrice) {
+    try {
+        var sm = INSTRUMENT_SCORE_MAP[name];
+        if (!sm || !sm.oiData || !sm.oiData.tableData || !sm.oiData.tableData.length) return { ok: false, reason: 'No cached OI/OBV data for ' + name };
+        var td = sm.oiData.tableData;
+        var tr = generateTrend(name);
+        var spot = parseFloat(tr.ltp), pc = parseFloat(tr.change) || 0;
+        var walls = _gtbFindWalls(td, pc, spot);
+        var erosion = _gtbWallErosion(td, walls);
+        var list = side === 'resistance' ? walls.resistance : walls.support;
+        if (!list || !list.length) return { ok: true, confirmed: false, text: 'No ranked ' + side + ' wall found' };
+        var top;
+        if (levelPrice) {
+            // Nearest ranked wall to the actual level, within ~1.5% of spot — ASO/AST is
+            // usually a strike step or two from spot, so this is generous enough to still
+            // match a real wall sitting near it without picking up something unrelated.
+            var PROX_PCT = 1.5;
+            var near = list.filter(function (w) { return Math.abs(w.strike - levelPrice) / spot * 100 <= PROX_PCT; });
+            near.sort(function (a, b) { return Math.abs(a.strike - levelPrice) - Math.abs(b.strike - levelPrice); });
+            if (!near.length) return { ok: true, confirmed: false, text: 'No ranked ' + side + ' wall near ' + levelPrice + ' (nearest is ' + list[0].strike + ')' };
+            top = near[0];
+        } else {
+            top = list[0];
+        }
+        var sideTag = side === 'resistance' ? 'R' : 'S';
+        var eroding = (erosion.eroding || []).some(function (e) { return e.side === sideTag && e.strike === top.strike; });
+        // Building = OBV at this exact strike is accelerating RIGHT NOW (leading), not just
+        // "not yet eroding" (lagging/neutral) — a stronger version of the same confirmation.
+        var building = false;
+        try {
+            var vel = _gtbWallVelocity(td, spot, 3, 2);
+            building = (vel.building || []).some(function (b) { return b.side === sideTag && b.strike === top.strike; });
+        } catch (e2) {}
+        return { ok: true, confirmed: !eroding, strike: top.strike, tier: top.tier, eroding: eroding, building: building,
+            text: (eroding ? 'Wall at ' + top.strike + ' is eroding — writers unwinding'
+                : (top.tier === 'primary' ? 'Primary' : 'Secondary') + ' wall at ' + top.strike + (building ? ' — actively building 🔥' : ' intact')) };
+    } catch (e) { return { ok: false, reason: 'error' }; }
+}
+
+// Which of NIFTY 50 / NIFTY BANK is genuinely weak (A/D + OI/OBV both negative) or strong
+// (both positive) — not just "less strong than the other index."
+function _gtbWeakStrongIndexCheck(direction) {
+    try {
+        var n = (typeof NIFTY_50_ADVANCE_DECLINE_SCORE !== 'undefined' ? NIFTY_50_ADVANCE_DECLINE_SCORE : 0) + (typeof NIFTY_50_OI_OBV_SCORE !== 'undefined' ? NIFTY_50_OI_OBV_SCORE : 0);
+        var b = (typeof NIFTY_BANK_ADVANCE_DECLINE_SCORE !== 'undefined' ? NIFTY_BANK_ADVANCE_DECLINE_SCORE : 0) + (typeof NIFTY_BANK_OI_OBV_SCORE !== 'undefined' ? NIFTY_BANK_OI_OBV_SCORE : 0);
+        var which = direction === 'weak' ? (n <= b ? 'NIFTY 50' : 'NIFTY BANK') : (n >= b ? 'NIFTY 50' : 'NIFTY BANK');
+        var val = which === 'NIFTY 50' ? n : b;
+        var confirmed = direction === 'weak' ? val < 0 : val > 0;
+        return { ok: true, confirmed: confirmed, which: which, val: val,
+            text: which + ' is ' + (confirmed ? '' : 'only mildly ') + (direction === 'weak' ? 'weakest' : 'strongest') + ' (A/D+OI/OBV ' + (val >= 0 ? '+' : '') + val.toFixed(1) + ')' };
+    } catch (e) { return { ok: false, reason: 'error' }; }
+}
+
+// Are the weighted components fading a rally (Sell case) or accelerating it (Buy case)?
+function _gtbComponentsCheck(direction) {
+    try {
+        var cs = typeof NIFTY_50_COMPONENT_SCORE !== 'undefined' ? NIFTY_50_COMPONENT_SCORE : 0;
+        var confirmed = direction === 'weak' ? cs <= 0 : cs >= 0;
+        return { ok: true, confirmed: confirmed, val: cs,
+            text: 'NIFTY 50 components ' + (direction === 'weak' ? (confirmed ? 'fading' : 'still driving the move up') : (confirmed ? 'accelerating' : 'not yet confirming')) + ' (' + (cs >= 0 ? '+' : '') + cs.toFixed(1) + ')' };
+    } catch (e) { return { ok: false, reason: 'error' }; }
+}
+
+// Futures REMARK direction, folded with that REMARK's own today-so-far accuracy
+// (INSTRUMENT_SCORE_MAP[name].futAccMap, populated by _dvLoadFutAcc if the Instrument Detail
+// View has been opened for this name this session — otherwise just shows direction, no
+// accuracy weighting). Per [[trade-signal-priority]], futures/OI-OBV flow is the fastest,
+// most-trusted leading signal in this app, so this belongs in the tally.
+function _gtbFuturesTrendCheck(name, direction) {
+    try {
+        var sm = INSTRUMENT_SCORE_MAP[name];
+        if (!sm || sm.futures_trend === undefined || sm.futures_trend === null) return { ok: false, reason: 'no futures data yet' };
+        var score = sm.futures_trend;
+        var confirmed = direction === 'weak' ? score < 0 : score > 0;
+        var remark = sm.futures_trend_remark || '—';
+        var accTxt = '';
+        try {
+            var acc = sm.futAccMap && sm.futAccMap[remark];
+            if (acc && acc.total >= 5) accTxt = ' (' + Math.round(acc.hits / acc.total * 100) + '% accurate today, n=' + acc.total + ')';
+        } catch (e2) {}
+        return { ok: true, confirmed: confirmed, text: remark + accTxt };
+    } catch (e) { return { ok: false, reason: 'error' }; }
+}
+
+// Live resting bid/ask order-book pressure from the WebSocket ticker — the fastest signal
+// in the app, genuinely different from OI/OBV (pre-trade order pressure vs executed volume).
+// Needs the WebSocket Subscribe popup connected; gracefully reports "not available" if not.
+function _gtbOrderFlowCheck(name, direction) {
+    var of = null;
+    try { of = _gtbOrderFlowImbalance(name); } catch (e) {}
+    if (!of) return { ok: false, reason: 'WebSocket not connected' };
+    var confirmed = direction === 'weak' ? of.dir < 0 : of.dir > 0;
+    return { ok: true, confirmed: confirmed, text: of.label + ' (' + (of.imb >= 0 ? '+' : '') + (of.imb * 100).toFixed(0) + '%)' };
+}
+
+// Is the move broad-based across NIFTY 50's weighted constituents (many contributors) in the
+// expected direction, or is one stock alone dragging the index the "wrong" way — same
+// weight% × price-change% "Index Impact" formula the Weighted Constituents OI table already
+// uses (_gtbSigOiWtdColHtml), reimplemented standalone here so this card doesn't depend on
+// that render function having already run.
+function _gtbBroadBasedCheck(direction) {
+    try {
+        var names = Object.keys(NIFTY_50_WEIGHTED_STOCKS || {});
+        if (!names.length) return { ok: false, reason: 'no data' };
+        var rows = names.map(function (name) {
+            var pc = 0; try { pc = parseFloat(generateTrend(name).change) || 0; } catch (e) {}
+            var weight = parseFloat(NIFTY_50_WEIGHTED_STOCKS[name]) || 0;
+            return { name: name, impact: weight * pc / 100 };
+        });
+        var netImpact = rows.reduce(function (s, r) { return s + r.impact; }, 0);
+        var totalAbs = rows.reduce(function (s, r) { return s + Math.abs(r.impact); }, 0) || 1;
+        var top = rows.slice().sort(function (a, b) { return Math.abs(b.impact) - Math.abs(a.impact); })[0];
+        var topShare = Math.round(Math.abs(top.impact) / totalAbs * 100);
+        var dirConfirmed = direction === 'weak' ? netImpact < 0 : netImpact > 0;
+        var broad = topShare < 50;
+        return { ok: true, confirmed: dirConfirmed && broad, netImpact: netImpact, topShare: topShare, topName: top.name,
+            text: (dirConfirmed ? 'Net impact ' + (netImpact >= 0 ? '+' : '') + netImpact.toFixed(2) + ' agrees' : 'Net impact ' + (netImpact >= 0 ? '+' : '') + netImpact.toFixed(2) + ' disagrees')
+                + (broad ? ', broad-based' : ', but ' + top.name + ' alone is ' + topShare + '% of it') };
+    } catch (e) { return { ok: false, reason: 'error' }; }
+}
+
+// IV Skew — Put skew (bearish pressure) vs Call skew (bullish pressure). A genuine
+// independent signal, unlike Max Pain (see _gtbMaxPainInfo below — kept informational only,
+// never scored, per [[trade-signal-priority]]).
+function _gtbIvSkewCheck(name, direction) {
+    try {
+        var score = INSTRUMENT_SCORE_MAP[name] && INSTRUMENT_SCORE_MAP[name].score ? INSTRUMENT_SCORE_MAP[name].score.iv_skew : undefined;
+        if (score === undefined && name === 'NIFTY 50') score = typeof NIFTY_50_IV_SKEW_SCORE !== 'undefined' ? NIFTY_50_IV_SKEW_SCORE : undefined;
+        if (score === undefined) return { ok: false, reason: 'no IV skew data' };
+        var confirmed = direction === 'weak' ? score < 0 : score > 0;
+        return { ok: true, confirmed: confirmed,
+            text: (score < 0 ? 'Put skew (bearish pressure)' : score > 0 ? 'Call skew (bullish pressure)' : 'Flat') + ' (' + (score >= 0 ? '+' : '') + score + ')' };
+    } catch (e) { return { ok: false, reason: 'error' }; }
+}
+
+// Max Pain — deliberately informational only, NEVER part of the confirmation tally. Per
+// [[trade-signal-priority]]: futures/OI-OBV flow is the faster, leading signal; Max Pain is
+// a target/support-resistance level, not a directional dampener — scoring it here would
+// repeat the same framing mistake that memory documents was already fixed elsewhere
+// (_btStrategyFor in bloombergAnalysis.js).
+function _gtbMaxPainInfo(name) {
+    try {
+        var mp = _gtbComputeMaxPainGEX(name);
+        if (!mp) return '';
+        return 'Max Pain ' + mp.maxPainK + ' vs spot ' + mp.spot.toFixed(0) + ' (' + (mp.maxPainPct >= 0 ? '+' : '') + mp.maxPainPct.toFixed(2) + '%) — informational target only, not scored.';
+    } catch (e) { return ''; }
+}
+
+// VIX regime caution — same LOW/NORMAL/ELEVATED/HIGH thresholds used everywhere else in this
+// app. ELEVATED/HIGH means the expected daily range is wider than usual, so a level-based
+// thesis (ASO/AST is typically only ~1 strike step away) can get blown through even when the
+// DIRECTION is correct — worth flagging before the tally, same idea as the Dead Zone banner.
+function _gtbVixRegimeBanner() {
+    var vixVal = 0;
+    try { vixVal = parseFloat((JSON.parse(localStorage.getItem('INSTRUMENT_LTP_PRICE') || '{}')['INDIA VIX'] || {}).ltp) || 0; } catch (e) {}
+    if (!vixVal || vixVal < 18) return ''; // LOW/NORMAL — no caution needed
+    var label = vixVal < 25 ? 'ELEVATED' : 'HIGH';
+    var col = vixVal < 25 ? '#f97316' : '#f85149';
+    return '<div style="padding:4px 8px;margin-bottom:6px;background:rgba(248,81,73,0.10);border-left:3px solid ' + col + ';font-size:0.48rem;color:var(--gtb-text);">'
+        + '<i class="bi bi-exclamation-triangle-fill" style="color:' + col + ';"></i> India VIX is <b style="color:' + col + ';">' + label + '</b> (' + vixVal.toFixed(1) + ') — expected range is wider than usual; a level-based thesis can get blown through even if direction is right. Consider wider stops or smaller size.</div>';
+}
+
+// Dead Zone warning banner — if NIFTY 50 is currently between two untested/weak levels
+// (_gtbDeadZone: |composite score| < 3), overall conviction is inherently weak and every
+// confirmation check below should be read with extra caution, not taken at face value.
+function _gtbDeadZoneBanner() {
+    var dz = null;
+    try { dz = _gtbDeadZone('NIFTY 50'); } catch (e) {}
+    if (!dz) return '';
+    return '<div style="padding:4px 8px;margin-bottom:6px;background:rgba(139,92,246,0.12);border-left:3px solid #8b5cf6;font-size:0.48rem;color:var(--gtb-text);">'
+        + '<i class="bi bi-exclamation-triangle-fill" style="color:#8b5cf6;"></i> NIFTY 50 is inside a <b>dead zone</b> ('
+        + dz.lo + ' – ' + dz.hi + ') — weak overall conviction; treat every confirmation below with extra caution until price actually breaks this band.</div>';
+}
+
+// Today's exact 9:15 combo's cached backtest win-rate — same lookup _gtbBuildPrediction
+// already uses, kept here as a separate small helper so this card doesn't need the whole
+// prediction-card build just for this one number.
+function _gtb915ComboStatsToday(comboKey) {
+    try {
+        var ckey = 'GTB_915TREND_' + moment().format('YYYY-MM-DD') + '_250_v5';
+        var cached = localStorage.getItem(ckey);
+        if (!cached) return null;
+        var rows = JSON.parse(cached);
+        var legs = 0, win = 0;
+        rows.forEach(function (r) {
+            if (r.key !== comboKey) return;
+            (r.legs || []).forEach(function (lg) { legs++; if (lg.win) win++; });
+        });
+        if (!legs) return null;
+        return { legs: legs, win: win, winPct: Math.round(win / legs * 100) };
+    } catch (e) { return null; }
+}
+
+function _gtbLevelConfirmSideHtml(sideLabel, side, level, direction, comboKey) {
+    // direction: 'weak' (Sell case) or 'strong' (Buy case) — feeds the weak/strong-index
+    // and components checks, which share the same "is it genuinely lopsided" shape.
+    // Actual numeric ASO/BSO price for each index — needed so the wall check can match a
+    // wall NEAR the real level, not just grab the single strongest wall anywhere in the
+    // chain (see _gtbLevelWallCheck's levelPrice param).
+    var b915ForLevels = {};
+    try { b915ForLevels = JSON.parse(localStorage.getItem('VALID_BREAKOUT_NINE_FIFTEEN') || '{}'); } catch (e) {}
+    var n50Level  = b915ForLevels['NIFTY 50']   ? (side === 'resistance' ? b915ForLevels['NIFTY 50']['aso']   : b915ForLevels['NIFTY 50']['bso'])   : null;
+    var bankLevel = b915ForLevels['NIFTY BANK'] ? (side === 'resistance' ? b915ForLevels['NIFTY BANK']['aso'] : b915ForLevels['NIFTY BANK']['bso']) : null;
+
+    var checks = [
+        Object.assign({ label: 'GIFT NIFTY' }, _gtbGiftLevelCheck(side)),
+        Object.assign({ label: 'OI/OBV wall @ ' + level }, _gtbLevelWallCheck('NIFTY 50', side, n50Level)),
+        Object.assign({ label: 'Futures trend' }, _gtbFuturesTrendCheck('NIFTY 50', direction)),
+        Object.assign({ label: 'Order flow' }, _gtbOrderFlowCheck('NIFTY 50', direction)),
+        Object.assign({ label: (direction === 'weak' ? 'Weakest' : 'Strongest') + ' index' }, _gtbWeakStrongIndexCheck(direction)),
+        Object.assign({ label: 'Broad-based?' }, _gtbBroadBasedCheck(direction)),
+        Object.assign({ label: 'Level Probability' }, (function () {
+            var lp = _gtbLevelProb('NIFTY 50');
+            if (!lp.ok) return { ok: false, reason: 'not available' };
+            var confirmed = direction === 'weak' ? lp.netDir < -0.1 : lp.netDir > 0.1;
+            return { ok: true, confirmed: confirmed, val: lp.netDir,
+                text: 'Live-signal lean ' + (lp.netDir >= 0 ? '+' : '') + lp.netDir.toFixed(2) + ' (' + (lp.netDir < 0 ? 'bearish' : lp.netDir > 0 ? 'bullish' : 'flat') + ')' };
+        })()),
+        Object.assign({ label: 'Components' }, _gtbComponentsCheck(direction)),
+        Object.assign({ label: 'IV Skew' }, _gtbIvSkewCheck('NIFTY 50', direction)),
+        // BANK NIFTY cross-check — NIFTY and BANK can fight each other (see the app's own
+        // NIFTY/BANK NIFTY Divergence panel); these reuse the exact same generic checks
+        // above, just pointed at BANK NIFTY's own levels/futures/order flow instead of
+        // re-deriving anything BANK-specific.
+        Object.assign({ label: 'BANK: wall @ own level' }, _gtbLevelWallCheck('NIFTY BANK', side, bankLevel)),
+        Object.assign({ label: 'BANK: futures trend' }, _gtbFuturesTrendCheck('NIFTY BANK', direction)),
+        Object.assign({ label: 'BANK: order flow' }, _gtbOrderFlowCheck('NIFTY BANK', direction)),
+    ];
+    var okChecks = checks.filter(function (c) { return c.ok; });
+    var confirmedN = okChecks.filter(function (c) { return c.confirmed; }).length;
+    var totalN = okChecks.length;
+    var tallyCol = totalN === 0 ? 'var(--gtb-muted)' : (confirmedN / totalN >= 0.8 ? 'var(--gtb-green)' : confirmedN / totalN >= 0.4 ? 'var(--gtb-amber)' : 'var(--gtb-red)');
+
+    var stats = _gtb915ComboStatsToday(comboKey);
+
+    var rows = checks.map(function (c) {
+        var icon = !c.ok ? '<span style="color:var(--gtb-muted);">—</span>' : c.confirmed ? '<span style="color:var(--gtb-green);">✓</span>' : '<span style="color:var(--gtb-red);">✗</span>';
+        var txt = !c.ok ? (c.reason || 'n/a') : c.text;
+        return '<div style="display:flex;justify-content:space-between;gap:8px;padding:2px 0;font-size:0.5rem;">'
+            + '<span style="color:var(--gtb-muted);">' + c.label + '</span>'
+            + '<span style="text-align:right;color:var(--gtb-text);">' + icon + ' ' + txt + '</span>'
+            + '</div>';
+    }).join('');
+
+    // Explicit take/skip verdict — the actual answer to "should I take this trade," not
+    // just a raw tally the user has to interpret themselves each time.
+    var verdict;
+    if (totalN === 0) verdict = { text: 'No live signals available yet', col: 'var(--gtb-muted)' };
+    else {
+        var pct = confirmedN / totalN;
+        if (pct >= 0.75) verdict = { text: 'Reasonable to take — most signals agree', col: 'var(--gtb-green)' };
+        else if (pct >= 0.5) verdict = { text: 'Mixed — size down or wait for more confirmation', col: 'var(--gtb-amber)' };
+        else verdict = { text: 'Skip — most signals disagree with this call', col: 'var(--gtb-red)' };
+    }
+    var maxPainTxt = _gtbMaxPainInfo('NIFTY 50');
+
+    return '<div style="flex:1;min-width:0;background:var(--gtb-surface2);border:1px solid var(--gtb-border);padding:6px 8px;">'
+        + '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px;">'
+        + '<span style="font-weight:800;font-size:0.56rem;">' + sideLabel + '</span>'
+        + '<span style="font-weight:800;font-size:0.56rem;color:' + tallyCol + ';">' + confirmedN + '/' + totalN + ' confirmed</span>'
+        + '</div>'
+        + rows
+        + '<div style="margin-top:5px;padding:3px 5px;background:rgba(0,0,0,0.15);font-weight:800;font-size:0.5rem;color:' + verdict.col + ';">' + verdict.text + '</div>'
+        + '<div style="margin-top:4px;padding-top:3px;border-top:1px solid var(--gtb-border);font-size:0.46rem;color:var(--gtb-muted);">'
+        + (stats ? 'Historical: <b style="color:' + (stats.winPct >= 60 ? 'var(--gtb-green)' : stats.winPct <= 40 ? 'var(--gtb-red)' : 'var(--gtb-amber)') + ';">' + stats.winPct + '% win-rate</b> (' + stats.legs + ' legs) for this combo — separate context, not part of the tally above.'
+                : '<span style="color:var(--gtb-amber);">UNVALIDATED</span> — this combo has no/too little history in the backtest sample.')
+        + (maxPainTxt ? '<br>' + maxPainTxt : '')
+        + '</div>'
+        + '</div>';
+}
+
+// Main entry — call from the Dashboard tab. Renders nothing when today's strategy is
+// Sideways/no-trade; renders one side-panel for Sell-at-ASO/AST, Buy-at-BSO/BST, or both.
+function _gtbLevelConfirmHtml() {
+    try {
+        var b915 = JSON.parse(localStorage.getItem('VALID_BREAKOUT_NINE_FIFTEEN') || '{}');
+        var n915raw = (b915['NIFTY 50']   && b915['NIFTY 50']['CLOSE_9_15'])   || 'B/W';
+        var s915raw = (b915['SENSEX']     && b915['SENSEX']['CLOSE_9_15'])      || 'B/W';
+        var b915raw = (b915['NIFTY BANK'] && b915['NIFTY BANK']['CLOSE_9_15']) || 'B/W';
+        var comboKey = _gtbNorm915(n915raw) + '-' + _gtbNorm915(s915raw) + '-' + _gtbNorm915(b915raw);
+        var strat = GTB_STRAT_LOOKUP[comboKey] || { outcome: 'Sideways', level: 'No trade' };
+
+        if (strat.outcome !== 'Sell' && strat.outcome !== 'Buy' && strat.outcome !== 'Buy/Sell') {
+            return '<div style="padding:10px;text-align:center;color:var(--gtb-muted);font-size:0.55rem;">Today\'s combo (' + comboKey + ') is Sideways — no ASO/AST or BSO/BST entry to confirm.</div>';
+        }
+
+        var panels = [];
+        if (strat.outcome === 'Sell' || strat.outcome === 'Buy/Sell') {
+            panels.push(_gtbLevelConfirmSideHtml('SELL @ ASO/AST', 'resistance', 'ASO/AST', 'weak', comboKey));
+        }
+        if (strat.outcome === 'Buy' || strat.outcome === 'Buy/Sell') {
+            panels.push(_gtbLevelConfirmSideHtml('BUY @ BSO/BST', 'support', 'BSO/BST', 'strong', comboKey));
+        }
+        return _gtbVixRegimeBanner() + _gtbDeadZoneBanner() + '<div style="display:flex;gap:8px;flex-wrap:wrap;">' + panels.join('') + '</div>';
+    } catch (e) {
+        return '<div style="padding:10px;text-align:center;color:var(--gtb-red);font-size:0.55rem;">Level Confirmation error: ' + (e.message || e) + '</div>';
+    }
+}
+
 // Shared row-list builder — NIFTY 50 / NIFTY BANK + their top weighted constituents, each
 // as one live-signal-only snapshot line (see _gtbLevelProb — weighted toward TODAY's live
 // signals, not a historical base rate). Used by both the Metrics tab's own section and the
@@ -11633,6 +12186,7 @@ jQ(document).on('click', '#show-commodities', function (e) {
         +         '<div id="cmd-crude-chart"  style="height:240px;"></div>'
         +       '</div>'
         +       '<div id="cmd-crude-global" class="cmd-card" style="margin-top:8px;"></div>'
+        +       '<div id="cmd-gift-crude-corr" class="cmd-card" style="margin-top:8px;"></div>'
         // Prediction — same per-instrument model used in Stock Viewer / Instrument Detail
         // View (MCX-aware: strike levels + OVX-based VIXU/VIXL come from strikeMap/.open,
         // not INSTRUMENT_LIST_GLOBAL, since MCX has no INSTRUMENT_TOKENS entry). The ONLY
@@ -11934,6 +12488,13 @@ jQ(document).on('click', '#show-commodities', function (e) {
         try { usdScore = computeInstrumentScore('USDINR').current_trend || ((INSTRUMENT_SCORE_MAP['USDINR'] || {}).futures_trend || 0); } catch(_e) {}
         var ovx = parseFloat(OVX) || 0;
 
+        // GIFT NIFTY — verified via the correlation check above the WTI inputs (r=-0.57,
+        // 74% opposite-direction days over 119 sessions): GIFT NIFTY down tends to mean crude
+        // up, and vice versa. Inverted into the same bull/bear vote the WTI/USD/INR inputs
+        // already use. Small threshold (±0.1%) so noise-level moves don't count as a vote.
+        var giftChg = 0;
+        try { giftChg = parseFloat(generateTrend('GIFT NIFTY').change) || 0; } catch (_ge) {}
+
         var signal = 'WAIT', sigCol = 'var(--gtb-amber)', sigReason = [];
         if (!wtiCur || !wtiPrev) {
             signal = 'ENTER WTI'; sigCol = 'var(--gtb-muted)';
@@ -11958,6 +12519,8 @@ jQ(document).on('click', '#show-commodities', function (e) {
                 if (usdScore < 0) { bearCount++; sigReason.push('USD/INR bearish — MCX drag'); }
                 bullCount += gapBias > 0 ? 1 : 0;
                 bearCount += gapBias < 0 ? 1 : 0;
+                if (giftChg < -0.1) { bullCount++; sigReason.push('GIFT NIFTY down ' + giftChg.toFixed(2) + '% — inverse correlation favors crude up'); }
+                if (giftChg > 0.1)  { bearCount++; sigReason.push('GIFT NIFTY up ' + giftChg.toFixed(2) + '% — inverse correlation favors crude down'); }
 
                 if (bullCount >= 2 && bearCount === 0) {
                     signal = 'BUY CE'; sigCol = 'var(--gtb-green)';
@@ -12327,6 +12890,7 @@ jQ(document).on('click', '#show-commodities', function (e) {
     _cmdRenderCrudeMeta();
     _cmdRenderSessionAlert();
     _cmdRenderGlobalContext();
+    _cmdRenderGiftCrudeCorrPlaceholder();
 
     // Session alert refreshes every minute so countdown stays live
     var _cmdSessionTimer = setInterval(function() {
@@ -12336,6 +12900,304 @@ jQ(document).on('click', '#show-commodities', function (e) {
 
     setTimeout(_cmdLoadAll, 80);
 });
+
+// ── GIFT NIFTY <-> Crude Oil correlation check ────────────────────────────────
+// User's own observation: "when GIFT NIFTY is down, crude is up, and vice versa." Rather
+// than assume that's real and build a signal on top of an unverified pattern, this fetches
+// actual daily closes for both and reports the measured Pearson correlation of their day-over-
+// day % changes — same math _btRenderCorrelation() already uses for the NSE correlation
+// matrix, reused here rather than re-derived. Button-triggered (not run on every popup open)
+// since it's a ~120-day historical fetch for two instruments; cached per day so re-opening
+// the popup the same day doesn't re-fetch.
+function _cmdRenderGiftCrudeCorrPlaceholder() {
+    var el = document.getElementById('cmd-gift-crude-corr');
+    if (!el) return;
+    var todayStr = (typeof CURRENT_DAY !== 'undefined' && CURRENT_DAY) ? CURRENT_DAY : moment().format('YYYY-MM-DD');
+    var cacheKey = 'GTB_GIFT_CRUDE_CORR_' + todayStr;
+    var cached = null;
+    try { cached = JSON.parse(localStorage.getItem(cacheKey)); } catch (e) {}
+    if (cached) { _cmdRenderGiftCrudeCorrResult(cached); return; }
+
+    el.innerHTML = '<div style="padding:6px;background:var(--gtb-surface);border:1px solid var(--gtb-border);font-size:0.48rem;">'
+        + '<div style="display:flex;align-items:center;gap:6px;">'
+        + '<i class="bi bi-diagram-3-fill" style="color:var(--gtb-blue);"></i>'
+        + '<span style="font-weight:800;letter-spacing:0.04em;color:var(--gtb-muted);font-size:0.42rem;">GIFT NIFTY &harr; CRUDE CORRELATION</span>'
+        + '<button id="cmd-gift-crude-corr-btn" style="margin-left:auto;background:var(--gtb-bg);border:1px solid var(--gtb-border);color:var(--gtb-text);padding:2px 6px;font-size:0.4rem;cursor:pointer;"><i class="bi bi-play-fill"></i> Check (120 trading days)</button>'
+        + '</div>'
+        + '<div style="color:var(--gtb-muted);font-size:0.42rem;margin-top:4px;">Verifies the observed "GIFT down &rarr; crude up" pattern against real daily closes before treating it as a signal.</div>'
+        + '</div>';
+}
+
+async function _cmdRunGiftCrudeCorr() {
+    var el = document.getElementById('cmd-gift-crude-corr');
+    if (el) el.querySelector('#cmd-gift-crude-corr-btn').innerHTML = '<i class="bi bi-hourglass-split"></i> Fetching…';
+
+    var DAYS = 120;
+    var toM = moment();
+    var fromM = moment().subtract(Math.ceil(DAYS * 1.5) + 10, 'days'); // pad for weekends/holidays, same convention as _gtbBuild915Trend
+
+    var giftTok = (typeof INSTRUMENT_TOKENS !== 'undefined') ? INSTRUMENT_TOKENS['GIFT NIFTY'] : null;
+    var crudeEntry = null;
+    try { crudeEntry = _psFutEntryFor('CRUDEOILM'); } catch (e) {}
+    var crudeTok = crudeEntry ? crudeEntry.instrument_token : null;
+
+    if (!giftTok || !crudeTok) {
+        if (el) el.innerHTML = '<div style="padding:6px;color:var(--gtb-red);font-size:0.46rem;">Missing GIFT NIFTY or CRUDEOILM futures token — try again after Data Load has run.</div>';
+        return;
+    }
+
+    var giftRes, crudeRes;
+    try {
+        giftRes  = await getHistoricalDataUsingPromise(giftTok,  fromM.format('YYYY-MM-DD'), toM.format('YYYY-MM-DD'), 'day');
+        crudeRes = await getHistoricalDataUsingPromise(crudeTok, fromM.format('YYYY-MM-DD'), toM.format('YYYY-MM-DD'), 'day');
+    } catch (e) {
+        if (el) el.innerHTML = '<div style="padding:6px;color:var(--gtb-red);font-size:0.46rem;">Fetch failed — ' + (e.message || e) + '</div>';
+        return;
+    }
+
+    var giftByDate = {}, crudeByDate = {};
+    (giftRes && giftRes.data && giftRes.data.candles || []).forEach(function (c) { giftByDate[moment(c[0]).format('YYYY-MM-DD')] = parseFloat(c[4]); });
+    (crudeRes && crudeRes.data && crudeRes.data.candles || []).forEach(function (c) { crudeByDate[moment(c[0]).format('YYYY-MM-DD')] = parseFloat(c[4]); });
+
+    // Only dates both instruments actually traded on, ascending, then last DAYS of them.
+    var commonDates = Object.keys(giftByDate).filter(function (d) { return crudeByDate[d] !== undefined; }).sort().slice(-DAYS - 1);
+    if (commonDates.length < 10) {
+        if (el) el.innerHTML = '<div style="padding:6px;color:var(--gtb-red);font-size:0.46rem;">Not enough overlapping daily data (' + commonDates.length + ' days) to compute a meaningful correlation.</div>';
+        return;
+    }
+
+    var giftRets = [], crudeRets = [], agree = 0, disagree = 0;
+    for (var i = 1; i < commonDates.length; i++) {
+        var d0 = commonDates[i - 1], d1 = commonDates[i];
+        var gR = (giftByDate[d1]  - giftByDate[d0])  / giftByDate[d0];
+        var cR = (crudeByDate[d1] - crudeByDate[d0]) / crudeByDate[d0];
+        giftRets.push(gR); crudeRets.push(cR);
+        // "Agree" here means SAME sign (both up or both down) — the OPPOSITE of the user's
+        // claimed inverse relationship, so disagree count is what would confirm it.
+        if ((gR >= 0) === (cR >= 0)) agree++; else disagree++;
+    }
+
+    // Same Pearson formula _btRenderCorrelation() already uses for the NSE matrix.
+    function pearson(a, b) {
+        var n = Math.min(a.length, b.length);
+        var mA = 0, mB = 0;
+        for (var i = 0; i < n; i++) { mA += a[i]; mB += b[i]; }
+        mA /= n; mB /= n;
+        var num = 0, dA = 0, dB = 0;
+        for (var i = 0; i < n; i++) { var da = a[i] - mA, db = b[i] - mB; num += da * db; dA += da * da; dB += db * db; }
+        return (dA * dB === 0) ? 0 : num / Math.sqrt(dA * dB);
+    }
+    var r = pearson(giftRets, crudeRets);
+    var n = giftRets.length;
+    var invPct = Math.round(disagree / n * 100);
+
+    var result = { r: r, n: n, agree: agree, disagree: disagree, invPct: invPct, computedAt: Date.now() };
+    var todayStr = (typeof CURRENT_DAY !== 'undefined' && CURRENT_DAY) ? CURRENT_DAY : moment().format('YYYY-MM-DD');
+    try { localStorage.setItem('GTB_GIFT_CRUDE_CORR_' + todayStr, JSON.stringify(result)); } catch (e) {}
+    _cmdRenderGiftCrudeCorrResult(result);
+}
+
+function _cmdRenderGiftCrudeCorrResult(result) {
+    var el = document.getElementById('cmd-gift-crude-corr');
+    if (!el) return;
+    var r = result.r;
+    var mag = Math.abs(r);
+    // Correlation direction: r < 0 means they DO move opposite (confirms the observation);
+    // r > 0 means they actually move together (would contradict it). Strength thresholds
+    // match common rule-of-thumb bands (|r|<0.2 negligible, 0.2-0.4 weak, 0.4-0.6 moderate,
+    // >0.6 strong) — not a claim of statistical significance, just plain-English magnitude.
+    var strength = mag < 0.2 ? 'negligible' : mag < 0.4 ? 'weak' : mag < 0.6 ? 'moderate' : 'strong';
+    var col = r < -0.2 ? 'var(--gtb-green)' : r > 0.2 ? 'var(--gtb-red)' : 'var(--gtb-muted)';
+    var verdict = r < -0.2
+        ? ('Confirms the observation — a ' + strength + ' inverse relationship (r=' + r.toFixed(2) + ')')
+        : r > 0.2
+        ? ('Contradicts the observation — they actually moved together, ' + strength + ' (r=' + r.toFixed(2) + ')')
+        : ('No real relationship in this sample (r=' + r.toFixed(2) + ', ' + strength + ') — day-to-day moves look independent');
+
+    el.innerHTML = '<div style="padding:6px;background:var(--gtb-surface);border:1px solid var(--gtb-border);font-size:0.48rem;">'
+        + '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">'
+        + '<i class="bi bi-diagram-3-fill" style="color:var(--gtb-blue);"></i>'
+        + '<span style="font-weight:800;letter-spacing:0.04em;color:var(--gtb-muted);font-size:0.42rem;">GIFT NIFTY &harr; CRUDE CORRELATION</span>'
+        + '<button id="cmd-gift-crude-corr-btn" style="margin-left:auto;background:var(--gtb-bg);border:1px solid var(--gtb-border);color:var(--gtb-text);padding:2px 6px;font-size:0.4rem;cursor:pointer;"><i class="bi bi-arrow-clockwise"></i> Recheck</button>'
+        + '</div>'
+        + '<div style="font-weight:800;font-size:0.6rem;color:' + col + ';margin-bottom:3px;">' + verdict + '</div>'
+        + '<div style="color:var(--gtb-muted);font-size:0.42rem;">Based on ' + result.n + ' trading-day pairs. Opposite-direction days: ' + result.disagree + '/' + result.n + ' (' + result.invPct + '%) — same-direction days: ' + result.agree + '/' + result.n + '.</div>'
+        + '</div>';
+}
+
+jQ(document).on('click', '#cmd-gift-crude-corr-btn', function (e) {
+    e.preventDefault(); e.stopPropagation();
+    _cmdRunGiftCrudeCorr();
+});
+
+// ── CRUDEOILM Opening-Trend Backtest ──────────────────────────────────────────
+// Single-instrument analog of _gtbBuild915Trend — crude has no sibling instruments to form
+// a 3-way combo with (unlike NIFTY/SENSEX/BANK), so this classifies CRUDEOILM's own opening
+// candle vs ITS OWN ASO/AST/BSO/BST (now correctly using MCX_FUTURE_STRIKE_DIFF via the
+// getStrikeDiff fix above, not the wrong NSE "100,100" default) and empirically measures BOTH
+// a long-from-open and a short-from-open leg for every zone — deliberately NOT assuming a
+// mean-reversion or momentum bias upfront the way GTB_STRAT_LOOKUP does for NIFTY (that table
+// is itself flagged elsewhere as a hand-authored, not-fully-backtested heuristic; adding a
+// second unvalidated rule table for crude would repeat the same mistake). The data decides
+// which side actually worked per zone.
+//
+// Real data-availability caveat, shown in the UI rather than hidden: MCX futures contracts
+// roll monthly and Kite's historical API is per specific contract token, not a continuous
+// series — so this can only backtest as far back as the CURRENT near-month contract has
+// been trading (typically a few weeks), nowhere near NIFTY's 250-day sample. Every stat here
+// should be read as directional, not a confident base rate.
+//
+// Also folds in the newly-verified GIFT NIFTY inverse correlation: for each day, records
+// whether GIFT NIFTY's same-day change agreed with the correlation's predicted crude direction,
+// and whether crude's actual close-to-close move went the SAME way GIFT predicted — a live
+// day-by-day accuracy check for the correlation, not just the single aggregate r value.
+async function _cmdBuildCrudeOpeningTrend() {
+    var CUTOFF_HOUR = 23; // crude trades ~9:00-23:30 IST — use nearly the full session, unlike NIFTY's noon cutoff
+    var entry = null;
+    try { entry = _psFutEntryFor('CRUDEOILM'); } catch (e) {}
+    if (!entry) return { rows: [], error: 'No CRUDEOILM futures contract found — run Data Load first.' };
+    var token = entry.instrument_token;
+
+    var toM = moment();
+    var fromM = moment().subtract(75, 'days'); // generous — the actual usable range will be much shorter (contract rollover), see caveat above
+    var candles = [];
+    try { candles = await _gtbFetch5minRange(token, fromM, toM); } catch (e) {
+        return { rows: [], error: 'Historical fetch failed — ' + (e.message || e) };
+    }
+    if (!candles.length) return { rows: [], error: 'No candle data returned for the current CRUDEOILM contract.' };
+
+    var giftTok = (typeof INSTRUMENT_TOKENS !== 'undefined') ? INSTRUMENT_TOKENS['GIFT NIFTY'] : null;
+    var giftCandles = [];
+    try { if (giftTok) giftCandles = await _gtbFetch5minRange(giftTok, fromM, toM); } catch (e) {}
+    var giftDayClose = {};
+    giftCandles.forEach(function (c) { giftDayClose[moment(c[0]).format('YYYY-MM-DD')] = parseFloat(c[4]); });
+    var giftDates = Object.keys(giftDayClose).sort();
+
+    var dayMap = {};
+    candles.forEach(function (c) {
+        var d = moment(c[0]).format('YYYY-MM-DD');
+        if (!dayMap[d]) dayMap[d] = { open: parseFloat(c[1]), close915: parseFloat(c[4]), dayClose: parseFloat(c[4]), cands: [c] };
+        else { dayMap[d].dayClose = parseFloat(c[4]); dayMap[d].cands.push(c); }
+    });
+    var dates = Object.keys(dayMap).sort();
+
+    var rows = dates.map(function (d, idx) {
+        var day = dayMap[d];
+        var cls = _gtbClassify915('CRUDEOILM', day.open, day.close915);
+        var longLeg  = _gtbSimLeg('long',  day.cands, day.open, 'CRUDEOILM', CUTOFF_HOUR);
+        var shortLeg = _gtbSimLeg('short', day.cands, day.open, 'CRUDEOILM', CUTOFF_HOUR);
+
+        // GIFT NIFTY cross-check for this day, if we have both GIFT's close AND yesterday's —
+        // predicts crude direction as the OPPOSITE of GIFT's own day-over-day change.
+        var giftPredict = null, giftCorrect = null;
+        var gIdx = giftDates.indexOf(d);
+        if (gIdx > 0) {
+            var gPrev = giftDayClose[giftDates[gIdx - 1]], gNow = giftDayClose[d];
+            if (gPrev) {
+                var gChg = (gNow - gPrev) / gPrev;
+                giftPredict = gChg < 0 ? 'up' : gChg > 0 ? 'down' : null;
+                if (giftPredict && idx > 0) {
+                    var crudePrevClose = dayMap[dates[idx - 1]].dayClose;
+                    var crudeActual = day.dayClose >= crudePrevClose ? 'up' : 'down';
+                    giftCorrect = (giftPredict === crudeActual);
+                }
+            }
+        }
+
+        return { date: d, cls: cls, longLeg: longLeg, shortLeg: shortLeg, giftPredict: giftPredict, giftCorrect: giftCorrect };
+    });
+
+    return { rows: rows, contractSymbol: entry.tradingsymbol || 'CRUDEOILM', error: null };
+}
+
+function _cmdRenderCrudeOpeningTrend(result) {
+    if (result.error) {
+        return '<div style="padding:20px;text-align:center;color:var(--gtb-red);font-size:0.7rem;">' + result.error + '</div>';
+    }
+    var rows = result.rows;
+    if (!rows.length) return '<div style="padding:20px;text-align:center;color:var(--gtb-muted);">No days available yet.</div>';
+
+    // Per-zone aggregate — long and short BOTH always measured, no assumed bias.
+    var zones = ['AST', 'ASO', 'B/W', 'BSO', 'BST'];
+    var agg = {};
+    zones.forEach(function (z) { agg[z] = { days: 0, longWin: 0, longN: 0, longPnl: 0, shortWin: 0, shortN: 0, shortPnl: 0 }; });
+    rows.forEach(function (r) {
+        var a = agg[r.cls]; if (!a) return;
+        a.days++;
+        if (r.longLeg)  { a.longN++;  if (r.longLeg.win)  a.longWin++;  a.longPnl  += r.longLeg.pnl; }
+        if (r.shortLeg) { a.shortN++; if (r.shortLeg.win) a.shortWin++; a.shortPnl += r.shortLeg.pnl; }
+    });
+
+    var giftChecked = rows.filter(function (r) { return r.giftCorrect !== null; });
+    var giftCorrectN = giftChecked.filter(function (r) { return r.giftCorrect; }).length;
+
+    var h = '<div class="gtb-t915-wrap">';
+    h += '<div style="background:rgba(249,115,22,0.10);border-left:3px solid #f97316;padding:6px 8px;margin-bottom:10px;font-size:0.5rem;color:var(--gtb-text);">'
+        + '<i class="bi bi-exclamation-triangle-fill" style="color:#f97316;"></i> Sample is the CURRENT near-month contract (<b>' + result.contractSymbol + '</b>) only — '
+        + rows.length + ' trading day(s). MCX futures roll monthly and Kite\'s historical API is per-contract, so this is nowhere near NIFTY\'s 250-day depth. Read every number here as directional, not a settled base rate.</div>';
+
+    h += '<div class="gtb-t915-combo-h"><i class="bi bi-trophy"></i> Per-zone edge — long AND short both measured, no assumed bias</div>';
+    h += '<table class="gtb-t915-table gtb-t915-combo"><thead><tr>'
+        + '<th>Zone (open candle vs own ASO/AST/BSO/BST)</th><th>Days</th>'
+        + '<th>Long win%</th><th>Long avg P/L</th><th>Short win%</th><th>Short avg P/L</th></tr></thead><tbody>';
+    zones.forEach(function (z) {
+        var a = agg[z];
+        if (!a.days) { h += '<tr><td class="gtb-t915-date">' + z + '</td><td class="gtb-t915-date" colspan="5" style="color:var(--gtb-muted);">No data</td></tr>'; return; }
+        var lWp = a.longN ? Math.round(a.longWin / a.longN * 100) : 0, lAvg = a.longN ? a.longPnl / a.longN : 0;
+        var sWp = a.shortN ? Math.round(a.shortWin / a.shortN * 100) : 0, sAvg = a.shortN ? a.shortPnl / a.shortN : 0;
+        var lCol = lWp >= 60 ? 'var(--gtb-green)' : lWp <= 40 ? 'var(--gtb-red)' : 'var(--gtb-amber)';
+        var sCol = sWp >= 60 ? 'var(--gtb-green)' : sWp <= 40 ? 'var(--gtb-red)' : 'var(--gtb-amber)';
+        h += '<tr>'
+            + '<td class="gtb-t915-date" style="font-weight:700;">' + z + '</td>'
+            + '<td class="gtb-t915-date">' + a.days + '</td>'
+            + '<td style="color:' + lCol + ';font-weight:800;font-family:var(--gtb-mono);">' + lWp + '%</td>'
+            + '<td style="color:' + (lAvg >= 0 ? 'var(--gtb-green)' : 'var(--gtb-red)') + ';font-family:var(--gtb-mono);">' + (lAvg >= 0 ? '+' : '') + lAvg.toFixed(1) + '</td>'
+            + '<td style="color:' + sCol + ';font-weight:800;font-family:var(--gtb-mono);">' + sWp + '%</td>'
+            + '<td style="color:' + (sAvg >= 0 ? 'var(--gtb-green)' : 'var(--gtb-red)') + ';font-family:var(--gtb-mono);">' + (sAvg >= 0 ? '+' : '') + sAvg.toFixed(1) + '</td>'
+            + '</tr>';
+    });
+    h += '</tbody></table>';
+
+    if (giftChecked.length) {
+        var giftPct = Math.round(giftCorrectN / giftChecked.length * 100);
+        h += '<div class="gtb-t915-combo-h" style="margin-top:12px;"><i class="bi bi-globe2"></i> GIFT NIFTY inverse-correlation day-by-day accuracy</div>';
+        h += '<div class="gtb-t915-stats"><span class="gtb-t915-stat">Predicted crude\'s next-close direction correctly on <b style="color:' + (giftPct >= 60 ? 'var(--gtb-green)' : giftPct <= 40 ? 'var(--gtb-red)' : 'var(--gtb-amber)') + ';">' + giftPct + '%</b> of days (' + giftCorrectN + '/' + giftChecked.length + '), over this same limited sample.</span></div>';
+    }
+
+    h += '<div class="gtb-t915-combo-h" style="margin-top:12px;"><i class="bi bi-calendar3"></i> Day-by-day</div>';
+    h += '<table class="gtb-t915-table"><thead><tr><th>Date</th><th>Zone</th><th>Long</th><th>Short</th><th>GIFT predicted</th></tr></thead><tbody>';
+    rows.slice().reverse().forEach(function (r) {
+        var empty = '<span class="gtb-t915-leg flat">—</span>';
+        function legHtml(lg) {
+            if (!lg) return empty;
+            var cls = lg.win ? 'up' : 'down';
+            return '<span class="gtb-t915-leg ' + cls + '">' + (lg.win ? '✓' : '✗') + ' ' + (lg.pnl >= 0 ? '+' : '') + lg.pnl.toFixed(1) + '</span>';
+        }
+        var giftCell = r.giftPredict == null ? empty
+            : '<span class="gtb-t915-leg ' + (r.giftCorrect ? 'up' : 'down') + '">' + r.giftPredict + ' ' + (r.giftCorrect ? '✓' : '✗') + '</span>';
+        h += '<tr>'
+            + '<td class="gtb-t915-date">' + moment(r.date).format('DD MMM') + '</td>'
+            + '<td>' + '<span class="gtb-t915-cls ' + ((r.cls === 'AST' || r.cls === 'ASO') ? 'up' : (r.cls === 'BST' || r.cls === 'BSO') ? 'down' : 'flat') + '">' + r.cls + '</span></td>'
+            + '<td>' + legHtml(r.longLeg) + '</td>'
+            + '<td>' + legHtml(r.shortLeg) + '</td>'
+            + '<td>' + giftCell + '</td>'
+            + '</tr>';
+    });
+    h += '</tbody></table></div>';
+    return h;
+}
+
+async function _gtbShowCrudeOpeningTrendBacktest() {
+    showMaximizeOverlay('<i class="bi bi-droplet-fill"></i> CRUDEOILM Opening-Trend Backtest',
+        '<div style="padding:30px;text-align:center;color:var(--gtb-muted);font-size:0.85rem;">'
+        + '<i class="bi bi-hourglass-split"></i> Fetching CRUDEOILM\'s current contract history…</div>');
+    try {
+        var result = await _cmdBuildCrudeOpeningTrend();
+        jQ('#groot-maximize-body').html(_cmdRenderCrudeOpeningTrend(result));
+    } catch (err) {
+        jQ('#groot-maximize-body').html('<div style="padding:24px;color:var(--gtb-red);">Error: ' + (err && err.message) + '</div>');
+    }
+}
 
 // ── Strike-level probability backtest ─────────────────────────────────────────
 // Backtests how price behaves once it touches each strike level, using daily OHLC.
@@ -13987,6 +14849,63 @@ async function showTopChart(name, bindtoDivId, chartHeight, idSuffix, interval, 
         await savePreviousStockQuote(tempName, INSTRUMENT_TOKENS[name]);
         let scriptData = generateTrend(name);
 
+        // GIFT NIFTY: ASO/AST/BSO/BST get re-anchored to its OWN 9:15 candle instead of
+        // generateTrend()'s session open (~6:30 AM) — same reasoning/convention as
+        // scanNineFifteenCandle's GIFT NIFTY branch and the 9:15 backtest's GIFT confirmation
+        // check. The OPEN ref line is left showing the real 6:30 session open (still useful
+        // as the "how far did it move overnight" context) — only the strike levels shift.
+        var _giftAnchor = null;
+        if (name === 'GIFT NIFTY') {
+            try {
+                var _g915cd = (data.data.candles || []).find(function (c) {
+                    var m = moment(c[0]); return m.hour() === 9 && m.minute() === 15;
+                });
+                if (_g915cd) {
+                    _giftAnchor = parseFloat(_g915cd[1]);
+                    scriptData = Object.assign({}, scriptData, { strikeData: getStrikeDetails({ price: _giftAnchor }, name) });
+                    // Persist into VALID_BREAKOUT_NINE_FIFTEEN so the Level Confirmation card's
+                    // GIFT NIFTY check has numbers to compare against WITHOUT depending on the
+                    // separate, manually-triggered scanNineFifteenCandle() scan — this fetch
+                    // (showTopChart) already runs every refresh cycle for the chart's own ref
+                    // lines, so the 9:15 anchor is already being computed here; it just wasn't
+                    // being saved anywhere else could read it. Close_9_15 classification (if
+                    // not already set by the real scan) is derived the same way that scan does.
+                    try {
+                        var _b915 = JSON.parse(localStorage.getItem('VALID_BREAKOUT_NINE_FIFTEEN') || '{}');
+                        var _sd = scriptData.strikeData;
+                        var _existing = _b915['GIFT NIFTY'] || {};
+                        if (!_existing.CLOSE_9_15) {
+                            var _c915close = parseFloat(_g915cd[4]);
+                            var _ast = parseFloat(_sd.ustrikeTwo), _aso = parseFloat(_sd.ustrikeOne), _bso = parseFloat(_sd.bstrikeOne), _bst = parseFloat(_sd.bstrikeTwo);
+                            _existing.CLOSE_9_15 = _c915close > _ast ? 'AST' : _c915close > _aso ? 'ASO' : _c915close < _bst ? 'BST' : _c915close < _bso ? 'BSO' : 'B/W';
+                        }
+                        _existing.aso = parseFloat(_sd.ustrikeOne);
+                        _existing.ast = parseFloat(_sd.ustrikeTwo);
+                        _existing.bso = parseFloat(_sd.bstrikeOne);
+                        _existing.bst = parseFloat(_sd.bstrikeTwo);
+                        _existing.anchor = _giftAnchor;
+                        // Intraday high/low SINCE the 9:15 anchor — needed so the Level
+                        // Confirmation card can tell "touched AST earlier and is now falling
+                        // back" apart from "still climbing toward AST," which a bare
+                        // current-LTP-vs-level comparison can't distinguish (both look like
+                        // "currently between ASO and AST").
+                        var _gIdx915 = data.data.candles.indexOf(_g915cd);
+                        var _sinceCands = data.data.candles.slice(_gIdx915);
+                        var _maxSince = -Infinity, _minSince = Infinity;
+                        _sinceCands.forEach(function (c) {
+                            var hi = parseFloat(c[2]), lo = parseFloat(c[3]);
+                            if (hi > _maxSince) _maxSince = hi;
+                            if (lo < _minSince) _minSince = lo;
+                        });
+                        _existing.maxSince915 = isFinite(_maxSince) ? _maxSince : null;
+                        _existing.minSince915 = isFinite(_minSince) ? _minSince : null;
+                        _b915['GIFT NIFTY'] = _existing;
+                        localStorage.setItem('VALID_BREAKOUT_NINE_FIFTEEN', JSON.stringify(_b915));
+                    } catch (_pe) {}
+                }
+            } catch (_ge) {}
+        }
+
         let refLines = [
             { key: 'OPEN', value: scriptData['open'],                         text: 'OPEN ' + scriptData['open'] },
             { key: 'VIXL', value: scriptData['vix'].vixDDLower,               text: 'VIXL ' + scriptData['vix'].vixDDLower },
@@ -13996,6 +14915,7 @@ async function showTopChart(name, bindtoDivId, chartHeight, idSuffix, interval, 
             { key: 'BSO',  value: scriptData['strikeData'].bstrikeOne,        text: 'BSO '  + scriptData['strikeData'].bstrikeOne },
             { key: 'BST',  value: scriptData['strikeData'].bstrikeTwo,        text: 'BST '  + scriptData['strikeData'].bstrikeTwo },
         ];
+        if (_giftAnchor != null) refLines.push({ key: '915', value: _giftAnchor, text: '9:15 ' + _giftAnchor });
 
         try {
             var _dz = _gtbDeadZone(name);
@@ -14022,7 +14942,7 @@ async function showTopChart(name, bindtoDivId, chartHeight, idSuffix, interval, 
         // Populate levels strip
         var _lMeta = { OPEN:{s:'O',c:'#ffbe0b'}, VIXU:{s:'V↑',c:'#38bdf8'}, VIXL:{s:'V↓',c:'#38bdf8'},
                        AST:{s:'A+',c:'#3fb950'}, ASO:{s:'A',c:'#3fb950'}, BSO:{s:'B',c:'#f85149'}, BST:{s:'B-',c:'#f85149'},
-                       DEADLO:{s:'D↓',c:'#8b5cf6'}, DEADHI:{s:'D↑',c:'#8b5cf6'} };
+                       DEADLO:{s:'D↓',c:'#8b5cf6'}, DEADHI:{s:'D↑',c:'#8b5cf6'}, '915':{s:'9:15',c:'#facc15'} };
         var _fmt = function(v) { v=parseFloat(v); return v>=1000?v.toLocaleString('en-IN',{maximumFractionDigits:1}):v.toFixed(1); };
         var _levelsHtml = refLines.map(function(rl) {
             var m = _lMeta[rl.key] || {s:rl.key,c:'#7d8590'};
@@ -17298,7 +18218,7 @@ function _gtbBuildPrediction(threeCol) {
     // Load cached backtest rows for today (built by _gtbBuild915Trend if run)
     var btRows = null;
     try {
-        var _ckey = 'GTB_915TREND_' + moment().format('YYYY-MM-DD') + '_250_v4';
+        var _ckey = 'GTB_915TREND_' + moment().format('YYYY-MM-DD') + '_250_v5';
         var _cached = localStorage.getItem(_ckey);
         if (_cached) btRows = JSON.parse(_cached);
     } catch(e) {}
@@ -17888,12 +18808,28 @@ async function _gtbDashPARenderCell(inst) {
             }
         } else {
             var sd; try { sd = generateTrend(inst.name); } catch (e) {}
+            // GIFT NIFTY: re-anchor ASO/AST/BSO/BST to its OWN 9:15 candle instead of
+            // generateTrend()'s session open (~6:30 AM) — same fix already applied to
+            // showTopChart/_gtbRenderDayChart/scanNineFifteenCandle for this instrument.
+            // This grid cell has its own separate render path (doesn't go through
+            // showTopChart), so it needed the same fix applied here independently.
+            var giftAnchorPA = null;
+            if (inst.name === 'GIFT NIFTY' && sd) {
+                try {
+                    var g915pa = candles.find(function (c) { var m = moment(c[0]); return m.hour() === 9 && m.minute() === 15; });
+                    if (g915pa) {
+                        giftAnchorPA = parseFloat(g915pa[1]);
+                        sd = Object.assign({}, sd, { strikeData: getStrikeDetails({ price: giftAnchorPA }, inst.name) });
+                    }
+                } catch (_gpae) {}
+            }
             if (sd) {
                 refLines.push({ key: 'OPEN', value: +sd.open });
                 if (sd.vix) refLines.push({ key: 'VIXU', value: +sd.vix.vixDDUpper }, { key: 'VIXL', value: +sd.vix.vixDDLower });
                 if (sd.strikeData) refLines.push(
                     { key: 'AST', value: +sd.strikeData.ustrikeTwo }, { key: 'ASO', value: +sd.strikeData.ustrikeOne },
                     { key: 'BSO', value: +sd.strikeData.bstrikeOne }, { key: 'BST', value: +sd.strikeData.bstrikeTwo });
+                if (giftAnchorPA != null) refLines.push({ key: '915', value: giftAnchorPA });
             }
         }
         refLines.forEach(function (rl) { rl.text = ''; });
@@ -17972,6 +18908,17 @@ function _gtbRenderDashboardPane() {
         +      '<div class="gtb-card-body" id="gtb-dash-predict" style="padding:6px 8px;"></div>'
         +    '</div>';
 
+        // Level Confirmation — live pre-trade filter for today's Sell-at-ASO/AST or
+        // Buy-at-BSO/BST call: 5 independent live checks (GIFT NIFTY's own level reaction,
+        // a real OI wall at that level, which index is genuinely weak/strong, Level
+        // Probability's lean, and component fade/accelerate) + the combo's historical
+        // win-rate as separate context. Dashboard-only per explicit request — the Pre-Trade
+        // Checklist tab is intentionally left unchanged.
+        h += '<div class="gtb-card gtb-widget" style="margin:0 8px 8px;">'
+        +      '<div class="gtb-card-header"><span class="gtb-card-title"><i class="bi bi-shield-check"></i> LEVEL CONFIRMATION</span></div>'
+        +      '<div class="gtb-card-body" id="gtb-dash-lvlconfirm" style="padding:6px 8px;"></div>'
+        +    '</div>';
+
         // Per-instrument OI/OBV + Prediction matrix — one row per instrument, reusing Stock
         // Viewer's own row classes/CSS (.gtb-row/.gtb-row-id/.gtb-row-predict/.gtb-row-oiobv;
         // scoped grid-template-columns override in common.css, same convention Stock Viewer
@@ -18037,6 +18984,7 @@ function _gtbRenderDashboardPane() {
     });
 
     try { jQ('#gtb-dash-predict').html(_gtbBuildPrediction(true)); } catch (e) {}
+    try { jQ('#gtb-dash-lvlconfirm').html(_gtbLevelConfirmHtml()); } catch (e) {}
 
     _gtbDashGridNames().forEach(function (name) {
         try {
@@ -23546,6 +24494,7 @@ function _gtbCreateFloatingBar() {
         { id: 'show-premarket-brief',        icon: 'bi-sunrise-fill',         title: 'Pre-Market Brief' },
         { id: 'show-quick-oi-obv',           icon: 'bi-speedometer2',         title: 'Quick OI/OBV (NIFTY 50 + BANK, no full sweep)' },
         { id: 'show-level-fade-scanner',     icon: 'bi-signpost-split-fill',  title: 'Level Fade Scanner (EOD wall scan + pre-market check)' },
+        { id: 'show-crude-opentrend',        icon: 'bi-droplet-half',         title: 'CRUDEOILM Opening-Trend Backtest' },
         { id: 'show-master-scanner',         icon: 'bi-binoculars-fill',      title: 'Master Scanner (Carry + Profile + SL-Hunt)' },
         { id: 'show-trade-ideas',            icon: 'bi-compass-fill',         title: 'Trade Ideas (Context / Location / Confirmation)' },
         { id: 'show-opportunities',          icon: 'bi-lightning-charge-fill', title: 'Opportunities' },
@@ -23613,6 +24562,7 @@ function _gtbCreateFloatingBar() {
             if (id === 'show-premarket-brief')   { _gtbShowPreMarketBrief(); return; }
             if (id === 'show-quick-oi-obv')      { _gtbQuickOIOBV(['NIFTY 50', 'NIFTY BANK']); return; }
             if (id === 'show-level-fade-scanner') { _gtbShowLevelFadeScanner(); return; }
+            if (id === 'show-crude-opentrend')   { _gtbShowCrudeOpeningTrendBacktest(); return; }
             if (id === 'show-master-scanner')    { _gtbShowMasterScanner(); return; }
             if (id === 'show-trade-ideas')       { _gtbShowTradeIdeas(); return; }
             if (id === 'show-opportunities')     { _gtbShowOpportunitiesPopup(); return; }

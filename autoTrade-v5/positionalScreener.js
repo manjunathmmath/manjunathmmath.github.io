@@ -908,12 +908,19 @@ async function _gtbRunEodLevelScan(onProgress, onPhase) {
 
     var universe = _lvsFullUniverse();
     if (onPhase) onPhase('Fetching OI/OBV for ' + universe.length + ' instruments…');
-    await _lvsActiveFetchOI(universe, onProgress);
+
+    // Wall-check each name RIGHT AFTER its own OI/OBV fetch completes (inside the progress
+    // callback), instead of waiting for the whole 200+ universe to finish and looping again
+    // afterward — that's what let results appear one-by-one as the scan runs instead of all
+    // at once at the very end. onProgress gets the incremental result (if any) plus the
+    // running results array so the caller can re-render live.
     var results = [];
-    universe.forEach(function (name) {
+    await _lvsActiveFetchOI(universe, function (name, done, total) {
         var r = _lvsWallCheck(name);
         if (r && r.bias) results.push(r);
+        if (onProgress) onProgress(name, done, total, (r && r.bias) ? r : null, results);
     });
+
     var dateStr = (typeof CURRENT_DAY !== 'undefined' && CURRENT_DAY) ? CURRENT_DAY : _psDateStr(new Date());
     localStorage.setItem('GTB_LEVEL_SCAN_' + dateStr, JSON.stringify({ date: dateStr, results: results, savedAt: Date.now() }));
     return { date: dateStr, results: results };
@@ -1037,10 +1044,56 @@ function _lvsRowHtml(r, showOpen) {
         + '</div>';
 }
 
+// Splits a shortlist into NIFTY 50 / BANK NIFTY / Other F&O — using the same top-10 weighted
+// membership lists (constants.js) already used everywhere else in this app for this kind of
+// grouping (Pre-Market Brief's OI Carryover Shortlist, Signals tab weighted-OI tables, etc.).
+// There's no full 50/12-constituent list anywhere in the codebase, only the top-10-by-weight
+// ones — so a stock outside both (the vast majority of the 200+ FO_LIST universe) lands in
+// "Other F&O". A stock CAN legitimately appear in both NIFTY 50 and BANK NIFTY groups
+// (HDFCBANK, ICICIBANK, SBIN, AXISBANK, KOTAKBANK are top-10 weighted in both indices) —
+// that's intentional, not a de-dup bug, since it really is a constituent of both.
+function _lvsGroupByIndex(rows) {
+    var nifty = [], bank = [], other = [];
+    rows.forEach(function (r) {
+        var inNifty = r.name === 'NIFTY 50' || (typeof NIFTY_50_WEIGHTED_STOCKS !== 'undefined' && NIFTY_50_WEIGHTED_STOCKS[r.name] !== undefined);
+        var inBank  = r.name === 'NIFTY BANK' || (typeof NIFTY_BANK_WEIGHTED_STOCKS !== 'undefined' && NIFTY_BANK_WEIGHTED_STOCKS[r.name] !== undefined);
+        if (inNifty) nifty.push(r);
+        if (inBank) bank.push(r);
+        if (!inNifty && !inBank) other.push(r);
+    });
+    return { nifty: nifty, bank: bank, other: other };
+}
+
+// Shared renderer for both the EOD results panel and the Pre-Market Check panel — filters by
+// the instrument search box, then segregates into NIFTY 50 / BANK NIFTY / Other F&O sections.
+function _lvsRenderGrouped(containerSel, rows, showOpen, filterText) {
+    var f = (filterText || '').toUpperCase().trim();
+    var filtered = f ? rows.filter(function (r) { return r.name.indexOf(f) !== -1; }) : rows;
+    if (!filtered.length) {
+        jQ(containerSel).html('<div style="padding:10px;text-align:center;color:var(--gtb-muted);">'
+            + (rows.length ? 'No instrument matches "' + f + '".' : 'No setups.') + '</div>');
+        return;
+    }
+    var groups = _lvsGroupByIndex(filtered);
+    function _section(title, list, col) {
+        if (!list.length) return '';
+        return '<div style="font-size:0.5rem;font-weight:800;color:' + col + ';letter-spacing:0.04em;margin:8px 0 3px;">' + title + ' (' + list.length + ')</div>'
+            + '<div style="background:var(--gtb-surface);border:1px solid var(--gtb-border);">'
+            + list.map(function (r) { return _lvsRowHtml(r, showOpen); }).join('')
+            + '</div>';
+    }
+    jQ(containerSel).html(
+        _section('NIFTY 50', groups.nifty, 'var(--gtb-blue,#58a6ff)')
+        + _section('BANK NIFTY', groups.bank, 'var(--gtb-accent,#a371f7)')
+        + _section('OTHER F&O', groups.other, 'var(--gtb-muted)')
+    );
+}
+
 function _gtbShowLevelFadeScanner() {
     var _cls = 'popup-custom-style-level-fade-scanner';
     var html = '<div id="lvs-wrap" style="height:100%;overflow:auto;padding:10px;background:var(--gtb-bg);color:var(--gtb-text);font-size:0.65rem;">'
         + '<div style="font-size:0.5rem;color:var(--gtb-muted);margin-bottom:8px;">Fades price sitting on an intact OI wall (OBV-ranked support/resistance, not just the nearest strike) — skips a wall that\'s already eroding.</div>'
+        + '<input id="lvs-filter" type="text" placeholder="Filter instrument…" style="width:100%;padding:4px 8px;margin-bottom:10px;font-size:0.6rem;background:var(--gtb-surface);color:var(--gtb-text);border:1px solid var(--gtb-border);box-sizing:border-box;" />'
 
         + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">'
         + '<span style="font-size:0.58rem;font-weight:800;color:var(--gtb-muted);letter-spacing:0.05em;"><i class="bi bi-moon-stars-fill"></i> 1 · EOD SCAN — full F&amp;O (run after close)</span>'
@@ -1070,30 +1123,65 @@ function _gtbShowLevelFadeScanner() {
 
     // Restore today's already-run EOD scan (if any) without re-running it.
     var todayStr = (typeof CURRENT_DAY !== 'undefined' && CURRENT_DAY) ? CURRENT_DAY : _psDateStr(new Date());
+    _LVS_LAST_EOD = null;
+    _LVS_LAST_PM = null;
     try {
         var cached = JSON.parse(localStorage.getItem('GTB_LEVEL_SCAN_' + todayStr));
         if (cached && cached.results) _lvsRenderEodResults(cached);
     } catch (e) {}
 }
 
+// Last-rendered datasets, kept so the filter box can re-render without re-fetching.
+var _LVS_LAST_EOD = null; // { date, results }
+var _LVS_LAST_PM = null;  // { date, rows, usedWs }
+
 function _lvsRenderEodResults(scan) {
+    _LVS_LAST_EOD = scan;
+    var filterText = jQ('#lvs-filter').val();
     if (!scan.results.length) {
         jQ('#lvs-eod-results').html('<div style="padding:10px;text-align:center;color:var(--gtb-muted);">No instrument closed on an intact OI wall today.</div>');
         return;
     }
     var longs = scan.results.filter(function (r) { return r.bias === 'LONG'; });
     var shorts = scan.results.filter(function (r) { return r.bias === 'SHORT'; });
-    jQ('#lvs-eod-results').html('<div style="font-size:0.46rem;color:var(--gtb-muted);margin-bottom:4px;">Saved for ' + scan.date + ' — ' + longs.length + ' long / ' + shorts.length + ' short setups.</div>'
-        + '<div style="background:var(--gtb-surface);border:1px solid var(--gtb-border);">'
-        + scan.results.map(function (r) { return _lvsRowHtml(r, false); }).join('')
-        + '</div>');
+    jQ('#lvs-eod-results').html('<div id="lvs-eod-summary" style="font-size:0.46rem;color:var(--gtb-muted);margin-bottom:4px;">Saved for ' + scan.date + ' — ' + longs.length + ' long / ' + shorts.length + ' short setups.</div>'
+        + '<div id="lvs-eod-grouped"></div>');
+    _lvsRenderGrouped('#lvs-eod-grouped', scan.results, false, filterText);
 }
+
+function _lvsRenderPmResults(out) {
+    _LVS_LAST_PM = out;
+    var filterText = jQ('#lvs-filter').val();
+    var srcNote = out.usedWs
+        ? '<span style="color:var(--gtb-green);">live WebSocket ticker</span>'
+        : '<span style="color:var(--gtb-amber);">historical fetch (WebSocket not connected — open/Connect it first for pre-9:15 reads)</span>';
+    jQ('#lvs-pm-results').html('<div id="lvs-pm-summary" style="font-size:0.46rem;color:var(--gtb-muted);margin-bottom:4px;">Comparing vs EOD scan saved on ' + out.date + ' — source: ' + srcNote + '.</div>'
+        + '<div id="lvs-pm-grouped"></div>');
+    _lvsRenderGrouped('#lvs-pm-grouped', out.rows, true, filterText);
+}
+
+// Re-applies the current filter text to whichever datasets are already loaded, without
+// re-running either scan — so typing in the filter box is instant.
+jQ(document).on('input', '#lvs-filter', function () {
+    var filterText = jQ(this).val();
+    if (_LVS_LAST_EOD && _LVS_LAST_EOD.results.length) _lvsRenderGrouped('#lvs-eod-grouped', _LVS_LAST_EOD.results, false, filterText);
+    if (_LVS_LAST_PM && _LVS_LAST_PM.rows.length) _lvsRenderGrouped('#lvs-pm-grouped', _LVS_LAST_PM.rows, true, filterText);
+});
 
 jQ(document).on('click', '#lvs-eod-btn', async function () {
     var $btn = jQ(this).prop('disabled', true).html('<i class="bi bi-hourglass-split"></i> Scanning…');
     jQ('#lvs-eod-progress').text('Starting full F&O scan…');
-    var scan = await _gtbRunEodLevelScan(function (name, done, total) {
-        jQ('#lvs-eod-progress').text('OI/OBV: ' + done + '/' + total + ' (' + name + ')');
+    // Empty the results area up front and fill it in live as each stock's wall check
+    // completes, instead of only writing to the DOM once the whole 200+ scan is done.
+    jQ('#lvs-eod-results').html('<div id="lvs-eod-summary" style="font-size:0.46rem;color:var(--gtb-muted);margin-bottom:4px;"></div><div id="lvs-eod-grouped"></div>');
+
+    var scan = await _gtbRunEodLevelScan(function (name, done, total, r, resultsSoFar) {
+        jQ('#lvs-eod-progress').text('OI/OBV: ' + done + '/' + total + ' (' + name + ') — ' + resultsSoFar.length + ' setup' + (resultsSoFar.length === 1 ? '' : 's') + ' so far');
+        if (r) {
+            var longsSoFar = resultsSoFar.filter(function (x) { return x.bias === 'LONG'; }).length;
+            jQ('#lvs-eod-summary').text('Scanning… ' + longsSoFar + ' long / ' + (resultsSoFar.length - longsSoFar) + ' short so far (' + done + '/' + total + ' scanned).');
+            _lvsRenderGrouped('#lvs-eod-grouped', resultsSoFar, false, jQ('#lvs-filter').val());
+        }
     }, function (phase) {
         jQ('#lvs-eod-progress').text(phase);
     });
@@ -1114,11 +1202,5 @@ jQ(document).on('click', '#lvs-pm-btn', async function () {
         jQ('#lvs-pm-results').html('<div style="padding:10px;text-align:center;color:var(--gtb-muted);">Last saved scan (' + out.date + ') had no setups.</div>');
         return;
     }
-    var srcNote = out.usedWs
-        ? '<span style="color:var(--gtb-green);">live WebSocket ticker</span>'
-        : '<span style="color:var(--gtb-amber);">historical fetch (WebSocket not connected — open/Connect it first for pre-9:15 reads)</span>';
-    jQ('#lvs-pm-results').html('<div style="font-size:0.46rem;color:var(--gtb-muted);margin-bottom:4px;">Comparing vs EOD scan saved on ' + out.date + ' — source: ' + srcNote + '.</div>'
-        + '<div style="background:var(--gtb-surface);border:1px solid var(--gtb-border);">'
-        + out.rows.map(function (r) { return _lvsRowHtml(r, true); }).join('')
-        + '</div>');
+    _lvsRenderPmResults(out);
 });

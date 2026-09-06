@@ -401,6 +401,15 @@ function getStrikeDiff(instrument) {
     if (NSE_STRIKE_DIFF[instrument]) {
         strikeDiff = NSE_STRIKE_DIFF[instrument]
         strikeDiff = strikeDiff.replace(/ /g, '')
+    } else if (typeof MCX_FUTURE_STRIKE_DIFF !== 'undefined' && MCX_FUTURE_STRIKE_DIFF[instrument]) {
+        // MCX commodities (CRUDEOILM etc.) live in a separate constant — showTopChartMCX has
+        // always read MCX_FUTURE_STRIKE_DIFF directly rather than through this function, so
+        // any OTHER caller passing an MCX name here (e.g. a backtest reusing generic NSE-side
+        // helpers like getStrikeDetails/_gtbClassify915/_gtbSimLeg against a commodity) was
+        // silently falling through to the wrong "100,100" default instead of crude's real
+        // 50-point strike step. Checked second so it never overrides an actual NSE_STRIKE_DIFF
+        // entry for the same name.
+        strikeDiff = MCX_FUTURE_STRIKE_DIFF[instrument].replace(/ /g, '')
     }
     return strikeDiff;
 }
