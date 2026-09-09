@@ -209,6 +209,70 @@ function _qwParseBinaryMessage(buf) {
 var _QW_WS = null;
 var _QW_SUBSCRIBED = {}; // token -> name
 var _QW_LAST_TICK = {};  // token -> tick
+var _QW_TOKEN_TO_NAME = null; // lazily built reverse of INSTRUMENT_TOKENS
+
+function _qwTokenToName(token) {
+    if (!_QW_TOKEN_TO_NAME) {
+        _QW_TOKEN_TO_NAME = {};
+        try { Object.keys(INSTRUMENT_TOKENS).forEach(function (n) { _QW_TOKEN_TO_NAME[String(INSTRUMENT_TOKENS[n])] = n; }); } catch (e) {}
+    }
+    var tokStr = String(token);
+    if (_QW_TOKEN_TO_NAME[tokStr]) return _QW_TOKEN_TO_NAME[tokStr];
+    // MCX commodities (CRUDEOILM, SILVER, GOLD, etc.) have no INSTRUMENT_TOKENS entry — that
+    // list is NSE-only (see the Fair Value / mcxLtp caveat elsewhere in this app). Their live
+    // token comes from COMMODITIES_FUTURE_INSTRUMENT_LIST instead (populated asynchronously by
+    // dataLoad.js, so this is checked fresh each miss rather than cached once up front — the
+    // NSE map above is safe to cache since INSTRUMENT_TOKENS is static from load).
+    try {
+        var hit = (typeof COMMODITIES_FUTURE_INSTRUMENT_LIST !== 'undefined' ? COMMODITIES_FUTURE_INSTRUMENT_LIST : [])
+            .find(function (f) { return String(f.instrument_token) === tokStr; });
+        if (hit && hit.name) return hit.name;
+    } catch (e) {}
+    return undefined;
+}
+
+// Live-LTP fan-out — while the WebSocket is connected and ticking, push each tick straight
+// into INSTRUMENT_LTP_PRICE and every visible LTP spot (topbar tickers, each instrument row's
+// identity LTP) instead of waiting for the next ~5-minute historical-fetch-based refresh
+// cycle. Only ever called from a live tick — if the socket isn't connected (or an instrument
+// isn't subscribed), nothing here runs and every reader keeps showing whatever the normal
+// refresh cycle already populated, so this is a pure freshness upgrade, never a new source of
+// truth that could go stale/wrong on its own.
+function _qwApplyLiveLtp(t) {
+    var name = _qwTokenToName(t.token);
+    if (!name || !t.ltp) return;
+    try {
+        var cache = JSON.parse(localStorage.getItem('INSTRUMENT_LTP_PRICE')) || {};
+        cache[name] = { name: name, ltp: t.ltp };
+        localStorage.setItem('INSTRUMENT_LTP_PRICE', JSON.stringify(cache));
+    } catch (e) {}
+    try { if (typeof INSTRUMENT_LTP_PRICE !== 'undefined') INSTRUMENT_LTP_PRICE[name] = { name: name, ltp: t.ltp }; } catch (e) {}
+    // MCX commodities have no INSTRUMENT_LTP_PRICE entry (scanLtpPrice() only ever populates
+    // it via INSTRUMENT_TOKENS, which is NSE-only) — the Fair Value / verdict code instead
+    // reads INSTRUMENT_SCORE_MAP[name].mcxLtp as its live-LTP source for MCX (see the Fair
+    // Value / Global Context notes elsewhere in this app), so keep that fresh too.
+    try {
+        if (typeof _CFG_MCX_COMMODITIES !== 'undefined' && _CFG_MCX_COMMODITIES.indexOf(name) !== -1) {
+            if (typeof INSTRUMENT_SCORE_MAP !== 'undefined') {
+                if (!INSTRUMENT_SCORE_MAP[name]) INSTRUMENT_SCORE_MAP[name] = {};
+                INSTRUMENT_SCORE_MAP[name].mcxLtp = t.ltp;
+            }
+            // The Commodities popup's own LTP chip (_cmdRenderCrudeMeta, grootTradeBot.js) is
+            // static HTML re-rendered only on its own refresh interval/instrument switch — it
+            // doesn't re-read INSTRUMENT_SCORE_MAP on its own, so writing mcxLtp above is not
+            // enough to move the visible chip. Re-render it directly (exposed on window when
+            // the popup is open; a no-op if it's closed, since the target div won't exist).
+            if (typeof window._cmdRenderCrudeMeta === 'function') window._cmdRenderCrudeMeta();
+        }
+    } catch (e) {}
+
+    var tid = name.replace(/ /g, '-').replace(/&/g, '-');
+    try {
+        var $ltp = jQ('#' + tid + '-ltp');
+        if ($ltp.length) $ltp.html(parseFloat(t.ltp).toLocaleString('en-IN', { maximumFractionDigits: 2 }));
+    } catch (e) {}
+    try { if (typeof updateTopBarTickers === 'function') updateTopBarTickers(); } catch (e) {}
+}
 
 function _qwWsSubscribeAll() {
     if (!_QW_WS || _QW_WS.readyState !== WebSocket.OPEN) return;
@@ -234,7 +298,7 @@ function _qwWsConnect(onStatus) {
     ws.onmessage = function (evt) {
         if (typeof evt.data === 'string') return; // heartbeat/text frame
         var ticks = _qwParseBinaryMessage(evt.data);
-        ticks.forEach(function (t) { _QW_LAST_TICK[t.token] = t; });
+        ticks.forEach(function (t) { _QW_LAST_TICK[t.token] = t; _qwApplyLiveLtp(t); });
         if (ticks.length && typeof window._qwOnTick === 'function') window._qwOnTick();
     };
 }
@@ -295,6 +359,20 @@ function _qwDefaultSubscribeList() {
         var tok = INSTRUMENT_TOKENS[n];
         if (tok) _QW_SUBSCRIBED[tok] = n;
     });
+    // Core MCX commodities (CRUDEOILM, SILVER(M), GOLD(M), etc.) — subscribed by their real
+    // futures contract token from COMMODITIES_FUTURE_INSTRUMENT_LIST (populated by dataLoad.js;
+    // if it hasn't loaded yet this run, they're simply skipped — same "best effort default,
+    // add manually if missing" behavior as the NSE list above), keyed to the app's own
+    // instrument name so live ticks land on the same LTP spots the rest of the app uses.
+    try {
+        var mcxSeen = {};
+        (typeof COMMODITIES_FUTURE_INSTRUMENT_LIST !== 'undefined' ? COMMODITIES_FUTURE_INSTRUMENT_LIST : []).forEach(function (f) {
+            if (!f.name || mcxSeen[f.name]) return;
+            if (typeof _CFG_MCX_COMMODITIES !== 'undefined' && _CFG_MCX_COMMODITIES.indexOf(f.name) === -1) return;
+            mcxSeen[f.name] = true;
+            if (f.instrument_token) _QW_SUBSCRIBED[f.instrument_token] = f.name;
+        });
+    } catch (e) {}
 }
 
 function showWebSocketPopup() {

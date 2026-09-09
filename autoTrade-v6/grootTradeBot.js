@@ -883,6 +883,11 @@ jQ(document).on('click', '#show-data-load-topbar', function (e) {
     _dlShowPopup();
 });
 
+jQ(document).on('click', '#show-market-trend-settings-tab', function (e) {
+    e.preventDefault();
+    _gtbShowMarketTrendSettings();
+});
+
 jQ(document).on("click", "#data-load", function () {
     let html = '';
     html += '<div class="gtb-ds-panel">';
@@ -1395,6 +1400,7 @@ function commonMarkupPlaceHolder() {
         + '<a id="show-help"                 class="gtb-ctrl-link" title="Help"><i class="bi bi-question-circle-fill"></i></a>'
         + '<a id="gtb-add-instr-btn"         class="gtb-ctrl-link" title="Add instrument"><i class="bi bi-plus-circle-fill"></i></a>'
         + '<a id="gtb-settings-toggle"       class="gtb-ctrl-link" title="Settings"><i class="bi bi-gear-fill"></i></a>'
+        + '<a id="show-market-trend-settings-tab" class="gtb-ctrl-link" title="Market Trend Settings (API keys, expiries)"><i class="bi bi-gear-wide-connected"></i></a>'
         + '</div>';
     h += '<div id="gtb-pane-dashboard" class="gtb-tab-pane" style="display:none;overflow-y:auto;padding:0;"></div>';
     h += '<div id="gtb-pane-metrics" class="gtb-tab-pane" style="display:none;overflow-y:auto;padding:0;"></div>';
@@ -7675,20 +7681,27 @@ function _gtbCfgFieldGroups() {
     }
     var foStocksDates = (typeof _CFG_FO_STOCK_OPTION_DATES !== 'undefined') ? _CFG_FO_STOCK_OPTION_DATES : [];
 
+    // Regrouped (per explicit request — the previous GENERAL bucket mixed auth, dates, and
+    // engine settings together, and MCX/COMMODITIES mixed dates with volatility indices, which
+    // got confusing once every field was on screen at once). Each group is now one concept:
+    // auth vs dates/engine vs NSE expiries vs hedge sizing vs MCX dates vs volatility indices
+    // vs the two MCX expiry-type sections. `id` is used for the quick-jump nav + anchors below.
     var groups = [];
-    groups.push({ title: 'GENERAL', fields: [
+    groups.push({ id: 'auth', title: 'API & AUTHENTICATION', fields: [
+        { key: 'api_key', label: 'API Key', type: 'text' },
+        { key: 'api_secret', label: 'API Secret', type: 'text' },
+        { key: 'api_access_token', label: 'Access Token', type: 'text' },
+        { key: 'create_at', label: '', type: 'button', buttonLabel: 'Create AT (login via Kite)' },
+    ]});
+    groups.push({ id: 'general', title: 'GENERAL', fields: [
         { key: 'previous_day_date', label: 'Previous day (YYYY-MM-DD)', type: 'text' },
         { key: 'current_day_date', label: 'Current day (YYYY-MM-DD)', type: 'text' },
         { key: 'margin', label: 'Margin', type: 'text' },
         { key: 'refresh_time', label: 'Refresh time', type: 'text' },
         { key: 'historical_data_interval', label: 'Historical data interval', type: 'text' },
         { key: 'use_ltp_for_strike', label: 'Use LTP for strike', type: 'checkbox' },
-        { key: 'api_key', label: 'API Key', type: 'text' },
-        { key: 'api_secret', label: 'API Secret', type: 'text' },
-        { key: 'api_access_token', label: 'Access Token', type: 'text' },
-        { key: 'create_at', label: '', type: 'button', buttonLabel: 'Create AT (login via Kite)' },
     ]});
-    groups.push({ title: 'NSE / INDEX', fields: [
+    groups.push({ id: 'nse', title: 'NSE / INDEX EXPIRY', fields: [
         Object.assign({ key: 'nifty_expiry_date', label: 'NIFTY options expiry date', type: 'select' }, nseExpiryChoices('NIFTY')),
         Object.assign({ key: 'sensex_expiry_date', label: 'SENSEX options expiry date', type: 'select' }, nseExpiryChoices('SENSEX')),
         Object.assign({ key: 'banknifty_expiry_date', label: 'BANK NIFTY options expiry date', type: 'select' }, nseExpiryChoices('BANKNIFTY')),
@@ -7697,17 +7710,21 @@ function _gtbCfgFieldGroups() {
         { key: 'future_expiry_month', label: 'Futures expiry month filter (all NSE/BSE F&O)', type: 'select',
           choices: (typeof _CFG_EXPIRY_LABELS !== 'undefined') ? _CFG_EXPIRY_LABELS : ['Nearest expiry (auto)'],
           values: (typeof _CFG_EXPIRY_CHOICES !== 'undefined') ? _CFG_EXPIRY_CHOICES : [''] },
-        { key: 'hedge_diff_nifty', label: 'Hedge strike diff — NIFTY (points)', type: 'text' },
-        { key: 'hedge_diff_banknifty', label: 'Hedge strike diff — BANK NIFTY (points)', type: 'text' },
-        { key: 'hedge_diff_stocks', label: 'Hedge strike diff — Stocks (points)', type: 'text' },
     ]});
-    groups.push({ title: 'MCX / COMMODITIES', fields: [
+    groups.push({ id: 'hedge', title: 'HEDGE STRIKE DIFFS', fields: [
+        { key: 'hedge_diff_nifty', label: 'NIFTY (points)', type: 'text' },
+        { key: 'hedge_diff_banknifty', label: 'BANK NIFTY (points)', type: 'text' },
+        { key: 'hedge_diff_stocks', label: 'Stocks (points)', type: 'text' },
+    ]});
+    groups.push({ id: 'mcxgeneral', title: 'MCX DATES', fields: [
         { key: 'mcx_previous_day_date', label: 'MCX previous day (YYYY-MM-DD)', type: 'text' },
         { key: 'mcx_current_day_date', label: 'MCX current day (YYYY-MM-DD)', type: 'text' },
-        { key: 'OVX', label: 'OVX (CBOE Crude Oil Volatility)', type: 'text' },
-        { key: 'VXSLV', label: 'VXSLV (CBOE Silver Volatility)', type: 'text' },
-        { key: 'GVZ', label: 'GVZ (CBOE Gold Volatility)', type: 'text' },
-        { key: 'VIX', label: 'VIX (CBOE, not India VIX)', type: 'text' },
+    ]});
+    groups.push({ id: 'vol', title: 'VOLATILITY INDICES (CBOE)', fields: [
+        { key: 'OVX', label: 'OVX (CBOE Crude Oil Volatility)', type: 'text', link: 'https://www.cboe.com/index/dashboard/OVX/' },
+        { key: 'VXSLV', label: 'VXSLV (CBOE Silver Volatility)', type: 'text', link: 'https://www.cboe.com/index/dashboard/VXSLV/' },
+        { key: 'GVZ', label: 'GVZ (CBOE Gold Volatility)', type: 'text', link: 'https://www.cboe.com/index/dashboard/GVZ/' },
+        { key: 'VIX', label: 'VIX (CBOE, not India VIX)', type: 'text', link: 'https://www.cboe.com/index/dashboard/VIX/' },
     ]});
     // Futures and options expiry as two SEPARATE sections (per explicit request) rather than
     // interleaved per commodity — each is its own independent setting (see the mcx_expiry_ /
@@ -7729,8 +7746,8 @@ function _gtbCfgFieldGroups() {
         mcxOptFields.push({ key: 'mcx_opt_expiry_' + n.toLowerCase(), label: n + ' options expiry', type: 'select',
             choices: ['Nearest expiry (auto)'].concat(optD), values: [''].concat(optD) });
     });
-    groups.push({ title: 'MCX FUTURES EXPIRY', fields: mcxFutFields });
-    groups.push({ title: 'MCX OPTIONS EXPIRY', fields: mcxOptFields });
+    groups.push({ id: 'mcxfut', title: 'MCX FUTURES EXPIRY', fields: mcxFutFields });
+    groups.push({ id: 'mcxopt', title: 'MCX OPTIONS EXPIRY', fields: mcxOptFields });
     return groups;
 }
 
@@ -7759,13 +7776,21 @@ function _gtbShowMarketTrendSettings() {
             return '<div class="gtb-cfg-field"><label>' + f.label + '</label><select id="' + id + '" data-key="' + f.key + '">' + opts + '</select></div>';
         }
         var safeVal = (val != null ? String(val) : '').replace(/"/g, '&quot;');
-        return '<div class="gtb-cfg-field"><label>' + f.label + '</label><input type="text" id="' + id + '" data-key="' + f.key + '" value="' + safeVal + '"></div>';
+        var labelHtml = f.label + (f.link ? ' <a href="' + f.link + '" target="_blank" rel="noopener" title="Look up live value on CBOE" style="color:var(--gtb-blue);"><i class="bi bi-box-arrow-up-right"></i></a>' : '');
+        return '<div class="gtb-cfg-field"><label>' + labelHtml + '</label><input type="text" id="' + id + '" data-key="' + f.key + '" value="' + safeVal + '"></div>';
     }
 
+    // Quick-jump nav — with 8 sections/40+ fields on one scroll, per explicit feedback that
+    // it's confusing to hunt through, this gives an at-a-glance map + one-click jump instead
+    // of scrolling blind. Plain in-page anchors (#gtb-cfg-sec-<id>), no JS needed beyond the
+    // browser's own anchor scroll (scoped to gtb-cfg-body via CSS scroll-margin, not the page).
     var html = '<div class="gtb-cfg-wrap">'
+        + '<div class="gtb-cfg-jumpnav">' + groups.map(function (g) {
+            return '<button type="button" data-jump="gtb-cfg-sec-' + g.id + '" class="gtb-cfg-jump-link">' + g.title + '</button>';
+        }).join('') + '</div>'
         + '<div class="gtb-cfg-body">'
         + groups.map(function (g) {
-            return '<div class="gtb-cfg-section"><div class="gtb-cfg-section-hdr">' + g.title + '</div>'
+            return '<div class="gtb-cfg-section" id="gtb-cfg-sec-' + g.id + '"><div class="gtb-cfg-section-hdr">' + g.title + '</div>'
                 + '<div class="gtb-cfg-grid">' + g.fields.map(fieldHtml).join('') + '</div></div>';
         }).join('')
         + '</div>'
@@ -7785,7 +7810,28 @@ function _gtbShowMarketTrendSettings() {
     hideNativePopupButtons(_cls);
     jQ('.' + _cls).find('.popupwindow_titlebar').removeClass('popupwindow_titlebar_draggable');
     jQ('.' + _cls).toggleClass('gtb-light', (localStorage.getItem('GTB_THEME') || 'dark') === 'light');
+
+    // NSE previous/current day and MCX previous/current day are almost always the same
+    // trading day — auto-mirror NSE's date fields into MCX's whenever NSE is edited, so the
+    // user doesn't have to type the same date twice. One-way (NSE → MCX) since NSE is the
+    // field the user actually types into first; MCX can still be overridden manually after.
+    jQ('#gtb-cfgf-previous_day_date').off('input.gtbCfgSync').on('input.gtbCfgSync', function () {
+        jQ('#gtb-cfgf-mcx_previous_day_date').val(jQ(this).val());
+    });
+    jQ('#gtb-cfgf-current_day_date').off('input.gtbCfgSync').on('input.gtbCfgSync', function () {
+        jQ('#gtb-cfgf-mcx_current_day_date').val(jQ(this).val());
+    });
 }
+
+// Plain anchor href="#gtb-cfg-sec-..." reloaded the page instead of scrolling — Kite's own
+// page-level click handling intercepts in-page hash links (this popup is injected into the
+// real kite.zerodha.com document, not a sandboxed iframe). Using a button + JS scrollIntoView
+// scoped to the popup's own scroll container sidesteps that entirely — no href, no hash change.
+jQ(document).on('click', '.gtb-cfg-jump-link', function (e) {
+    e.preventDefault();
+    var target = document.getElementById(jQ(this).data('jump'));
+    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
 
 jQ(document).on('click', '#gtb-open-market-settings', function (e) {
     e.preventDefault();
@@ -13218,6 +13264,10 @@ jQ(document).on('click', '#show-commodities', function (e) {
     _cmdUpdateStatus();
 
     // Render static meta immediately (no async needed)
+    // Exposed globally so quoteWs.js's live-tick handler can re-render just this chip the
+    // instant a fresh MCX LTP tick arrives, instead of the LTP chip only updating on the
+    // popup's own ~1-min refresh interval/instrument switch while the WebSocket is connected.
+    window._cmdRenderCrudeMeta = _cmdRenderCrudeMeta;
     _cmdRenderCrudeMeta();
     _cmdRenderSessionAlert();
     _cmdRenderGlobalContext();
@@ -24841,6 +24891,7 @@ function _gtbCreateFloatingBar() {
         { id: 'show-maxpain-gex',            icon: 'bi-bar-chart-steps',      title: 'Max Pain / GEX' },
         { id: 'gtb-add-instr-btn',           icon: 'bi-plus-circle-fill',     title: 'Add Instrument' },
         { id: 'gtb-settings-toggle',         icon: 'bi-gear-fill',            title: 'Settings' },
+        { id: 'show-market-trend-settings',  icon: 'bi-sliders',              title: 'Market Trend Settings (API keys, expiries)' },
         { id: 'show-snap-replay',            icon: 'bi-collection-play-fill', title: 'Historical Day Replay' },
         { id: 'show-trade-setup',            icon: 'bi-lightning-fill',       title: 'Trade Recommender' },
         { id: 'show-trade-checklist',        icon: 'bi-clipboard-check',      title: 'Pre-Trade Checklist' },
@@ -24903,6 +24954,7 @@ function _gtbCreateFloatingBar() {
             if (id === 'show-option-strike-search') { _ossShowPopup(); return; }
             if (id === 'show-positional-screener') { _psShowPopup(); return; }
             if (id === 'show-data-load-popup')   { _dlShowPopup(); return; }
+            if (id === 'show-market-trend-settings') { _gtbShowMarketTrendSettings(); return; }
             var $el = jQ('#' + id);
             if ($el.length) {
                 $el[0].click();
