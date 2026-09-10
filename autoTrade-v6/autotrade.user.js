@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Groot Bot
 // @namespace    Groot Bot
-// @version      29.108
+// @version      29.109
 // @description  Groot Bot
 // @author       Manjunath
 // @match        https://kite.zerodha.com/*
@@ -18,6 +18,7 @@
 // @connect      nsearchives.nseindia.com
 // @connect      api.kite.trade
 // @connect      query1.finance.yahoo.com
+// @connect      cdn.cboe.com
 // @resource     BOOTSTRAP_CSS https://manjunathmmath.github.io/autoTrade-v6/dist/css/bootstrap.css
 // @resource     DATATABLE_CSS https://manjunathmmath.github.io/autoTrade-v6/global/vendor/datatables/datatables.min.css
 // @resource     BOOTSTRAP_ICON_CSS https://manjunathmmath.github.io/autoTrade-v6/dist/font/bootstrap-icons.css

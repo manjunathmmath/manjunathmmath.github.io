@@ -42,6 +42,15 @@
   background: var(--gtb-surface); color: var(--gtb-text); border: 1px solid var(--gtb-border);
   padding: 3px 6px; font-size: 0.6rem; font-family: var(--gtb-mono); width: 100%; box-sizing: border-box;
 }
+.gtb-cfg-field-row { display: flex; gap: 4px; align-items: stretch; }
+.gtb-cfg-field-row input[type="text"] { flex: 1 1 auto; min-width: 0; }
+.gtb-cfg-fetch-btn {
+  flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  background: var(--gtb-surface); color: var(--gtb-accent); border: 1px solid var(--gtb-border);
+  padding: 0 7px; cursor: pointer; font-size: 0.65rem;
+}
+.gtb-cfg-fetch-btn:hover { border-color: var(--gtb-accent); }
+.gtb-cfg-fetch-btn:disabled { opacity: 0.5; cursor: default; }
 .gtb-cfg-field-checkbox {
   flex-direction: row; align-items: center; gap: 5px; font-size: 0.58rem; color: var(--gtb-text);
   grid-column: span 3;

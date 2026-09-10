@@ -7721,10 +7721,10 @@ function _gtbCfgFieldGroups() {
         { key: 'mcx_current_day_date', label: 'MCX current day (YYYY-MM-DD)', type: 'text' },
     ]});
     groups.push({ id: 'vol', title: 'VOLATILITY INDICES (CBOE)', fields: [
-        { key: 'OVX', label: 'OVX (CBOE Crude Oil Volatility)', type: 'text', link: 'https://www.cboe.com/index/dashboard/OVX/' },
-        { key: 'VXSLV', label: 'VXSLV (CBOE Silver Volatility)', type: 'text', link: 'https://www.cboe.com/index/dashboard/VXSLV/' },
-        { key: 'GVZ', label: 'GVZ (CBOE Gold Volatility)', type: 'text', link: 'https://www.cboe.com/index/dashboard/GVZ/' },
-        { key: 'VIX', label: 'VIX (CBOE, not India VIX)', type: 'text', link: 'https://www.cboe.com/index/dashboard/VIX/' },
+        { key: 'OVX', label: 'OVX (CBOE Crude Oil Volatility)', type: 'text', link: 'https://www.cboe.com/index/dashboard/OVX/', fetchSymbol: '_OVX' },
+        { key: 'VXSLV', label: 'VXSLV (CBOE Silver Volatility)', type: 'text', link: 'https://www.cboe.com/index/dashboard/VXSLV/', fetchSymbol: '_VXSLV' },
+        { key: 'GVZ', label: 'GVZ (CBOE Gold Volatility)', type: 'text', link: 'https://www.cboe.com/index/dashboard/GVZ/', fetchSymbol: '_GVZ' },
+        { key: 'VIX', label: 'VIX (CBOE, not India VIX)', type: 'text', link: 'https://www.cboe.com/index/dashboard/VIX/', fetchSymbol: '_VIX' },
     ]});
     // Futures and options expiry as two SEPARATE sections (per explicit request) rather than
     // interleaved per commodity — each is its own independent setting (see the mcx_expiry_ /
@@ -7777,7 +7777,17 @@ function _gtbShowMarketTrendSettings() {
         }
         var safeVal = (val != null ? String(val) : '').replace(/"/g, '&quot;');
         var labelHtml = f.label + (f.link ? ' <a href="' + f.link + '" target="_blank" rel="noopener" title="Look up live value on CBOE" style="color:var(--gtb-blue);"><i class="bi bi-box-arrow-up-right"></i></a>' : '');
-        return '<div class="gtb-cfg-field"><label>' + labelHtml + '</label><input type="text" id="' + id + '" data-key="' + f.key + '" value="' + safeVal + '"></div>';
+        // Fetch-prev-close button — CBOE's own delayed-quote CDN (cdn.cboe.com) returns
+        // data.prev_day_close directly, so instead of eyeballing the dashboard page (which
+        // shows current_price, not the prev-close these manually-entered fields actually
+        // want) this pulls it straight into the field. Kept alongside the existing dashboard
+        // link (per explicit request not to remove it) — the link is for a human sanity-check
+        // look, the button is for actually filling the value.
+        var fetchBtn = f.fetchSymbol
+            ? '<button type="button" class="gtb-cfg-fetch-btn" data-symbol="' + f.fetchSymbol + '" data-target="' + id + '" title="Fetch previous close from CBOE"><i class="bi bi-cloud-download"></i></button>'
+            : '';
+        return '<div class="gtb-cfg-field"><label>' + labelHtml + '</label>'
+            + '<div class="gtb-cfg-field-row"><input type="text" id="' + id + '" data-key="' + f.key + '" value="' + safeVal + '">' + fetchBtn + '</div></div>';
     }
 
     // Quick-jump nav — with 8 sections/40+ fields on one scroll, per explicit feedback that
@@ -7827,6 +7837,47 @@ function _gtbShowMarketTrendSettings() {
 // page-level click handling intercepts in-page hash links (this popup is injected into the
 // real kite.zerodha.com document, not a sandboxed iframe). Using a button + JS scrollIntoView
 // scoped to the popup's own scroll container sidesteps that entirely — no href, no hash change.
+// Pulls previous close for a CBOE volatility index (OVX/VXSLV/GVZ/VIX) straight from CBOE's
+// own delayed-quote CDN and drops it into the matching Settings field. GM_xmlhttpRequest is
+// used (not jQ.ajax) for the same reason quoteWs.js/_cmdFetchYahooQuote already use it
+// elsewhere in this app — cdn.cboe.com sends no permissive CORS headers for browser origins,
+// so a plain XHR/fetch from the page would be silently blocked. Response shape (confirmed
+// live): { symbol: '_OVX', data: { prev_day_close: 49.85, current_price: 58.01, ... } } —
+// prev_day_close is what these fields actually want (yesterday's settle), not current_price.
+jQ(document).on('click', '.gtb-cfg-fetch-btn', function () {
+    var $btn = jQ(this);
+    var symbol = $btn.data('symbol');
+    var targetId = $btn.data('target');
+    var $icon = $btn.find('i');
+    $icon.removeClass('bi-cloud-download').addClass('bi-arrow-repeat spin');
+    $btn.prop('disabled', true);
+    GM_xmlhttpRequest({
+        method: 'GET',
+        url: 'https://cdn.cboe.com/api/global/delayed_quotes/quotes/' + symbol + '.json',
+        onload: function (res) {
+            $btn.prop('disabled', false);
+            $icon.removeClass('bi-arrow-repeat spin').addClass('bi-cloud-download');
+            try {
+                var j = JSON.parse(res.responseText);
+                var prevClose = j && j.data && j.data.prev_day_close;
+                if (prevClose == null) { callSackBarInfo('No prev_day_close in CBOE response for ' + symbol); return; }
+                jQ('#' + targetId).val(prevClose);
+                callSackBarInfo(symbol.replace('_', '') + ' prev close: ' + prevClose);
+            } catch (e) { callSackBarInfo('Failed to parse CBOE response: ' + e.message); }
+        },
+        onerror: function () {
+            $btn.prop('disabled', false);
+            $icon.removeClass('bi-arrow-repeat spin').addClass('bi-cloud-download');
+            callSackBarInfo('CBOE fetch failed (network error)');
+        },
+        ontimeout: function () {
+            $btn.prop('disabled', false);
+            $icon.removeClass('bi-arrow-repeat spin').addClass('bi-cloud-download');
+            callSackBarInfo('CBOE fetch timed out');
+        },
+    });
+});
+
 jQ(document).on('click', '.gtb-cfg-jump-link', function (e) {
     e.preventDefault();
     var target = document.getElementById(jQ(this).data('jump'));
