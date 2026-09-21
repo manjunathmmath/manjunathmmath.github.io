@@ -181,11 +181,57 @@ function _qwParsePacket(view, offset, size) {
         // live resting-order pressure instead of only lagging 5-min OI/OBV candles.
         var totalBuyQty  = view.getUint32(offset + 20, false);
         var totalSellQty = view.getUint32(offset + 24, false);
+        var depth = null;
+        // Market depth (5 bid + 5 ask levels) — only present on the full 184-byte packet,
+        // starting right after OI/OI-day-high/day-low/exchange-timestamp (bytes 44-64).
+        // Each level is 12 bytes: qty(int32) + price(int32, needs /div) + orders(int16) +
+        // 2 bytes padding. This is the ANSWER to "OI/OBV changes as price moves" — resting
+        // orders in the book exist BEFORE a trade prints, unlike OI/OBV which only updates
+        // AFTER a trade clears and the exchange republishes the option's open interest.
+        // Was previously parsed no further than byte 44 — _gtbOrderFlowImbalance
+        // (grootTradeBot.js) already uses the coarser totalBuyQty/totalSellQty fields above,
+        // but never had access to the actual best-5-level book this adds.
+        if (size >= 184) {
+            depth = { buy: [], sell: [] };
+            for (var lvl = 0; lvl < 5; lvl++) {
+                var bidOff = offset + 64 + lvl * 12;
+                depth.buy.push({
+                    qty: view.getInt32(bidOff, false),
+                    price: view.getInt32(bidOff + 4, false) / div,
+                    orders: view.getInt16(bidOff + 8, false),
+                });
+                var askOff = offset + 64 + 60 + lvl * 12;
+                depth.sell.push({
+                    qty: view.getInt32(askOff, false),
+                    price: view.getInt32(askOff + 4, false) / div,
+                    orders: view.getInt16(askOff + 8, false),
+                });
+            }
+        }
         return { token: token, ltp: ltp, open: open2, high: high2, low: low2, close: close2,
                  change: ltp - close2, volume: volume, tradable: true,
-                 totalBuyQty: totalBuyQty, totalSellQty: totalSellQty };
+                 totalBuyQty: totalBuyQty, totalSellQty: totalSellQty, depth: depth };
     }
     return null;
+}
+
+// Weighted best-5-level order book imbalance — level 1 (best bid/ask) weighted highest,
+// tapering to level 5, since a resting order far from the touch is a much weaker signal of
+// imminent direction than size sitting right at the best price. Returns null if this tick
+// has no depth (only 'full'-mode 184-byte packets carry it — a 'quote'/'ltp' mode
+// subscription or an instrument with size<184 won't).
+function _qwDepthImbalance(tick) {
+    if (!tick || !tick.depth) return null;
+    var weights = [5, 4, 3, 2, 1];
+    var wBid = 0, wAsk = 0;
+    tick.depth.buy.forEach(function (l, i) { wBid += (l.qty || 0) * weights[i]; });
+    tick.depth.sell.forEach(function (l, i) { wAsk += (l.qty || 0) * weights[i]; });
+    if (wBid + wAsk === 0) return null;
+    return {
+        imb: (wBid - wAsk) / (wBid + wAsk), // -1 (all ask) .. +1 (all bid)
+        wBid: wBid, wAsk: wAsk,
+        bestBid: tick.depth.buy[0], bestAsk: tick.depth.sell[0],
+    };
 }
 
 function _qwParseBinaryMessage(buf) {
@@ -307,14 +353,110 @@ function _qwWsDisconnect() {
     if (_QW_WS) { try { _QW_WS.close(1000); } catch (e) {} _QW_WS = null; }
 }
 
+// Resolves this instrument's strike-derived levels (ASO/AST/BSO/BST/VIXU/VIXL) from whatever
+// is already cached by the main dashboard's normal refresh cycle — no new fetch here, this
+// popup is a live-tick viewer, not a scanner. Two sources, checked in order:
+//   1. VALID_BREAKOUT_NINE_FIFTEEN[name] (localStorage) — the 9:15-anchored aso/ast/bso/bst
+//      set by scanNineFifteenCandle(), already used across the app for the same purpose.
+//   2. MCX commodities have no 9:15 scan entry — fall back to INSTRUMENT_SCORE_MAP[name]
+//      .strikeMap (set by showTopChartMCX, commodities.js) for those.
+// VIXU/VIXL are derived fresh from INSTRUMENT_LIST_GLOBAL (open/prevClose) + the cached
+// VIX_QUOTE prev-close — same formula/inputs already used by _btRenderRisk (bloombergDashboard
+// convention: getVixRange(prevClose, prevVix)). Returns null fields rather than throwing when
+// any input is missing (e.g. before the day's first refresh, or for an instrument with no
+// strike-diff entry at all, like INDIA VIX itself).
+function _qwStrikeLevels(name) {
+    var out = { aso: null, ast: null, bso: null, bst: null, vixu: null, vixl: null };
+    try {
+        var b915 = JSON.parse(localStorage.getItem('VALID_BREAKOUT_NINE_FIFTEEN') || '{}');
+        if (b915[name] && b915[name].aso !== undefined) {
+            out.aso = parseFloat(b915[name].aso);
+            out.ast = parseFloat(b915[name].ast);
+            out.bso = parseFloat(b915[name].bso);
+            out.bst = parseFloat(b915[name].bst);
+        } else if (typeof INSTRUMENT_SCORE_MAP !== 'undefined' && INSTRUMENT_SCORE_MAP[name] && INSTRUMENT_SCORE_MAP[name].strikeMap) {
+            var sm = INSTRUMENT_SCORE_MAP[name].strikeMap;
+            out.aso = parseFloat(sm.ustrikeOne); out.ast = parseFloat(sm.ustrikeTwo);
+            out.bso = parseFloat(sm.bstrikeOne); out.bst = parseFloat(sm.bstrikeTwo);
+            out.vixu = parseFloat(sm.vixDDUpper); out.vixl = parseFloat(sm.vixDDLower);
+        }
+    } catch (e) {}
+    if (out.vixu === null) {
+        try {
+            var opens = JSON.parse(localStorage.getItem('INSTRUMENT_LIST_GLOBAL') || '{}');
+            var openDetail = opens[name] || {};
+            var prevClose = parseFloat(openDetail.prevPrice || 0);
+            var vixRaw = JSON.parse(localStorage.getItem('VIX_QUOTE') || 'null');
+            var prevVix = vixRaw ? parseFloat(vixRaw.data.candles[0][4]) : 0;
+            if (prevClose && prevVix) {
+                var vr = getVixRange(prevClose, prevVix);
+                out.vixu = parseFloat(vr.vixDDUpper);
+                out.vixl = parseFloat(vr.vixDDLower);
+            }
+        } catch (e) {}
+    }
+    return out;
+}
+
+// Classifies LTP against the resolved levels, same tiering as scanNineFifteenCandle's
+// CLOSE_9_15 logic but with VIXU/VIXL as outer bands beyond AST/BST.
+function _qwLevelBadge(ltp, lv) {
+    if (lv.vixu !== null && !isNaN(lv.vixu) && ltp > lv.vixu) return { label: 'VIXU', col: 'var(--gtb-green,#3fb950)' };
+    if (lv.ast !== null && !isNaN(lv.ast) && ltp > lv.ast) return { label: 'AST', col: 'var(--gtb-green,#3fb950)' };
+    if (lv.aso !== null && !isNaN(lv.aso) && ltp > lv.aso) return { label: 'ASO', col: 'var(--gtb-green,#3fb950)' };
+    if (lv.vixl !== null && !isNaN(lv.vixl) && ltp < lv.vixl) return { label: 'VIXL', col: 'var(--gtb-red,#f85149)' };
+    if (lv.bst !== null && !isNaN(lv.bst) && ltp < lv.bst) return { label: 'BST', col: 'var(--gtb-red,#f85149)' };
+    if (lv.bso !== null && !isNaN(lv.bso) && ltp < lv.bso) return { label: 'BSO', col: 'var(--gtb-red,#f85149)' };
+    return { label: 'B/W', col: 'var(--gtb-muted,#7d8590)' };
+}
+
+// Renders the DEPTH column cell — weighted best-5-level imbalance % (green = bid-heavy,
+// red = ask-heavy), with best bid/ask price+qty in the tooltip. This is the live,
+// forward-looking alternative to OI/OBV discussed alongside this feature: resting orders
+// exist BEFORE a trade prints, unlike OI which only updates after a trade clears — so this
+// reads current intent instead of a record of what already happened.
+function _qwDepthCell(tick) {
+    var d = _qwDepthImbalance(tick);
+    if (!d) return '<td style="padding:3px 6px;text-align:center;color:var(--gtb-muted,#7d8590);" title="No depth on this tick (needs full-mode subscription).">—</td>';
+    var tip = 'Best bid: ' + d.bestBid.qty.toLocaleString() + ' @ ' + d.bestBid.price.toFixed(2)
+        + ' | Best ask: ' + d.bestAsk.qty.toLocaleString() + ' @ ' + d.bestAsk.price.toFixed(2)
+        + ' | Weighted (5 levels, near-touch weighted highest): bid ' + d.wBid.toLocaleString() + ' vs ask ' + d.wAsk.toLocaleString();
+    // A literal 0 on one whole side (wBid or wAsk === 0) is NOT a normal, trustworthy ±100%
+    // reading — for a liquid instrument, one side of the top-5 book being completely empty
+    // is itself suspicious (parsing bug or a genuine feed anomaly), so it's flagged distinctly
+    // rather than shown as a clean, confident-looking percentage like every other value here.
+    if (d.wBid === 0 || d.wAsk === 0) {
+        return '<td style="padding:3px 6px;text-align:center;font-family:monospace;font-weight:800;color:var(--gtb-amber,#d29922);" title="ONE-SIDED — ' + (d.wBid === 0 ? 'bid' : 'ask') + ' side of the top-5 book read as completely empty. Unusual for a liquid instrument — treat as suspect, not a real signal, until verified. ' + tip + '">⚠ 1-SIDED</td>';
+    }
+    var col = d.imb > 0.15 ? 'var(--gtb-green,#3fb950)' : d.imb < -0.15 ? 'var(--gtb-red,#f85149)' : 'var(--gtb-muted,#7d8590)';
+    return '<td style="padding:3px 6px;text-align:center;font-family:monospace;font-weight:800;color:' + col + ';" title="' + tip + '">' + (d.imb >= 0 ? '+' : '') + (d.imb * 100).toFixed(0) + '%</td>';
+}
+
 function _qwRenderWsTable() {
     var f = function (v) { return (v || v === 0) ? parseFloat(v).toFixed(2) : '—'; };
+    // A level cell is highlighted (bold + accent bg) when LTP has actually cleared it —
+    // i.e. it's the badge's own active level — so the row visually shows *which* strike
+    // band price is currently trading beyond, not just the raw numbers.
+    var lvlCell = function (val, isActive, positive) {
+        if (val === null || isNaN(val)) return '<td style="padding:3px 6px;text-align:right;font-family:monospace;color:var(--gtb-muted,#7d8590);">—</td>';
+        var bg = isActive ? (positive ? 'rgba(63,185,80,0.18)' : 'rgba(248,81,73,0.18)') : 'transparent';
+        var col = isActive ? (positive ? 'var(--gtb-green,#3fb950)' : 'var(--gtb-red,#f85149)') : 'var(--gtb-text,#e6edf3)';
+        var fw = isActive ? '800' : '400';
+        return '<td style="padding:3px 6px;text-align:right;font-family:monospace;background:' + bg + ';color:' + col + ';font-weight:' + fw + ';">' + val.toFixed(2) + '</td>';
+    };
     var rows = Object.keys(_QW_SUBSCRIBED).map(function (tok) {
         var name = _QW_SUBSCRIBED[tok];
         var t = _QW_LAST_TICK[tok];
-        if (!t) return '<tr><td style="padding:3px 6px;">' + name + '</td><td colspan="7" style="padding:3px 6px;color:var(--gtb-muted,#7d8590);">waiting for tick…</td></tr>';
+        var lv = _qwStrikeLevels(name);
+        var lvlCols = lvlCell(lv.vixl, false, false) + lvlCell(lv.bst, false, false) + lvlCell(lv.bso, false, false)
+            + lvlCell(lv.aso, false, true) + lvlCell(lv.ast, false, true) + lvlCell(lv.vixu, false, true);
+        if (!t) return '<tr><td style="padding:3px 6px;">' + name + '</td><td colspan="7" style="padding:3px 6px;color:var(--gtb-muted,#7d8590);">waiting for tick…</td>' + lvlCols + '<td style="padding:3px 6px;">—</td><td style="padding:3px 6px;">—</td></tr>';
         var chg = t.change || 0;
         var chgCol = chg > 0 ? 'var(--gtb-green,#3fb950)' : chg < 0 ? 'var(--gtb-red,#f85149)' : 'var(--gtb-muted,#7d8590)';
+        var badge = _qwLevelBadge(t.ltp, lv);
+        var active = { vixl: badge.label === 'VIXL', bst: badge.label === 'BST', bso: badge.label === 'BSO', aso: badge.label === 'ASO', ast: badge.label === 'AST', vixu: badge.label === 'VIXU' };
+        lvlCols = lvlCell(lv.vixl, active.vixl, false) + lvlCell(lv.bst, active.bst, false) + lvlCell(lv.bso, active.bso, false)
+            + lvlCell(lv.aso, active.aso, true) + lvlCell(lv.ast, active.ast, true) + lvlCell(lv.vixu, active.vixu, true);
         return '<tr>'
             + '<td style="padding:3px 6px;font-weight:700;">' + name + '</td>'
             + '<td style="padding:3px 6px;text-align:right;font-family:monospace;">' + t.ltp.toFixed(2) + '</td>'
@@ -324,6 +466,9 @@ function _qwRenderWsTable() {
             + '<td style="padding:3px 6px;text-align:right;font-family:monospace;color:var(--gtb-muted,#7d8590);">' + f(t.low) + '</td>'
             + '<td style="padding:3px 6px;text-align:right;font-family:monospace;color:var(--gtb-muted,#7d8590);">' + f(t.close) + '</td>'
             + '<td style="padding:3px 6px;text-align:right;font-family:monospace;color:var(--gtb-muted,#7d8590);">' + (t.volume || '—') + '</td>'
+            + lvlCols
+            + '<td style="padding:3px 6px;text-align:center;font-weight:800;color:' + badge.col + ';">' + badge.label + '</td>'
+            + _qwDepthCell(t)
             + '</tr>';
     }).join('');
     jQ('#qw-ws-table tbody').html(rows || '<tr><td style="padding:6px;color:var(--gtb-muted,#7d8590);">No instruments subscribed yet.</td></tr>');
@@ -396,8 +541,14 @@ function showWebSocketPopup() {
         + '        <th style="padding:3px 6px;text-align:right;">Open</th><th style="padding:3px 6px;text-align:right;">High</th>'
         + '        <th style="padding:3px 6px;text-align:right;">Low</th><th style="padding:3px 6px;text-align:right;">Prev Close</th>'
         + '        <th style="padding:3px 6px;text-align:right;">Vol</th>'
+        + '        <th style="padding:3px 6px;text-align:right;" title="VIXL / BST / BSO / ASO / AST / VIXU">VIXL</th>'
+        + '        <th style="padding:3px 6px;text-align:right;">BST</th><th style="padding:3px 6px;text-align:right;">BSO</th>'
+        + '        <th style="padding:3px 6px;text-align:right;">ASO</th><th style="padding:3px 6px;text-align:right;">AST</th>'
+        + '        <th style="padding:3px 6px;text-align:right;">VIXU</th>'
+        + '        <th style="padding:3px 6px;text-align:center;">Zone</th>'
+        + '        <th style="padding:3px 6px;text-align:center;" title="Weighted best-5-level order book imbalance — green = bid-heavy (buy pressure), red = ask-heavy (sell pressure). Hover a value for best bid/ask detail.">Depth &Delta;</th>'
         + '      </tr></thead>'
-        + '      <tbody><tr><td style="padding:6px;color:var(--gtb-muted,#7d8590);">No instruments subscribed yet.</td></tr></tbody>'
+        + '      <tbody><tr><td colspan="15" style="padding:6px;color:var(--gtb-muted,#7d8590);">No instruments subscribed yet.</td></tr></tbody>'
         + '    </table>'
         + '  </div>'
         + '</div>';

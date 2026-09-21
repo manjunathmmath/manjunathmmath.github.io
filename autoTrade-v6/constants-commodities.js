@@ -12,3 +12,10 @@ let MCX_FUTURE_STRIKE_DIFF = {
 
 let COMMODITIES_FUTURE_INSTRUMENT_LIST = []; // populated by dataLoad.js from the Kite Instruments cache (per-commodity expiry override, else nearest)
 
+// Every MCX futures contract per commodity (all expiries, not just the resolved one above) —
+// {name: [{expiry:'YYYY-MM-DD', token, tradingsymbol, lot_size}, ...]}, sorted by expiry
+// ascending. Populated by dataLoad.js alongside COMMODITIES_FUTURE_INSTRUMENT_LIST — needed
+// for curve-structure (contango/backwardation) comparison, which needs the NEAR *and* NEXT
+// contract at once, not just the single "current" one every other feature in this app uses.
+let MCX_FUT_CURVE = {};
+

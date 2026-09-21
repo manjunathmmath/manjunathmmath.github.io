@@ -2850,6 +2850,7 @@ td.details-control {
   --gtb-col-wt:      170px;
   --gtb-col-detail:  160px;
   --gtb-col-predict: 130px;
+  --gtb-col-futacc:  150px;
 }
 
 /* ── Individual View popup — same layout as main panel, scaled to 1400px wide ── */
@@ -5371,6 +5372,47 @@ td.details-control {
    min-height floor with overflow:hidden — clipping everything below the chart's own
    midline, i.e. every negative bar. flex:0 0 120px opts back out of grow-based sizing. */
 [id^="gtb-dash-matrix-"] .gtb-row-oiobv .gtb-chart-oi { flex: 0 0 60px; min-height: 60px; height: 60px; }
+
+/* Optional 4th column (extraCol param in _gtbDashMatrixColHtml) — currently only the MCX
+   Dashboard's FUT ACC win-rate chip. Scoped to .gtb-dash-matrix-4col so every other caller of
+   the shared function (the NSE Dashboard's Index/Stock + Weighted Constituents panels) keeps
+   its original 3-column layout untouched. Higher specificity ([id^=...].class) than the plain
+   3-column [id^="gtb-dash-matrix-"] rules above, so it wins for matrices that opt in. */
+[id^="gtb-dash-matrix-"].gtb-dash-matrix-4col .gtb-dash-matrix-head,
+[id^="gtb-dash-matrix-"].gtb-dash-matrix-4col .gtb-row {
+  grid-template-columns: var(--gtb-col-instr) var(--gtb-col-predict) var(--gtb-col-oiobv) var(--gtb-col-futacc);
+  min-width: calc(var(--gtb-col-instr) + var(--gtb-col-predict) + var(--gtb-col-oiobv) + var(--gtb-col-futacc));
+}
+.gtb-row-futacc {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 5px 8px; text-align: center;
+  border-right: 1px solid var(--gtb-border2);
+  min-width: 0; overflow: hidden;
+}
+[id^="gtb-dash-matrix-"].gtb-dash-matrix-4col .gtb-row-oiobv { border-right: 1px solid var(--gtb-border2); }
+
+/* MCX Dashboard — per-instrument vertical card (name → OI/OBV → Predict → Fut Acc), laid out
+   in a horizontally-scrolling row (grid-auto-flow:column on the parent .gtb-card-body, see
+   _gtbShowMcxDashboard) instead of the row-table _gtbDashMatrixColHtml normally builds. */
+.gtb-mcxdash-card {
+  display: flex; flex-direction: column;
+  background: var(--gtb-surface); border: 1px solid var(--gtb-border);
+  overflow: hidden;
+}
+.gtb-mcxdash-card-hdr {
+  padding: 6px 8px; border-bottom: 1px solid var(--gtb-border2);
+  flex-shrink: 0;
+}
+.gtb-mcxdash-card-sec {
+  padding: 5px 8px; border-bottom: 1px solid var(--gtb-border2);
+  min-width: 0; overflow: hidden;
+}
+.gtb-mcxdash-card-sec:last-child { border-bottom: none; }
+.gtb-mcxdash-card-predict { min-height: 60px; }
+.gtb-mcxdash-card-futacc {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; min-height: 40px;
+}
 
 /* ── F&O Backtest popup ──────────────────────────────────────────────────── */
 .popup-custom-style-backtest-popup .popupwindow_content:after { display: none !important; content: none !important; }

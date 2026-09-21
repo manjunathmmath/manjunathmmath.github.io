@@ -283,7 +283,7 @@ async function _gtbChartGridLoad() {
                 var m = metaMap[rl.key] || { short: rl.key, color: '#7d8590' };
                 return '<span style="display:inline-flex;align-items:center;gap:1px;white-space:nowrap;">'
                     + '<span style="font-size:0.44rem;font-weight:700;color:' + m.color + ';letter-spacing:0.02em;">' + m.short + '</span>'
-                    + '<span style="font-size:0.44rem;color:var(--gtb-muted);">' + fmt(rl.value) + '</span>'
+                    + '<span style="font-size:0.54rem;color:var(--gtb-muted);">' + fmt(rl.value) + '</span>'
                     + '</span>';
             }).join('<span style="color:#30363d;font-size:0.4rem;"> · </span>');
         }
@@ -470,7 +470,7 @@ function _gtbRenderNowTrade() {
 
     var _lvl = function(label, val, col) {
         return '<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0;border-bottom:1px solid var(--gtb-border);">'
-            + '<span style="font-size:0.44rem;color:var(--gtb-muted);">' + label + '</span>'
+            + '<span style="font-size:0.54rem;color:var(--gtb-muted);">' + label + '</span>'
             + '<span style="font-size:0.52rem;font-weight:800;font-family:var(--gtb-mono);color:' + (col||'var(--gtb-text)') + ';">' + (val || '—') + '</span>'
             + '</div>';
     };
@@ -1139,6 +1139,11 @@ function _buildCardStandalone(item) {
        + '<span class="gtb-ic-panel-btns"><button class="gtb-sig-hdr-btn dv-futacc-reload" data-name="' + name + '"><i class="bi bi-arrow-clockwise"></i></button></span></div>'
        + '<div class="gtb-ic-panel-body" id="' + tid + '-futacc"><div class="cmd-load"><i class="bi bi-hourglass-split"></i> Replaying 5-min candles…</div></div></div>';
 
+    // Panel: curve structure (contango/backwardation) — near vs next futures contract.
+    h += '<div class="gtb-ic-panel" data-col="curve"><div class="gtb-ic-panel-hdr"><span class="gtb-ic-panel-title"><i class="bi bi-graph-up-arrow"></i> CURVE STRUCTURE' + _ii('cmd-curve') + '</span>'
+       + '<span class="gtb-ic-panel-btns"><button class="gtb-sig-hdr-btn dv-curve-reload" data-name="' + name + '"><i class="bi bi-arrow-clockwise"></i></button></span></div>'
+       + '<div class="gtb-ic-panel-body" id="' + tid + '-curve"><div class="cmd-load"><i class="bi bi-hourglass-split"></i> Loading contract curve…</div></div></div>';
+
     // Panel: fut
     h += '<div class="gtb-ic-panel" data-col="fut"><div class="gtb-ic-panel-hdr"><span class="gtb-ic-panel-title"><i class="bi bi-graph-up"></i> FUTURES' + _ii('dv-futures') + '</span>'
        + '<span class="gtb-ic-panel-btns"><button class="sv-icon-btn maximize-component-btn" data-name="' + name + '" data-type="futures"><i class="bi bi-fullscreen"></i></button></span></div>'
@@ -1150,7 +1155,7 @@ function _buildCardStandalone(item) {
 
     // Panel: oimatrix
     h += '<div class="gtb-ic-panel" data-col="oimatrix"><div class="gtb-ic-panel-hdr"><span class="gtb-ic-panel-title"><i class="bi bi-table"></i> OI MATRIX' + _ii('dv-oimatrix') + '</span>'
-       + '<span id="' + tid + '-oimatrix-lbl" style="font-size:0.42rem;color:var(--gtb-muted);margin-left:4px;"></span></div>'
+       + '<span id="' + tid + '-oimatrix-lbl" style="font-size:0.52rem;color:var(--gtb-muted);margin-left:4px;"></span></div>'
        + '<div class="gtb-ic-panel-body" style="overflow-x:auto;padding:0 4px;">'
        + '<div id="' + tid + '-oimatrix" class="gtb-row-oimatrix"></div>'
        + '</div></div>';
@@ -1392,6 +1397,7 @@ function commonMarkupPlaceHolder() {
         + '<a id="show-fut-accuracy"         class="gtb-ctrl-link" title="Futures remark accuracy"><i class="bi bi-bullseye"></i></a>'
         + '<a id="show-futures-signal"       class="gtb-ctrl-link" title="Instrument Detail View"><i class="bi bi-flag-fill"></i></a>'
         + '<a id="show-commodities"          class="gtb-ctrl-link" title="Commodities — GIFT NIFTY &amp; Crude"><i class="bi bi-droplet-fill"></i></a>'
+        + '<a id="show-mcx-dashboard"        class="gtb-ctrl-link" title="MCX Dashboard — all commodities"><i class="bi bi-collection-fill"></i></a>'
         + '<a id="show-oi-viewer"            class="gtb-ctrl-link" title="OI Analyzer"><i class="bi bi-eye"></i></a>'
         + '<a id="show-stock-viewer"         class="gtb-ctrl-link" title="Stock Viewer"><i class="bi bi-list-ul"></i></a>'
         + '<a id="show-market-quote-analyzer" class="gtb-ctrl-link" title="Quotes"><i class="bi bi-graph-up"></i></a>'
@@ -1721,9 +1727,9 @@ function commonMarkupPlaceHolder() {
     h += '<div class="gtb-detail-toggle gtb-collapse-toggle" data-target="gtb-all-ad-body">';
     h += '<span><i class="bi bi-clock-history"></i> 9:15 &amp; A/D</span>';
     h += '<span class="hdr-actions"><button class="sv-icon-btn refresh-advance-decline" data-name="ALL" title="Refresh Spot A/D"><i class="bi bi-arrow-clockwise"></i></button>';
-    h += '<span style="font-size:0.44rem;color:var(--gtb-muted);letter-spacing:0.04em;">SPO</span>';
+    h += '<span style="font-size:0.54rem;color:var(--gtb-muted);letter-spacing:0.04em;">SPO</span>';
     h += '<button class="sv-icon-btn refresh-advance-decline-futures" data-name="ALL" title="Refresh Futures A/D"><i class="bi bi-arrow-clockwise"></i></button>';
-    h += '<span style="font-size:0.44rem;color:var(--gtb-muted);letter-spacing:0.04em;">FUT</span>';
+    h += '<span style="font-size:0.54rem;color:var(--gtb-muted);letter-spacing:0.04em;">FUT</span>';
     h += '<i class="bi bi-chevron-down gtb-caret"></i></span></div>';
     h += '<div id="gtb-all-ad-body" class="gtb-collapse-body">';
     h += '<div id="ALL-nine-fifteen-close" class="gtb-915-strip"></div>';
@@ -2022,7 +2028,7 @@ function _gtbRenderIVSignalsSection() {
     var idxList = allList.filter(function(it) { return it.group === 'Index / Stock'; });
     var wtdList = allList.filter(function(it) { return it.group === 'Weighted constituent'; });
 
-    var thStyle = 'padding:3px 6px;font-size:0.44rem;font-weight:600;color:var(--gtb-muted);border-bottom:1px solid var(--gtb-border);white-space:nowrap;text-align:left;';
+    var thStyle = 'padding:3px 6px;font-size:0.54rem;font-weight:600;color:var(--gtb-muted);border-bottom:1px solid var(--gtb-border);white-space:nowrap;text-align:left;';
     var thead = '<thead><tr>'
         + '<th style="' + thStyle + 'position:sticky;left:0;background:var(--gtb-surface2);z-index:1;">Instrument</th>'
         + '<th style="' + thStyle + '">IV Skew ' + _ii('sig-iv-skew') + '</th>'
@@ -2133,7 +2139,7 @@ function _gtbRenderIVSignalsSection() {
 
     function _groupRows(list, groupLabel) {
         if (!list.length) return '';
-        var sepStyle = 'padding:3px 6px;font-size:0.42rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--gtb-muted);background:var(--gtb-surface2);border-bottom:1px solid var(--gtb-border);';
+        var sepStyle = 'padding:3px 6px;font-size:0.52rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--gtb-muted);background:var(--gtb-surface2);border-bottom:1px solid var(--gtb-border);';
         return '<tr><td colspan="9" style="' + sepStyle + '">' + groupLabel + '</td></tr>'
             + list.map(function(it) { return _ivRow(it.name); }).join('');
     }
@@ -2206,7 +2212,7 @@ function _dvRenderMPGex(name, tid, sfx) {
     var el = document.getElementById('dv-mpgex-body-' + tid + sfx);
     if (!el) return;
     var d = _gtbComputeMaxPainGEX(name);
-    if (!d) { el.innerHTML = '<div style="font-size:0.44rem;color:var(--gtb-muted);padding:4px;">No OI data available.</div>'; return; }
+    if (!d) { el.innerHTML = '<div style="font-size:0.54rem;color:var(--gtb-muted);padding:4px;">No OI data available.</div>'; return; }
 
     var dc = d.maxPainDist > 0 ? 'var(--gtb-green)' : d.maxPainDist < 0 ? 'var(--gtb-red)' : 'var(--gtb-muted)';
     var gc = d.netGEX > 0 ? 'var(--gtb-green)' : d.netGEX < 0 ? 'var(--gtb-red)' : 'var(--gtb-muted)';
@@ -2218,7 +2224,7 @@ function _dvRenderMPGex(name, tid, sfx) {
 
     // OI Signal Strip
     var h = '<div style="margin-bottom:6px;padding:4px;background:var(--gtb-surface);border:1px solid var(--gtb-border);">'
-        + '<div style="font-size:0.38rem;color:var(--gtb-muted);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:3px;">OI Signals</div>'
+        + '<div style="font-size:0.48rem;color:var(--gtb-muted);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:3px;">OI Signals</div>'
         + _gtbSigStripHtml(name)
         + '</div>';
 
@@ -2235,7 +2241,7 @@ function _dvRenderMPGex(name, tid, sfx) {
     h += '<div style="grid-column:1/-1;border-top:1px solid var(--gtb-border2);padding-top:4px;">'
         + '<span style="color:var(--gtb-muted);font-size:0.4rem;">OUTCOME</span><br>'
         + '<b style="color:' + oc.color + ';font-size:0.48rem;">' + oc.label + '</b>'
-        + '<div style="font-size:0.42rem;color:var(--gtb-muted);margin-top:3px;line-height:1.4;white-space:normal;">' + oc.reason + '</div>'
+        + '<div style="font-size:0.52rem;color:var(--gtb-muted);margin-top:3px;line-height:1.4;white-space:normal;">' + oc.reason + '</div>'
         + '</div>';
     var _fpc = _gtbFlowVsPullConflict(name, d);
     if (_fpc) {
@@ -2579,7 +2585,7 @@ function _gtbSigChip(label, value, color, tip, infoKey) {
     var lbl = label + (infoKey ? _ii(infoKey) : '');
     return '<span title="' + safe + '" style="display:inline-flex;flex-direction:column;align-items:center;'
         + 'background:var(--gtb-surface2);border:1px solid var(--gtb-border);padding:2px 5px;font-size:0.42rem;gap:1px;cursor:default;">'
-        + '<span style="color:var(--gtb-muted);font-size:0.38rem;text-transform:uppercase;letter-spacing:0.04em;">' + lbl + '</span>'
+        + '<span style="color:var(--gtb-muted);font-size:0.48rem;text-transform:uppercase;letter-spacing:0.04em;">' + lbl + '</span>'
         + '<span style="color:' + color + ';font-weight:700;font-family:var(--gtb-mono);">' + value + '</span>'
         + '</span>';
 }
@@ -2652,7 +2658,7 @@ function _gtbSigStripHtml(name) {
             var atmIvNote = ex.atmIV !== null ? (ex.atmIV > 25 ? ' High' : ex.atmIV > 15 ? ' Normal' : ' Low') : '';
             var skewTip = 'PE OTM IV minus CE OTM IV at ATM±2. +ve = put fear (bearish bias). −ve = call demand (bullish). ATM IV: ' + atmIvStr + ' — high ATM IV = elevated uncertainty.';
             h += '<span title="' + skewTip.replace(/"/g,"'") + '" style="display:inline-flex;flex-direction:column;align-items:center;background:var(--gtb-surface2);border:1px solid var(--gtb-border);padding:2px 5px;font-size:0.42rem;gap:1px;cursor:default;">'
-                + '<span style="color:var(--gtb-muted);font-size:0.38rem;text-transform:uppercase;letter-spacing:0.04em;">IV Skew' + _ii('sig-iv-skew') + '</span>'
+                + '<span style="color:var(--gtb-muted);font-size:0.48rem;text-transform:uppercase;letter-spacing:0.04em;">IV Skew' + _ii('sig-iv-skew') + '</span>'
                 + '<span style="color:' + skewColor + ';font-weight:700;font-family:var(--gtb-mono);">' + (ex.ivSkew > 0 ? '+' : '') + ex.ivSkew + '% ' + skewLabel + '</span>'
                 + '<span style="color:' + atmIvColor + ';font-size:0.38rem;font-family:var(--gtb-mono);">ATM IV ' + atmIvStr + atmIvNote + '</span>'
                 + '</span>';
@@ -2687,7 +2693,7 @@ function _gtbSigStripHtml(name) {
         var sso = _gtbSigStripOutcome(ex);
         h += _gtbSigChip('Outcome', sso.label, sso.color, sso.reason, 'sig-strip-outcome');
     } else {
-        h += '<span style="font-size:0.44rem;color:var(--gtb-muted);">Signal extras not yet computed — reload OI.</span>';
+        h += '<span style="font-size:0.54rem;color:var(--gtb-muted);">Signal extras not yet computed — reload OI.</span>';
     }
     h += '</div>';
     return h;
@@ -2722,7 +2728,7 @@ function _gtbMpSummaryRows(instrs) {
             + '<td>' + flipHtml + '</td>'
             + '<td style="white-space:normal;word-break:break-word;">'
             +   '<span style="font-weight:700;font-size:0.55rem;color:' + oc.color + ';" title="' + oc.reason.replace(/"/g,"'") + '">' + oc.label + '</span>' + _fpcBadge
-            +   '<div style="font-size:0.44rem;color:var(--gtb-muted);line-height:1.3;margin-top:2px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;" title="' + oc.reason.replace(/"/g,"'") + '">' + oc.reason + '</div>'
+            +   '<div style="font-size:0.54rem;color:var(--gtb-muted);line-height:1.3;margin-top:2px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;" title="' + oc.reason.replace(/"/g,"'") + '">' + oc.reason + '</div>'
             + '</td>'
             + '</tr>';
     }).join('');
@@ -3196,6 +3202,13 @@ async function commonShowPopupWindow() {
       + 'Refresh completed at <b>' + _endTime + '</b>'
       + ' &nbsp; * &nbsp; '
       + '<i class="bi bi-stopwatch" style="margin-right:3px;"></i>Total time: <b>' + _elapsed + 's</b>'
+      + ' &nbsp; * &nbsp; '
+      // Settings-configured current_day_date/previous_day_date drive every historical
+      // fetch in the app (NSE + MCX) — surfaced here so a stale/wrong date after a
+      // config change or an overnight session is obvious at a glance, not just
+      // discoverable by opening Settings.
+      + '<i class="bi bi-calendar-week" style="margin-right:3px;"></i>Today: <b>' + CURRENT_DAY + '</b>'
+      + ' &nbsp; Prev: <b>' + PREVIOUS_DAY + '</b>'
     );
 
 }
@@ -3828,6 +3841,14 @@ let HDFCBANK_9_15_CLOSE_SCORE = 0;
 let ALL_ADVANCE_DECLINE_SCORE = 0;
 let NIFTY_50_ADVANCE_DECLINE_SCORE = 0;
 let NIFTY_BANK_ADVANCE_DECLINE_SCORE = 0;
+// Coverage for ALL_ADVANCE_DECLINE_SCORE: the ratio above only counts stocks that have
+// actually broken their 9:15 zone (advances+declines) — stocks still inside the band (B/W)
+// are silently excluded from the denominator. A handful of early movers can therefore swing
+// the ratio hard even though most of the universe hasn't shown its hand yet. These two let
+// any consumer (e.g. the Fear & Greed Breadth component) discount the score by how much of
+// the universe it's actually based on, instead of trusting a thin sample at full confidence.
+let ALL_ADVANCE_DECLINE_SAMPLE = 0;   // allAdvances + allDeclines
+let ALL_ADVANCE_DECLINE_UNIVERSE = 0; // activeScanList.length
 
 let ALL_FUTURES_TREND_SCORE = 0;
 let NIFTY_50_FUTURES_TREND_SCORE = 0;
@@ -4416,7 +4437,7 @@ async function _gtbShowHistoricalReplay() {
         '<div style="width:40px;height:40px;background:var(--gtb-accent);display:flex;align-items:center;justify-content:center;flex-shrink:0;">' +
         '<i class="bi bi-collection-play-fill" style="color:#fff;font-size:1.1rem;"></i></div>' +
         '<div><div style="font-size:0.85rem;font-weight:900;color:var(--gtb-text);letter-spacing:0.02em;">HISTORICAL DAY REPLAY</div>' +
-        '<div style="font-size:0.42rem;color:var(--gtb-muted);margin-top:2px;">Reconstruct every score tick-by-tick from live Kite 5-min data</div>' +
+        '<div style="font-size:0.52rem;color:var(--gtb-muted);margin-top:2px;">Reconstruct every score tick-by-tick from live Kite 5-min data</div>' +
         '</div></div>' +
 
         // Divider
@@ -4430,13 +4451,13 @@ async function _gtbShowHistoricalReplay() {
         '</div>' +
         '<div style="display:flex;align-items:flex-start;gap:8px;padding:8px 10px;background:var(--gtb-surface2);border-left:3px solid var(--gtb-amber);">' +
         '<i class="bi bi-exclamation-triangle-fill" style="color:var(--gtb-amber);font-size:0.6rem;margin-top:1px;flex-shrink:0;"></i>' +
-        '<div style="font-size:0.42rem;color:var(--gtb-muted);line-height:1.5;">Other dates — price-action only (Futures/OI = 0). Max Pain &amp; IV Skew never available historically.</div>' +
+        '<div style="font-size:0.52rem;color:var(--gtb-muted);line-height:1.5;">Other dates — price-action only (Futures/OI = 0). Max Pain &amp; IV Skew never available historically.</div>' +
         '</div></div>' +
 
         // Date input row
         '<div style="display:flex;gap:10px;align-items:center;">' +
         '<div style="flex:1;display:flex;flex-direction:column;gap:4px;">' +
-        '<label style="font-size:0.38rem;font-weight:700;color:var(--gtb-muted);text-transform:uppercase;letter-spacing:0.06em;">Select Trading Day</label>' +
+        '<label style="font-size:0.48rem;font-weight:700;color:var(--gtb-muted);text-transform:uppercase;letter-spacing:0.06em;">Select Trading Day</label>' +
         '<input type="date" id="gtb-hr-date" value="' + today + '" max="' + today + '" style="' +
             'background:var(--gtb-surface2);color:var(--gtb-text);border:1px solid var(--gtb-border);' +
             'padding:8px 12px;font-size:0.58rem;width:100%;box-sizing:border-box;cursor:pointer;">' +
@@ -5056,7 +5077,7 @@ async function _gtbShowHistoricalReplay() {
 
             // Score block
             h += '<div style="padding:14px 16px 12px;text-align:center;border-bottom:1px solid var(--gtb-border);">';
-            h +=   '<div style="font-size:0.34rem;font-weight:700;color:var(--gtb-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">Composite Score</div>';
+            h +=   '<div style="font-size:0.44rem;font-weight:700;color:var(--gtb-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">Composite Score</div>';
             h +=   '<div style="font-size:2.4rem;font-weight:900;color:' + scCol + ';line-height:1;margin-bottom:4px;">' + (sc > 0 ? '+' : '') + parseFloat(sc).toFixed(1) + '</div>';
             h +=   '<div style="height:4px;background:var(--gtb-border);margin:0 8px 8px;">';
             h +=     '<div style="width:' + pct + '%;height:100%;background:' + scCol + ';"></div></div>';
@@ -5069,14 +5090,14 @@ async function _gtbShowHistoricalReplay() {
                 var exitCol = exitSig.direction === 'LONG' ? 'var(--gtb-red)' : 'var(--gtb-green)';
                 h += '<div style="padding:7px 14px;border-bottom:1px solid var(--gtb-border);background:' + exitCol + '18;border-left:3px solid ' + exitCol + ';">';
                 h +=   '<div style="font-size:0.38rem;font-weight:800;color:' + exitCol + ';margin-bottom:2px;">EXIT ' + exitSig.direction + '</div>';
-                h +=   '<div style="font-size:0.36rem;color:var(--gtb-muted);line-height:1.5;">' + exitSig.reason + '</div>';
+                h +=   '<div style="font-size:0.46rem;color:var(--gtb-muted);line-height:1.5;">' + exitSig.reason + '</div>';
                 h += '</div>';
             }
 
             // Signal reason
             if (snap.signalReason) {
                 h += '<div style="padding:6px 14px;border-bottom:1px solid var(--gtb-border);border-left:3px solid ' + sigCol + ';">';
-                h +=   '<div style="font-size:0.36rem;color:var(--gtb-muted);line-height:1.5;">' + snap.signalReason + '</div>';
+                h +=   '<div style="font-size:0.46rem;color:var(--gtb-muted);line-height:1.5;">' + snap.signalReason + '</div>';
                 h += '</div>';
             }
 
@@ -5084,7 +5105,7 @@ async function _gtbShowHistoricalReplay() {
             if (vixVal != null) {
                 h += '<div style="padding:7px 14px;border-bottom:1px solid var(--gtb-border);display:flex;align-items:center;justify-content:space-between;">';
                 h +=   '<div>';
-                h +=     '<div style="font-size:0.34rem;font-weight:700;color:var(--gtb-muted);text-transform:uppercase;letter-spacing:0.06em;">INDIA VIX</div>';
+                h +=     '<div style="font-size:0.44rem;font-weight:700;color:var(--gtb-muted);text-transform:uppercase;letter-spacing:0.06em;">INDIA VIX</div>';
                 h +=     '<div style="font-size:0.36rem;color:' + vixColor + ';font-weight:700;margin-top:1px;">' + vixLabel + '</div>';
                 h +=   '</div>';
                 h +=   '<div style="font-size:1rem;font-weight:900;color:' + vixColor + ';">' + parseFloat(vixVal).toFixed(2) + '</div>';
@@ -5098,7 +5119,7 @@ async function _gtbShowHistoricalReplay() {
 
             // Breadth
             h += '<div style="padding:8px 14px;border-bottom:1px solid var(--gtb-border);">';
-            h +=   '<div style="font-size:0.34rem;font-weight:700;color:var(--gtb-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:5px;">Market Breadth</div>';
+            h +=   '<div style="font-size:0.44rem;font-weight:700;color:var(--gtb-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:5px;">Market Breadth</div>';
             h +=   '<div style="display:flex;justify-content:space-between;font-size:0.42rem;margin-bottom:4px;">';
             h +=     '<span style="color:var(--gtb-green);">▲ ' + (br.bull||0) + ' Bull</span>';
             h +=     '<span style="color:var(--gtb-red);">▼ ' + (br.bear||0) + ' Bear</span>';
@@ -5111,7 +5132,7 @@ async function _gtbShowHistoricalReplay() {
 
             // Advance / Decline with counts
             h += '<div style="padding:7px 14px;border-bottom:1px solid var(--gtb-border);">';
-            h +=   '<div style="font-size:0.34rem;font-weight:700;color:var(--gtb-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">Advance / Decline</div>';
+            h +=   '<div style="font-size:0.44rem;font-weight:700;color:var(--gtb-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">Advance / Decline</div>';
             [['All F&O', ad.all], ['NIFTY 50', ad.n50], ['BANK', ad.bn]].forEach(function(r) {
                 var adObj = r[1] || {};
                 var adv = adObj.adv != null ? adObj.adv : '—';
@@ -5129,7 +5150,7 @@ async function _gtbShowHistoricalReplay() {
 
             // Component scores
             h += '<div style="padding:7px 14px;">';
-            h +=   '<div style="font-size:0.34rem;font-weight:700;color:var(--gtb-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">Component</div>';
+            h +=   '<div style="font-size:0.44rem;font-weight:700;color:var(--gtb-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">Component</div>';
             [['N50 Weighted', comp.n50||0], ['BN Weighted', comp.bn||0]].forEach(function(r) {
                 h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid var(--gtb-border2);font-size:0.42rem;">';
                 h +=   '<span style="color:var(--gtb-muted);">' + r[0] + '</span>' + _sc(r[1]);
@@ -5148,7 +5169,7 @@ async function _gtbShowHistoricalReplay() {
             // Panel helper
             function _panel(icon, title, bodyHtml, width) {
                 return '<div style="' + (width ? 'flex:0 0 ' + width + 'px;width:' + width + 'px;' : 'flex:1;min-width:0;') + 'border-right:1px solid var(--gtb-border);display:flex;flex-direction:column;overflow:hidden;">' +
-                    '<div style="padding:5px 10px;border-bottom:1px solid var(--gtb-border);font-size:0.38rem;font-weight:800;color:var(--gtb-muted);text-transform:uppercase;letter-spacing:0.07em;flex-shrink:0;background:var(--gtb-surface);white-space:nowrap;"><i class="' + icon + '"></i> ' + title + '</div>' +
+                    '<div style="padding:5px 10px;border-bottom:1px solid var(--gtb-border);font-size:0.48rem;font-weight:800;color:var(--gtb-muted);text-transform:uppercase;letter-spacing:0.07em;flex-shrink:0;background:var(--gtb-surface);white-space:nowrap;"><i class="' + icon + '"></i> ' + title + '</div>' +
                     '<div style="overflow-y:auto;flex:1;padding:6px 10px;">' + bodyHtml + '</div>' +
                     '</div>';
             }
@@ -5169,7 +5190,7 @@ async function _gtbShowHistoricalReplay() {
                 brkBody += '<tr>';
                 brkBody +=   '<td style="padding:4px 0 4px;font-size:0.44rem;border-bottom:1px solid var(--gtb-border2);color:' + (p.warn ? 'var(--gtb-amber)' : 'var(--gtb-text)') + ';white-space:nowrap;width:105px;">' + p.label + '</td>';
                 brkBody +=   '<td style="padding:4px 6px;border-bottom:1px solid var(--gtb-border2);text-align:right;font-size:0.46rem;white-space:nowrap;">' + (p.warn ? '<span style="color:var(--gtb-amber);">—</span>' : _sc(p.val)) + '</td>';
-                brkBody +=   '<td style="padding:4px 0;border-bottom:1px solid var(--gtb-border2);font-size:0.34rem;color:var(--gtb-muted);">' + p.detail + '</td>';
+                brkBody +=   '<td style="padding:4px 0;border-bottom:1px solid var(--gtb-border2);font-size:0.44rem;color:var(--gtb-muted);">' + p.detail + '</td>';
                 brkBody += '</tr>';
             });
             brkBody += '<tr><td colspan="3" style="padding:4px 0;font-size:0.34rem;color:var(--gtb-amber);">Max Pain / IV Skew — not available historically</td></tr>';
@@ -5226,16 +5247,16 @@ async function _gtbShowHistoricalReplay() {
             if (!hasFut) {
                 futBody = '<div style="font-size:0.44rem;color:var(--gtb-amber);padding:4px 0;line-height:1.7;">Date outside current expiry window.<br>Futures &amp; OI data unavailable.</div>';
             } else {
-                futBody += '<div style="font-size:0.34rem;font-weight:700;color:var(--gtb-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">Futures Trend</div>';
+                futBody += '<div style="font-size:0.44rem;font-weight:700;color:var(--gtb-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">Futures Trend</div>';
                 [['NIFTY 50', fut.n50], ['NIFTY BANK', fut.bn], ['All', fut.all]].forEach(function(r) {
                     futBody += '<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--gtb-border2);font-size:0.44rem;"><span style="color:var(--gtb-muted);">' + r[0] + '</span>' + _sc(r[1]||0) + '</div>';
                 });
-                futBody += '<div style="font-size:0.34rem;font-weight:700;color:var(--gtb-muted);text-transform:uppercase;letter-spacing:0.06em;margin:7px 0 4px;">Futures OI</div>';
+                futBody += '<div style="font-size:0.44rem;font-weight:700;color:var(--gtb-muted);text-transform:uppercase;letter-spacing:0.06em;margin:7px 0 4px;">Futures OI</div>';
                 [['NIFTY 50', futOI.n50], ['NIFTY BANK', futOI.bn]].forEach(function(r) {
                     futBody += '<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--gtb-border2);font-size:0.44rem;"><span style="color:var(--gtb-muted);">' + r[0] + '</span>' + _sc(r[1]||0) + '</div>';
                 });
                 if (hasOpt) {
-                    futBody += '<div style="font-size:0.34rem;font-weight:700;color:var(--gtb-muted);text-transform:uppercase;letter-spacing:0.06em;margin:7px 0 4px;">Option Chain OI</div>';
+                    futBody += '<div style="font-size:0.44rem;font-weight:700;color:var(--gtb-muted);text-transform:uppercase;letter-spacing:0.06em;margin:7px 0 4px;">Option Chain OI</div>';
                     [['NIFTY 50', optOI.n50], ['NIFTY BANK', optOI.bn]].forEach(function(r) {
                         futBody += '<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--gtb-border2);font-size:0.44rem;"><span style="color:var(--gtb-muted);">' + r[0] + '</span>' + _sc(r[1]||0) + '</div>';
                     });
@@ -5255,7 +5276,7 @@ async function _gtbShowHistoricalReplay() {
                 };
                 var _renderMatrix = function(mat, atm, label) {
                     var strikes = Object.keys(mat).map(Number).sort(function(a,b){ return a-b; });
-                    var body = '<div style="font-size:0.34rem;font-weight:700;color:var(--gtb-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:3px;">' + label + ' (ATM ' + atm + ')</div>';
+                    var body = '<div style="font-size:0.44rem;font-weight:700;color:var(--gtb-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:3px;">' + label + ' (ATM ' + atm + ')</div>';
                     body += '<table style="width:100%;border-collapse:collapse;">';
                     body += '<tr style="background:var(--gtb-surface);">';
                     body += '<th style="padding:2px 4px;font-size:0.3rem;color:var(--gtb-muted);text-align:right;">Strike</th>';
@@ -5289,11 +5310,11 @@ async function _gtbShowHistoricalReplay() {
 
             // BOTTOM ROW: Instrument Scores (full width)
             h += '<div style="flex:0 0 auto;display:flex;flex-direction:column;overflow:hidden;border-top:0;">';
-            h += '<div style="padding:5px 10px;border-bottom:1px solid var(--gtb-border);font-size:0.38rem;font-weight:800;color:var(--gtb-muted);text-transform:uppercase;letter-spacing:0.07em;background:var(--gtb-surface);flex-shrink:0;"><i class="bi bi-table"></i> Instrument Scores</div>';
+            h += '<div style="padding:5px 10px;border-bottom:1px solid var(--gtb-border);font-size:0.48rem;font-weight:800;color:var(--gtb-muted);text-transform:uppercase;letter-spacing:0.07em;background:var(--gtb-surface);flex-shrink:0;"><i class="bi bi-table"></i> Instrument Scores</div>';
             h += '<div style="overflow:auto;">';
             h += '<table style="width:100%;border-collapse:collapse;">';
             h += '<thead><tr style="background:var(--gtb-surface);">';
-            var _ith = function(label, align) { return '<th style="padding:4px 8px;font-size:0.36rem;font-weight:700;color:var(--gtb-muted);text-transform:uppercase;border-bottom:1px solid var(--gtb-border);white-space:nowrap;text-align:' + (align||'left') + ';">' + label + '</th>'; };
+            var _ith = function(label, align) { return '<th style="padding:4px 8px;font-size:0.46rem;font-weight:700;color:var(--gtb-muted);text-transform:uppercase;border-bottom:1px solid var(--gtb-border);white-space:nowrap;text-align:' + (align||'left') + ';">' + label + '</th>'; };
             h += _ith('Instrument') + _ith('Price','right') + _ith('Zone','center') + _ith('9:15','right') + _ith('Trend','right') + _ith('Futures','right') + _ith('OI/OBV','right') + _ith('Total','right') + _ith('Action','right');
             h += '</tr></thead><tbody>';
             mainInstrs.forEach(function(nm) {
@@ -5966,6 +5987,10 @@ async function _dvLoadFutAcc(name, tid, sfx, isMcx) {
         });
         body += '</tbody></table>';
         el.innerHTML = '<div class="gtb-t915-wrap">' + body + '</div>';
+        // Re-render Short Covering / Long Unwinding now that futAccMap (just cached above)
+        // is available — its historical-win-rate factor was skipped on the earlier render
+        // inside _dvFetchAndRender, which runs before this candle replay finishes.
+        try { jQ('#' + tid + '-shortcov' + sfx).html(_gtbShortCoveringHtml(name)); } catch (e5) {}
     } catch(e) {
         el.innerHTML = '<div class="cmd-load" style="color:var(--gtb-red);">Error loading accuracy data.</div>';
         console.log('_dvLoadFutAcc', name, e);
@@ -5986,6 +6011,108 @@ jQ(document).off('click.dv-futacc-reload').on('click.dv-futacc-reload', '.dv-fut
     var sfx = elId.slice(sfxIdx + '-futacc'.length);
     var isMcx = (typeof _gtbIsMcxFuture === 'function') ? _gtbIsMcxFuture(name) : false;
     _dvLoadFutAcc(name, tid, sfx, isMcx);
+});
+
+// ── Curve Structure (contango/backwardation) — Instrument Detail View, NSE/BFO ─────────────
+// Same near-vs-next-contract comparison as the Commodities popup's Curve Structure card
+// (_cmdLoadCurveStructure), applied to NSE_FUT_CURVE (dataLoad.js) instead of MCX_FUT_CURVE.
+// The interpretation text is NSE-specific, not a copy of the commodities framing: an index/
+// stock future has no storage cost, so its normal cost-of-carry baseline is roughly the
+// risk-free rate minus expected dividend yield — a MILD contango, not commodities' storage-
+// cost contango — and backwardation here is usually a dividend/ex-date or rollover-flow
+// artifact rather than "physical tightness" (there's no physical commodity to be tight on).
+async function _dvLoadCurveStructure(name, tid, sfx) {
+    var elId = tid + '-curve' + sfx;
+    var el = document.getElementById(elId);
+    if (!el) return;
+    el.innerHTML = '<div class="cmd-load"><i class="bi bi-hourglass-split"></i> Loading contract curve…</div>';
+    try {
+        var curve = (typeof NSE_FUT_CURVE !== 'undefined' ? NSE_FUT_CURVE[name] : null) || [];
+        if (curve.length < 2) {
+            el.innerHTML = '<div style="padding:6px;color:var(--gtb-muted);">Only ' + curve.length + ' active contract' + (curve.length === 1 ? '' : 's') + ' listed for ' + name + ' right now — no second (far-month) contract to compare against. Kite\'s instrument list only ever carries currently-active contracts.</div>';
+            return;
+        }
+        var near = curve[0], far = curve[1];
+        var from = moment().subtract(10, 'days').format('YYYY-MM-DD');
+        var to = moment().format('YYYY-MM-DD');
+        var results = await Promise.all([
+            getHistoricalDataUsingPromise(near.token, from, to, 'day'),
+            getHistoricalDataUsingPromise(far.token, from, to, 'day'),
+        ]);
+        var nearCandles = results[0] && results[0].data && results[0].data.candles;
+        var farCandles  = results[1] && results[1].data && results[1].data.candles;
+        if (!nearCandles || !nearCandles.length || !farCandles || !farCandles.length) {
+            el.innerHTML = '<div style="color:var(--gtb-red);">No candle data for one or both contracts.</div>';
+            return;
+        }
+        var nearLtp = parseFloat(nearCandles[nearCandles.length - 1][4]);
+        var farLtp  = parseFloat(farCandles[farCandles.length - 1][4]);
+        var diffPct = nearLtp ? ((farLtp - nearLtp) / nearLtp * 100) : 0;
+        var daysGap = Math.max(1, moment(far.expiry).diff(moment(near.expiry), 'days'));
+        var annualizedPct = diffPct * (365 / daysGap);
+
+        var state, stateCol, lean, leanCol, leanNote;
+        if (diffPct > 0.05) { state = 'CONTANGO'; stateCol = 'var(--gtb-muted)'; }
+        else if (diffPct < -0.05) { state = 'BACKWARDATION'; stateCol = 'var(--gtb-amber)'; }
+        else { state = 'FLAT'; stateCol = 'var(--gtb-muted)'; }
+
+        if (annualizedPct < -2) {
+            lean = 'BULLISH LEAN (check dividend calendar)'; leanCol = 'var(--gtb-green)';
+            leanNote = 'Backwardated — near contract trading at a premium to far month. For an NSE future this is usually a dividend/ex-date or rollover-flow effect rather than physical tightness — check ' + name + '\'s upcoming ex-dividend date before reading this as pure bullish conviction.';
+        } else if (annualizedPct > 10) {
+            lean = 'STEEP CONTANGO'; leanCol = 'var(--gtb-amber)';
+            leanNote = 'Far month priced well above near — steeper than a typical cost-of-carry gap (risk-free rate minus expected dividend yield). Can reflect strong bullish rollover demand OR a thinly-traded far contract distorting the price — treat as a mild confirmation only, not standalone.';
+        } else {
+            lean = 'NEUTRAL'; leanCol = 'var(--gtb-muted)';
+            leanNote = 'Within normal cost-of-carry range for a ' + daysGap + '-day gap — not a directional signal on its own.';
+        }
+
+        // Cache the read so Master Consensus (a separate, synchronous engine) can vote on
+        // it without triggering its own fetch — dir mirrors the same lean thresholds just
+        // computed above: backwardation beyond -2%/yr = bullish, contango beyond +10%/yr =
+        // bearish/caution, everything in between is genuinely neutral (no vote).
+        var curveDir = annualizedPct < -2 ? 1 : annualizedPct > 10 ? -1 : 0;
+        if (!INSTRUMENT_SCORE_MAP[name]) INSTRUMENT_SCORE_MAP[name] = {};
+        INSTRUMENT_SCORE_MAP[name].curveState = { state: state, diffPct: diffPct, annualizedPct: annualizedPct, lean: lean, dir: curveDir, ts: Date.now() };
+
+        el.innerHTML =
+            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">'
+            +   '<div><div style="color:var(--gtb-muted);">NEAR — ' + near.tradingsymbol + ' (exp ' + near.expiry + ')</div><div style="font-family:var(--gtb-mono);font-weight:800;font-size:1.1rem;">' + nearLtp.toLocaleString('en-IN') + '</div></div>'
+            +   '<div><div style="color:var(--gtb-muted);">FAR — ' + far.tradingsymbol + ' (exp ' + far.expiry + ')</div><div style="font-family:var(--gtb-mono);font-weight:800;font-size:1.1rem;">' + farLtp.toLocaleString('en-IN') + '</div></div>'
+            + '</div>'
+            + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px;">'
+            +   '<div style="background:var(--gtb-bg);border:1px solid var(--gtb-border);padding:6px;text-align:center;">'
+            +     '<div style="color:var(--gtb-muted);font-size:0.62rem;">STATE</div>'
+            +     '<div style="font-weight:800;color:' + stateCol + ';">' + state + '</div>'
+            +   '</div>'
+            +   '<div style="background:var(--gtb-bg);border:1px solid var(--gtb-border);padding:6px;text-align:center;">'
+            +     '<div style="color:var(--gtb-muted);font-size:0.62rem;">GAP (RAW)</div>'
+            +     '<div style="font-weight:800;font-family:var(--gtb-mono);">' + (diffPct >= 0 ? '+' : '') + diffPct.toFixed(2) + '%</div>'
+            +   '</div>'
+            +   '<div style="background:var(--gtb-bg);border:1px solid var(--gtb-border);padding:6px;text-align:center;">'
+            +     '<div style="color:var(--gtb-muted);font-size:0.62rem;">GAP (ANNUALIZED)</div>'
+            +     '<div style="font-weight:800;font-family:var(--gtb-mono);">' + (annualizedPct >= 0 ? '+' : '') + annualizedPct.toFixed(1) + '%</div>'
+            +   '</div>'
+            + '</div>'
+            + '<div style="background:' + leanCol + '18;outline:1px solid ' + leanCol + '44;padding:6px;">'
+            +   '<div style="font-weight:800;color:' + leanCol + ';margin-bottom:2px;">' + lean + '</div>'
+            +   '<div style="color:var(--gtb-muted);font-size:0.68rem;">' + leanNote + '</div>'
+            + '</div>';
+    } catch (e) {
+        el.innerHTML = '<div style="color:var(--gtb-red);">Error loading curve structure.</div>';
+        console.log('_dvLoadCurveStructure', name, e);
+    }
+}
+
+jQ(document).off('click.dv-curve-reload').on('click.dv-curve-reload', '.dv-curve-reload', function () {
+    var name = jQ(this).data('name');
+    var $panel = jQ(this).closest('.gtb-ic-panel').find('.gtb-ic-panel-body');
+    if (!name || !$panel.length) return;
+    var elId = $panel.attr('id');
+    var sfxIdx = elId.indexOf('-curve');
+    var tid = elId.slice(0, sfxIdx);
+    var sfx = elId.slice(sfxIdx + '-curve'.length);
+    _dvLoadCurveStructure(name, tid, sfx);
 });
 
 // Fetch live data then render trend probability, OI/OBV, futures, OI matrix,
@@ -6078,9 +6205,16 @@ async function _dvFetchAndRender(name, tid, sfx, isMcx) {
             var _vMpd = null; try { _vMpd = _gtbComputeMaxPainGEX(name); } catch (e3) {}
             _cmdRenderVerdict(tid + '-verdict' + sfx, name, _vOiData, _vPc, _vMpd);
         } catch(e) { try { jQ('#' + tid + '-verdict' + sfx).html('<div class="cmd-load" style="color:var(--gtb-red);">Verdict error.</div>'); } catch(e4) {} }
+        try { jQ('#' + tid + '-shortcov' + sfx).html(_gtbShortCoveringHtml(name)); } catch(e) {}
         // Fire-and-forget — a full day's candle replay is slower than everything else on this
         // page, and doesn't block any score-dependent panel above.
         try { _dvLoadFutAcc(name, tid, sfx, isMcx); } catch(e) {}
+        // Curve structure is NSE/BFO-only here (MCX has its own version, with commodities-
+        // specific "physical tightness" framing, in the Commodities popup) — for an MCX
+        // instrument this panel just shows "no data" since NSE_FUT_CURVE never carries MCX
+        // names, so skip the call entirely rather than fetch for nothing.
+        if (!isMcx) { try { _dvLoadCurveStructure(name, tid, sfx); } catch(e) {} }
+        else { try { jQ('#' + tid + '-curve' + sfx).html('<div style="color:var(--gtb-muted);">See the Commodities popup\'s own Curve Structure card for MCX instruments.</div>'); } catch(e) {} }
         try { _gtbUpdateWeightBars(name, sfx); } catch(e) {}
 
         // ── Trade Analysis — render inline after all data is ready ───────────────
@@ -6184,7 +6318,7 @@ async function _gtbLoadInstrDetail(name) {
     h += '<div class="gtb-ic-panel" data-col="oimatrix">';
     h +=   '<div class="gtb-ic-panel-hdr">';
     h +=     '<span class="gtb-ic-panel-title"><i class="bi bi-table"></i> OI MATRIX</span>';
-    h +=     '<span id="' + tid + '-oimatrix-lbl' + sfx + '" style="font-size:0.42rem;color:var(--gtb-muted);margin-left:4px;"></span>';
+    h +=     '<span id="' + tid + '-oimatrix-lbl' + sfx + '" style="font-size:0.52rem;color:var(--gtb-muted);margin-left:4px;"></span>';
     h +=   '</div>';
     h +=   '<div class="gtb-ic-panel-body" style="overflow-x:auto;padding:0 4px;">';
     h +=   '<div id="' + tid + '-oimatrix' + sfx + '" class="gtb-row-oimatrix"></div>';
@@ -6220,6 +6354,13 @@ async function _gtbLoadInstrDetail(name) {
     h +=   '<div class="gtb-ic-panel-hdr"><span class="gtb-ic-panel-title"><i class="bi bi-bullseye"></i> FUTURES REMARK ACCURACY' + _ii('dv-futacc') + '</span>';
     h +=     '<span class="gtb-ic-panel-btns"><button class="gtb-sig-hdr-btn dv-futacc-reload" data-name="' + name + '"><i class="bi bi-arrow-clockwise"></i></button></span></div>';
     h +=   '<div class="gtb-ic-panel-body" id="' + tid + '-futacc' + sfx + '"><div class="cmd-load"><i class="bi bi-hourglass-split"></i> Replaying 5-min candles…</div></div>';
+    h += '</div>';
+
+    // ── [5e] Curve Structure (contango/backwardation) — near vs next futures contract. ──
+    h += '<div class="gtb-ic-panel" data-col="curve">';
+    h +=   '<div class="gtb-ic-panel-hdr"><span class="gtb-ic-panel-title"><i class="bi bi-graph-up-arrow"></i> CURVE STRUCTURE' + _ii('cmd-curve') + '</span>';
+    h +=     '<span class="gtb-ic-panel-btns"><button class="gtb-sig-hdr-btn dv-curve-reload" data-name="' + name + '"><i class="bi bi-arrow-clockwise"></i></button></span></div>';
+    h +=   '<div class="gtb-ic-panel-body" id="' + tid + '-curve' + sfx + '"><div class="cmd-load"><i class="bi bi-hourglass-split"></i> Loading contract curve…</div></div>';
     h += '</div>';
 
     // ── [6] Futures ──────────────────────────────────────────────────────────
@@ -6279,14 +6420,14 @@ async function _gtbLoadInstrDetail(name) {
     var _taSfxId = '-dv'.replace(/-/g,'_');
     h += '<div id="dv-ta-' + tid + '_dv" class="gtb-ic-panel" style="margin-top:6px;">'
        + '<div class="gtb-ic-panel-hdr"><span class="gtb-ic-panel-title"><i class="bi bi-lightbulb-fill"></i> TRADE ANALYSIS' + _ii('dv-ta') + '</span>'
-       + '<span style="font-size:0.44rem;color:var(--gtb-muted);margin-left:6px;">loads after data</span></div>'
+       + '<span style="font-size:0.54rem;color:var(--gtb-muted);margin-left:6px;">loads after data</span></div>'
        + '<div class="gtb-ic-panel-body" style="padding:4px 0;"></div>'
        + '</div>';
 
     // Risk Manager panel — rendered after _dvFetchAndRender completes
     h += '<div class="gtb-ic-panel" data-risk-name="' + name + '" style="margin-top:6px;">'
        + '<div class="gtb-ic-panel-hdr"><span class="gtb-ic-panel-title"><i class="bi bi-shield-fill-check"></i> RISK MANAGER' + _ii('dv-risk') + '</span>'
-       + '<span style="font-size:0.44rem;color:var(--gtb-muted);margin-left:6px;">loads after data</span></div>'
+       + '<span style="font-size:0.54rem;color:var(--gtb-muted);margin-left:6px;">loads after data</span></div>'
        + '<div class="gtb-ic-panel-body" style="padding:0;"></div>'
        + '</div>';
 
@@ -6320,7 +6461,13 @@ function _gtbLoadInstrDetailPanel(name) {
     var h = '<div class="gtb-instr-card-v gtb-dv-col" id="gtb-dv-col-' + tid + '">';
 
     // [0] Identity — sticky full-width header
-    var kiteLink = 'https://kite.zerodha.com/markets/ext/chart/web/tvc/NSE/' + name + '/' + INSTRUMENT_TOKENS[name];
+    // Was hardcoded to NSE/INSTRUMENT_TOKENS — for an MCX name (INSTRUMENT_TOKENS is NSE-only)
+    // that produced a dead/wrong chart link. _cmdChartLink already resolves the right
+    // exchange+token for both NSE and MCX names (built for the Commodities popup's own chart
+    // link, same fix class as this one) — reused here now that this multi-instrument card is
+    // used for MCX names too (see _gtbShowMcxDashboard).
+    var kiteLink = (typeof _cmdChartLink === 'function') ? _cmdChartLink(name)
+        : ('https://kite.zerodha.com/markets/ext/chart/web/tvc/NSE/' + name + '/' + INSTRUMENT_TOKENS[name]);
     h += '<div class="gtb-ic-panel gtb-ic-panel-identity" data-col="id">';
     h +=   '<div class="gtb-ic-panel-hdr">';
     h +=     '<a class="gtb-instr-link" href="' + kiteLink + '" target="_blank" style="font-weight:900;font-size:0.68rem;letter-spacing:0.01em;">' + name + '</a>';
@@ -6416,7 +6563,7 @@ function _gtbLoadInstrDetailPanel(name) {
     h += '<div class="gtb-ic-panel" data-col="oimatrix">';
     h +=   '<div class="gtb-ic-panel-hdr">';
     h +=     '<span class="gtb-ic-panel-title"><i class="bi bi-table"></i> OI MATRIX</span>';
-    h +=     '<span id="' + tid + '-oimatrix-lbl' + sfx + '" style="font-size:0.42rem;color:var(--gtb-muted);margin-left:4px;"></span>';
+    h +=     '<span id="' + tid + '-oimatrix-lbl' + sfx + '" style="font-size:0.52rem;color:var(--gtb-muted);margin-left:4px;"></span>';
     h +=   '</div>';
     h +=   '<div class="gtb-ic-panel-body" style="overflow-x:auto;padding:0 4px;">';
     h +=   '<div id="' + tid + '-oimatrix' + sfx + '" class="gtb-row-oimatrix"></div>';
@@ -6448,6 +6595,22 @@ function _gtbLoadInstrDetailPanel(name) {
     h +=   '<div class="gtb-ic-panel-hdr"><span class="gtb-ic-panel-title"><i class="bi bi-bullseye"></i> FUTURES REMARK ACCURACY' + _ii('dv-futacc') + '</span>';
     h +=     '<span class="gtb-ic-panel-btns"><button class="gtb-sig-hdr-btn dv-futacc-reload" data-name="' + name + '"><i class="bi bi-arrow-clockwise"></i></button></span></div>';
     h +=   '<div class="gtb-ic-panel-body" id="' + tid + '-futacc' + sfx + '"><div class="cmd-load"><i class="bi bi-hourglass-split"></i> Replaying 5-min candles…</div></div>';
+    h += '</div>';
+
+    h += '<div class="gtb-ic-panel" data-col="curve">';
+    h +=   '<div class="gtb-ic-panel-hdr"><span class="gtb-ic-panel-title"><i class="bi bi-graph-up-arrow"></i> CURVE STRUCTURE' + _ii('cmd-curve') + '</span>';
+    h +=     '<span class="gtb-ic-panel-btns"><button class="gtb-sig-hdr-btn dv-curve-reload" data-name="' + name + '"><i class="bi bi-arrow-clockwise"></i></button></span></div>';
+    h +=   '<div class="gtb-ic-panel-body" id="' + tid + '-curve' + sfx + '"><div class="cmd-load"><i class="bi bi-hourglass-split"></i> Loading contract curve…</div></div>';
+    h += '</div>';
+
+
+    // Short Covering / Long Unwinding probability — see _gtbShortCoveringSignal's own
+    // comment for the mechanics. Populated in _dvFetchAndRender right after this
+    // instrument's futures/OI data lands, then re-rendered once futAccMap is ready
+    // (_dvLoadFutAcc's completion) so the historical-reliability factor gets folded in.
+    h += '<div class="gtb-ic-panel" data-col="shortcov">';
+    h +=   '<div class="gtb-ic-panel-hdr"><span class="gtb-ic-panel-title"><i class="bi bi-arrow-repeat"></i> SHORT COVERING / LONG UNWINDING' + _ii('dv-shortcov') + '</span></div>';
+    h +=   '<div class="gtb-ic-panel-body" id="' + tid + '-shortcov' + sfx + '"><span class="gtb-row-na" style="margin:auto">—</span></div>';
     h += '</div>';
 
     h += '<div class="gtb-ic-panel" data-col="weights">';
@@ -6489,7 +6652,7 @@ function _gtbLoadInstrDetailPanel(name) {
     h +=     '<span class="gtb-ic-panel-btns"><button class="sv-icon-btn mp-gex-btn" data-name="' + name + '" title="Expand"><i class="bi bi-fullscreen"></i></button></span>';
     h +=   '</div>';
     h +=   '<div class="gtb-ic-panel-body" id="dv-mpgex-body-' + tid + sfx + '" style="padding:4px;">';
-    h +=     '<div style="font-size:0.44rem;color:var(--gtb-muted);">Loading after OI fetch…</div>';
+    h +=     '<div style="font-size:0.54rem;color:var(--gtb-muted);">Loading after OI fetch…</div>';
     h +=   '</div>';
     h += '</div>';
 
@@ -6701,6 +6864,359 @@ jQ(document).on('click', '#show-futures-signal', function (e) {
     _gtbCreateInstrDetailPopup();
 });
 
+// ── MCX Dashboard — same look as the main NSE Dashboard tab (Price Action grid + a
+// per-instrument matrix row with Predict/OI/OBV), just scoped to MCX commodities ──────────
+// Built entirely out of the SAME functions the NSE Dashboard tab already uses, per name —
+// none of them are actually NSE-specific once you look inside: _gtbDashPARenderCell already
+// has its own isMcx branch (chart, MCX-specific ref lines via MCX_FUTURE_STRIKE_DIFF/OVX-GVZ-
+// VXSLV), _gtbDashMatrixColHtml just needs a name list + container id + label,
+// _gtbRefreshAllPredictCards/_gtbRefreshAllOIOBVCharts key everything off tid = name (no
+// popup/pane coupling), and _gtbLevelProb (behind _gtbLevelProbRowsHtmlFor) has its own
+// isMcx branch too (see v26.80). The one thing the NSE Dashboard gets for free that MCX
+// doesn't — OI/futures data already sitting in INSTRUMENT_SCORE_MAP from the background
+// refresh cycle — is fetched explicitly here per commodity before populating.
+// Mini contracts (CRUDEOILM/GOLDM/SILVERM/NATGASMINI) first — per explicit request, since
+// those are the ones actually traded most — everything else follows in its original
+// _CFG_MCX_COMMODITIES order. Scoped to this dashboard only (doesn't touch the shared
+// config.js list, which also drives the Settings popup's field ordering).
+function _gtbMcxDashNames() {
+    var all = (typeof _CFG_MCX_COMMODITIES !== 'undefined' ? _CFG_MCX_COMMODITIES : []);
+    var isMini = function (n) { return /M$/.test(n) || /MINI/.test(n); };
+    return all.filter(isMini).concat(all.filter(function (n) { return !isMini(n); }));
+}
+
+function _gtbMcxDashInstruments() {
+    return _gtbMcxDashNames().map(function (n) { return { name: n, mcx: true, label: n }; });
+}
+
+// One commodity's futures + OI/OBV fetch, then re-render everything keyed off its name —
+// same sequence _dvFetchAndRender's isMcx branch already runs, trimmed to just what the
+// matrix row needs (no verdict/futures-accuracy/weight-bar panels here, this is the compact
+// dashboard row, not the full per-instrument detail card).
+// Futures remark accuracy for ONE commodity — replay today's 5-min candles, cache the
+// per-REMARK win-rate map (same INSTRUMENT_SCORE_MAP[name].futAccMap convention _dvLoadFutAcc
+// already uses for the Instrument Detail View), then show just the CURRENT remark's win-
+// rate/sample-count in that card's Fut Acc cell. Factored out of _gtbMcxDashFetchOne so the
+// per-card refresh button (.refresh-oi-dash) can call it too, not just the global Refresh.
+async function _gtbMcxDashRenderFutAcc(name, tid) {
+    try {
+        var vixForAcc = 0;
+        try { vixForAcc = parseFloat((JSON.parse(localStorage.getItem('INSTRUMENT_LTP_PRICE') || '{}')['INDIA VIX'] || {}).ltp) || 0; } catch (e0) {}
+        var cd = await _gtbFetchFutCandlesMCX(name).catch(function () { return null; });
+        if (!cd) return;
+        var accMap = {};
+        _gtbReconstructFutAccuracy(cd, vixForAcc, accMap);
+        if (!INSTRUMENT_SCORE_MAP[name]) INSTRUMENT_SCORE_MAP[name] = {};
+        INSTRUMENT_SCORE_MAP[name].futAccMap = accMap;
+        var remark = INSTRUMENT_SCORE_MAP[name].futures_trend_remark;
+        var a = remark && accMap[remark];
+        if (a && a.total) {
+            var win = Math.round(a.hits / a.total * 100);
+            var wc = win >= 60 ? 'var(--gtb-green)' : win <= 40 ? 'var(--gtb-red)' : 'var(--gtb-amber)';
+            jQ('#' + tid + '-futacc-dash').html(
+                '<div style="font-size:0.62rem;font-weight:800;color:' + wc + ';">' + win + '% win</div>'
+                + '<div style="font-size:0.54rem;color:var(--gtb-muted);margin-top:2px;">n=' + a.total + ' for ' + remark + '</div>'
+            );
+        } else {
+            jQ('#' + tid + '-futacc-dash').html('<span class="gtb-row-na" style="margin:auto">—</span>');
+        }
+    } catch (e) {}
+}
+
+// Level Probability for ONE commodity — _gtbLevelProbHtml(name) already renders the full
+// ASO/AST/VIXU vs BSO/BST/VIXL bar display (same one used in the Instrument Detail View and
+// Commodities popup) and is MCX-aware via _gtbLevelProb's isMcx branch; it just needs
+// strikeMap/.open to already be set (showTopChartMCX, called earlier in _gtbMcxDashFetchOne
+// or by the per-card refresh button below).
+function _gtbMcxDashRenderLvlProb(name, tid) {
+    try { jQ('#' + tid + '-lvlprob-dash').html(_gtbLevelProbHtml(name)); } catch (e) {}
+}
+
+async function _gtbMcxDashFetchOne(name) {
+    var tid = name.replace(/ /g, '-').replace(/&/g, '-');
+    // Price Action mini-chart for this instrument's card — was only ever rendered up front by
+    // _gtbMcxDashRefreshAll's own forEach, so an individual card's refresh button never
+    // touched it. No-ops harmlessly if the '<tid>-chart-dash-pa' container isn't in the DOM
+    // (e.g. this got called from the shared .refresh-oi-dash handler on the NSE Dashboard,
+    // which has no Price Action grid of its own).
+    try { await _gtbDashPARenderCell({ name: name, mcx: true, label: name }); } catch (e) {}
+    // Populates INSTRUMENT_SCORE_MAP[name].strikeMap/.open — the one thing this dashboard's
+    // own fetch never set, which silently broke Level Probability for every MCX name (it
+    // bails out immediately without strikeMap, see _gtbLevelProb's isMcx branch) no matter
+    // how many times Refresh was clicked. No bind div passed — the chart render step inside
+    // showTopChartMCX just no-ops if its target container isn't found (same convention every
+    // other chart renderer here follows), so this only has the side effect we actually want.
+    try { await showTopChartMCX(name); } catch (e) {}
+    try {
+        var res = await showFutureDetailsMCX(name);
+        if (res) {
+            if (!INSTRUMENT_SCORE_MAP[name]) INSTRUMENT_SCORE_MAP[name] = {};
+            // showFutureDetailsMCX already returns a real live LTP (res.ltp — the latest
+            // trimmed intraday candle's close) — no need to wait on a WebSocket tick or the
+            // Fair Value button's Yahoo fetch just to show a price here.
+            var liveLtp = parseFloat(res['ltp']);
+            if (liveLtp) INSTRUMENT_SCORE_MAP[name].mcxLtp = liveLtp;
+            INSTRUMENT_SCORE_MAP[name].futures_trend = getFuturesTrendScore(res['REMARK']);
+            INSTRUMENT_SCORE_MAP[name].futures_trend_remark = res['REMARK'];
+            var ft = INSTRUMENT_SCORE_MAP[name].futures_trend;
+            var col = ft > 0 ? 'var(--gtb-green)' : ft < 0 ? 'var(--gtb-red)' : 'var(--gtb-muted)';
+            var lbl = ft > 0 ? '▲ Long' : ft < 0 ? '▼ Short' : '— Flat';
+            jQ('#' + tid + '-futures-dash').html('<span style="color:' + col + ';font-weight:700;">' + lbl + '</span>');
+            await showPrictionProbabiltyMCX(name, res);
+            var cached = INSTRUMENT_SCORE_MAP[name].stockEntry;
+            var oiData = cached && cached['DATA'];
+            if (oiData && oiData.tableData && oiData.tableData.length) INSTRUMENT_SCORE_MAP[name].oiData = oiData;
+        }
+        INSTRUMENT_SCORE_MAP[name].score = computeInstrumentScore(name);
+    } catch (e) { console.log('mcx-dash fetch', name, e); }
+    try {
+        var ltp = parseFloat(INSTRUMENT_SCORE_MAP[name] && INSTRUMENT_SCORE_MAP[name].mcxLtp) || NaN;
+        jQ('#' + tid + '-ltp-dash').text(isNaN(ltp) ? '' : ltp.toLocaleString('en-IN', { maximumFractionDigits: 2 }));
+    } catch (e) {}
+    try { _gtbRefreshAllPredictCards(name); } catch (e) {}
+    try { _gtbRefreshAllOIOBVCharts(name); } catch (e) {}
+    await _gtbMcxDashRenderFutAcc(name, tid);
+    _gtbMcxDashRenderLvlProb(name, tid);
+    // After futAccMap (just set above) so the historical win-rate factor is included.
+    try { jQ('#' + tid + '-shortcov-dash').html(_gtbShortCoveringHtml(name)); } catch (e) {}
+}
+
+// Same combined-table style as _gtbLoadFutAccInPane (the NSE Dashboard's FUTURES ACCURACY
+// panel), just fed by _gtbFetchFutCandlesMCX instead of _gtbFetchFutCandles — otherwise the
+// exact same replay/win-rate math (_gtbReconstructFutAccuracy is instrument-agnostic; it only
+// reads the candle/lot-size shape both fetchers return the same way).
+// Kept PER-INSTRUMENT (unlike _gtbLoadFutAccInPane's merged-across-5-stocks NSE table) —
+// merging every commodity's remark stats into one shared bucket made sense for NIFTY 50's
+// correlated large-caps, but crude/gold/zinc/natural gas aren't correlated the same way, so a
+// combined "SHORT: 45% win" figure would blend unrelated markets into one meaningless number.
+// Each instrument gets its own mini win-rate table instead, same math per table.
+async function _gtbMcxLoadFutAcc(targetId) {
+    var _target = '#' + targetId;
+    try {
+        var instruments = _gtbMcxDashNames();
+        var vix = 0;
+        try { vix = parseFloat((JSON.parse(localStorage.getItem('INSTRUMENT_LTP_PRICE') || '{}')['INDIA VIX'] || {}).ltp) || 0; } catch (er) {}
+        var cds = await Promise.all(instruments.map(function (nm) {
+            return _gtbFetchFutCandlesMCX(nm).catch(function () { return null; });
+        }));
+
+        var sections = [];
+        cds.forEach(function (cd, idx) {
+            if (!cd) return;
+            var name = instruments[idx];
+            var accMap = {};
+            try { _gtbReconstructFutAccuracy(cd, vix, accMap); } catch (err) { return; }
+            var rows = Object.keys(accMap).map(function (key) {
+                var a = accMap[key];
+                return { remark: key, total: a.total, hits: a.hits,
+                         win: a.total ? Math.round(a.hits / a.total * 100) : 0,
+                         avgPts: a.total ? (a.pts / a.total) : 0,
+                         dir: getFuturesTrendScore(key) };
+            }).sort(function (x, y) { return y.total - x.total; });
+            if (rows.length) sections.push({ name: name, rows: rows });
+        });
+
+        var body;
+        if (!sections.length) {
+            body = '<div class="gtb-sig-wait" style="color:var(--gtb-red);">No intraday futures data available to reconstruct.</div>';
+        } else {
+            body = sections.map(function (sec) {
+                var t = '<div style="font-size:0.5rem;font-weight:800;color:var(--gtb-text);padding:6px 8px 2px;">' + sec.name + '</div>'
+                    + '<table class="gtb-t915-table"><thead><tr>'
+                    + '<th>Remark</th><th>Bias</th><th>Samples</th><th>Win-rate</th><th>Avg pts (5-min)</th>'
+                    + '</tr></thead><tbody>';
+                sec.rows.forEach(function (r) {
+                    var bc  = r.dir > 0 ? 'up' : r.dir < 0 ? 'down' : 'flat';
+                    var wc  = r.win >= 60 ? 'var(--gtb-green)' : r.win <= 40 ? 'var(--gtb-red)' : 'var(--gtb-amber)';
+                    var ptc = r.avgPts >= 0 ? 'var(--gtb-green)' : 'var(--gtb-red)';
+                    var dirc = r.dir > 0 ? 'var(--gtb-green)' : r.dir < 0 ? 'var(--gtb-red)' : 'var(--gtb-muted)';
+                    var isReliable = r.win >= 60 && r.avgPts > 0 && r.total >= 8;
+                    var rowStyle = r.total < 8 ? 'opacity:0.55;' : isReliable ? 'background:var(--gtb-green)18;outline:1px solid var(--gtb-green)44;' : '';
+                    t += '<tr' + (rowStyle ? ' style="' + rowStyle + '"' : '') + '>'
+                        + '<td><span class="gtb-t915-out ' + bc + '">' + r.remark + '</span>' + (isReliable ? ' <span style="font-size:0.44rem;color:var(--gtb-green);font-weight:800;">★</span>' : '') + '</td>'
+                        + '<td style="font-family:var(--gtb-mono);color:' + dirc + ';">' + (r.dir > 0 ? '▲' : r.dir < 0 ? '▼' : '—') + '</td>'
+                        + '<td class="gtb-t915-date">' + r.total + '</td>'
+                        + '<td style="font-family:var(--gtb-mono);font-weight:800;color:' + wc + ';">' + r.win + '%</td>'
+                        + '<td style="font-family:var(--gtb-mono);color:' + ptc + ';">' + (r.avgPts >= 0 ? '+' : '') + r.avgPts.toFixed(1) + '</td>'
+                        + '</tr>';
+                });
+                return t + '</tbody></table>';
+            }).join('');
+        }
+        jQ(_target).html('<div class="gtb-t915-wrap">' + body + '</div>');
+    } catch (e) {
+        jQ(_target).html('<div class="gtb-sig-wait" style="color:var(--gtb-red);">Error loading futures data.</div>');
+    }
+}
+
+function _gtbMcxDashProgress(done, total) {
+    var $p = jQ('#gtb-mcxdash-progress');
+    if (!$p.length) return;
+    $p.text(done < total ? ('Loading ' + done + '/' + total + '…') : '');
+}
+
+// Returns a Promise that resolves once every commodity's fetch has finished — LEVEL
+// PROBABILITY needs INSTRUMENT_SCORE_MAP[name].strikeMap (set inside _gtbMcxDashFetchOne via
+// showTopChartMCX), so it can't be computed until all fetches actually land; firing it
+// synchronously right after kicking off the fetches (the previous version) meant it always
+// ran against data that hadn't arrived yet, no matter how many times Refresh was clicked.
+// Fut Acc + Level Probability now render per-card (inside _gtbMcxDashFetchOne, at the end)
+// instead of as two separate combined panels below the cards — per explicit request — so
+// this just needs to wait for every card's fetch to finish for the progress counter/Refresh
+// button state; no separate combined-panel population step needed anymore.
+function _gtbMcxDashRefreshAll() {
+    _gtbMcxDashInstruments().forEach(function (inst) { try { _gtbDashPARenderCell(inst); } catch (e) {} });
+    var names = _gtbMcxDashNames();
+    var total = names.length, done = 0;
+    _gtbMcxDashProgress(done, total);
+    return Promise.all(names.map(function (n) {
+        return Promise.resolve().then(function () { return _gtbMcxDashFetchOne(n); })
+            .catch(function (e) { console.log('mcx-dash refresh', n, e); })
+            .then(function () { done++; _gtbMcxDashProgress(done, total); });
+    })).then(function () {
+        try { jQ('#gtb-mcxdash-consensus').html(_gtbMasterConsensusMcxRowsHtml()); } catch (e) {}
+    });
+}
+
+function _gtbShowMcxDashboard() {
+    var popId = 'pop-up-window-mcx-dashboard';
+    var popCls = 'popup-custom-style-mcx-dashboard';
+    var $existing = jQ('#' + popId);
+    if ($existing.length) {
+        // Same reopen logic as _gtbCreateInstrDetailPopup (Instrument Detail View) — closing
+        // via the custom [X] control (.popup-win-close) only HIDES the popup, it doesn't
+        // destroy the library's internal PopupWindow instance/DOM. Calling .PopupWindow('show')
+        // unconditionally on that stale-but-present element is what broke reopening after
+        // navigating elsewhere: the plugin instance was left in a state .PopupWindow('show')
+        // doesn't reliably resurrect. If it's still actually visible (e.g. just minimized),
+        // bring it to front; otherwise tear down the stale instance and rebuild fresh below —
+        // cheap (it re-fetches nothing on open per the earlier "load only on Refresh" change).
+        if ($existing.is(':visible')) {
+            try { $existing.PopupWindow('show'); } catch (ex) {}
+            if (typeof _gtbSetPopupMinimized === 'function') _gtbSetPopupMinimized($existing, false);
+            return;
+        }
+        try { $existing.PopupWindow('destroy'); } catch (ex) {}
+        $existing.remove();
+    }
+
+    var insts = _gtbMcxDashInstruments();
+    var names = _gtbMcxDashNames();
+
+    // Instrument -> Price Action grid entry lookup, so the chart embedded in each card below
+    // can reuse the exact same _gtbDashPARenderCell/chart-link machinery the old standalone
+    // PRICE ACTION row used — that row is gone now (folded into each card per explicit
+    // request), but the container id ('<tid>-chart-dash-pa') and render call are unchanged.
+    var instByName = {};
+    insts.forEach(function (inst) { instByName[inst.name] = inst; });
+
+    var body = '<div style="padding:0;overflow-y:auto;height:100%;box-sizing:border-box;">'
+        + '<div class="gtb-card gtb-widget" style="margin:0 0 8px;">'
+        +   '<div class="gtb-card-header" style="display:flex;align-items:center;justify-content:space-between;">'
+        +     '<span class="gtb-card-title"><i class="bi bi-grid-3x3-gap-fill"></i> MCX COMMODITIES</span>'
+        +     '<span style="display:flex;align-items:center;gap:8px;">'
+        +       '<span id="gtb-mcxdash-progress" style="font-size:0.46rem;color:var(--gtb-muted);"></span>'
+        +       '<button id="gtb-mcxdash-refresh" style="background:transparent;border:1px solid var(--gtb-border);color:var(--gtb-muted);padding:2px 8px;font-size:0.46rem;cursor:pointer;"><i class="bi bi-arrow-clockwise"></i> Refresh</button>'
+        +     '</span>'
+        +   '</div>'
+        // Per-instrument vertical card (name → Chart → OI/OBV → Predict → Fut Acc → Level
+        // Prob), laid out in a horizontally-scrolling row — per explicit request, replacing
+        // both the standalone PRICE ACTION row above and the row-table layout
+        // (_gtbDashMatrixColHtml) this section originally reused from the NSE Dashboard. Same
+        // element ids as before (tid + '-chart-dash-pa'/'-ltp-dash'/'-futures-dash'/'-oi-dash'/
+        // '-obv-dash'/'-oiobv-xaxis-dash'/'-predict-dash'/'-futacc-dash'/'-lvlprob-dash'), so
+        // every population function (_gtbMcxDashFetchOne, _gtbDashPARenderCell,
+        // _gtbRefreshAllPredictCards, _gtbRefreshAllOIOBVCharts) keeps working unchanged —
+        // only the surrounding markup/layout moved.
+        +   '<div class="gtb-card-body" style="padding:6px;display:grid;grid-auto-flow:column;grid-auto-columns:minmax(240px, 1fr);gap:8px;overflow-x:auto;align-items:start;">'
+        +     names.map(function (name) {
+                var tid = name.replace(/ /g, '-').replace(/&/g, '-');
+                var inst = instByName[name] || { name: name, mcx: true, label: name };
+                return '<div class="gtb-mcxdash-card">'
+                    +   '<div class="gtb-mcxdash-card-hdr">'
+                    +     '<div class="gtb-row-name" style="display:flex;align-items:center;gap:4px;">' + name
+                    +       '<button class="sv-icon-btn refresh-oi-dash" data-name="' + name + '" title="Refresh" style="margin-left:2px;"><i class="bi bi-arrow-clockwise"></i></button>'
+                    +       '<a href="' + _gtbDashPAChartLink(inst) + '" target="_blank" rel="noopener" title="Open on Kite chart" style="color:var(--gtb-muted);margin-left:auto;"><i class="bi bi-box-arrow-up-right" style="font-size:0.5rem;"></i></a>'
+                    +     '</div>'
+                    +     '<div class="gtb-row-ltp" id="' + tid + '-ltp-dash"></div>'
+                    +     '<div id="' + tid + '-futures-dash" style="font-size:0.48rem;font-weight:700;margin-top:2px;"></div>'
+                    +   '</div>'
+                    +   '<div class="gtb-mcxdash-card-sec" style="padding:0;">'
+                    // Populated for free by showTopChartMCX(name) (called with no bindtoDivId
+                    // in _gtbMcxDashFetchOne — see its comment) — it always writes the O/VIXU/
+                    // VIXL/ASO/AST/BSO/BST levels strip to '<tid>-chart-levels' (no suffix)
+                    // as one of its default write targets, so this div just needs to exist.
+                    +     '<div id="' + tid + '-chart-levels" class="gtb-chart-levels" style="min-height:16px;flex-wrap:wrap;"></div>'
+                    +     '<div id="' + tid + '-chart-dash-pa" style="height:90px;position:relative;"></div>'
+                    +   '</div>'
+                    +   '<div class="gtb-mcxdash-card-sec">'
+                    +     '<div class="gtb-oiobv-lbl">OI</div>'
+                    +     '<div id="' + tid + '-oi-dash" class="gtb-chart-oi" style="height:90px;"></div>'
+                    +     '<div class="gtb-oiobv-lbl">OBV</div>'
+                    +     '<div id="' + tid + '-obv-dash" class="gtb-chart-oi" style="height:90px;"></div>'
+                    +     '<div id="' + tid + '-oiobv-xaxis-dash" class="gtb-oiobv-xaxis"></div>'
+                    +   '</div>'
+                    +   '<div class="gtb-mcxdash-card-sec gtb-mcxdash-card-predict" id="' + tid + '-predict-dash"><span class="gtb-row-na" style="margin:auto">—</span></div>'
+                    +   '<div class="gtb-mcxdash-card-sec gtb-mcxdash-card-futacc" id="' + tid + '-futacc-dash"><span class="gtb-row-na" style="margin:auto">—</span></div>'
+                    +   '<div class="gtb-mcxdash-card-sec gtb-mcxdash-card-lvlprob" id="' + tid + '-lvlprob-dash"><span class="gtb-row-na" style="margin:auto">—</span></div>'
+                    +   '<div class="gtb-mcxdash-card-sec" id="' + tid + '-shortcov-dash"><span class="gtb-row-na" style="margin:auto">—</span></div>'
+                    + '</div>';
+            }).join('')
+        +   '</div>'
+        + '</div>'
+        // Master Consensus — same 9-engine weighted vote as the NSE Dashboard's card,
+        // applied to every tracked MCX commodity. Equal-weight breadth (no index-vs-
+        // constituent distinction here — commodities don't have that structure the way
+        // an index and its constituent stocks do).
+        + '<div class="gtb-card gtb-widget" style="margin:0 0 8px;">'
+        +   '<div class="gtb-card-header"><span class="gtb-card-title"><i class="bi bi-columns-gap"></i> MASTER CONSENSUS (ALL COMMODITIES)' + _ii('gtb-master-consensus') + '</span></div>'
+        +   '<div class="gtb-card-body" id="gtb-mcxdash-consensus" style="padding:6px 8px;overflow:auto;max-height:420px;"></div>'
+        + '</div>'
+        + '</div>';
+
+    var winW = window.innerWidth || document.documentElement.clientWidth;
+    var winH = window.innerHeight || document.documentElement.clientHeight;
+    showPopUpWindow('mcx-dashboard', body, 'MCX Dashboard', Math.min(winW - 40, 1400), Math.min(winH - 60, 860));
+
+    var isLight = jQ('#main-trade-bot-container').hasClass('gtb-light') || (localStorage.getItem('GTB_THEME') || 'dark') === 'light';
+    jQ('.' + popCls).toggleClass('gtb-light', isLight);
+
+    var titleHtml = '<div style="display:flex;align-items:center;gap:6px;width:100%;">'
+        + '<i class="bi bi-collection-fill" style="color:#f0a020;font-size:0.7rem;"></i>'
+        + '<span style="font-weight:800;font-size:0.7rem;">MCX DASHBOARD</span>'
+        + popupWinControls(popCls)
+        + '</div>';
+    jQ('.' + popCls).find('.popupwindow_titlebar_text').html(titleHtml);
+    hideNativePopupButtons(popCls);
+    jQ('.' + popCls).find('.popupwindow_titlebar').removeClass('popupwindow_titlebar_draggable');
+    // Deliberately NOT forcing .popupwindow_content to display:flex + overflow:hidden here
+    // (unlike _gtbCreateInstrDetailPopup, which needs that for its own sticky-header layout)
+    // — that combo is exactly what broke scrolling: it turned the body div below into a flex
+    // item, whose default min-height:auto let its content grow past the flex parent instead
+    // of the body div's own overflow-y:auto ever kicking in. The Settings popup
+    // (_gtbShowMarketTrendSettings) scrolls correctly with no such override — matching that
+    // simpler, proven pattern here instead: .popupwindow_content keeps its default overflow,
+    // the body div below is just a plain height:100%; overflow-y:auto block.
+
+    // Nothing is fetched on open — per explicit request, this only loads on Refresh click
+    // (fetching all commodities' futures+OI+candle-replay data up front on every open was
+    // wasteful for a popup someone might just glance at and close).
+}
+
+jQ(document).on('click', '#gtb-mcxdash-refresh', function () {
+    var $btn = jQ(this).prop('disabled', true);
+    var _orig = $btn.html();
+    $btn.html('<i class="bi bi-arrow-repeat"></i> Refreshing…');
+    Promise.resolve(_gtbMcxDashRefreshAll()).then(function () {}).finally(function () {
+        $btn.prop('disabled', false).html(_orig);
+    });
+});
+
+jQ(document).on('click', '#show-mcx-dashboard', function (e) {
+    e.preventDefault();
+    _gtbShowMcxDashboard();
+});
+
 // Auto-minimize the Instrument Detail View popup whenever Kite navigates into its own
 // chart view (clicking a stock in Kite's own watchlist/search, or our identity-strip
 // chart link) — Kite is a single-page app, so that navigation never reloads the page and
@@ -6902,7 +7418,18 @@ function computeInstrumentScore(name) {
 
     score.max_pain = _gtbMaxPainScore(name);
     score.iv_skew  = _gtbIVSkewScore(name);
-    score.total = score.nine_fifteen + score.current_trend + score.futures_trend + score.oi_obv + score.max_pain + score.iv_skew;
+    // OI/OBV is the only UNCAPPED sub-score here — nine_fifteen/current_trend max out at
+    // ±2, futures_trend/max_pain/iv_skew at ±1, but oi_obv (computeOIScoreFromData, summed
+    // per-strike) routinely runs into double digits (e.g. +13.5 seen live on a real
+    // instrument). Left uncapped, it structurally dominates `total` for ANY instrument
+    // whenever it fires strongly — not a commodities-specific issue, just more visible
+    // there since MCX names often have less 9:15/futures signal competing against it.
+    // Fixed by capping only its CONTRIBUTION to total (±3, roughly matching the combined
+    // weight of nine_fifteen+current_trend) — score.oi_obv itself stays the real,
+    // uncapped value for every other reader (OI signal strips, tooltips, backtests) that
+    // intentionally wants the raw number, not this total-specific dampening.
+    var oiObvCapped = Math.max(-3, Math.min(3, score.oi_obv));
+    score.total = score.nine_fifteen + score.current_trend + score.futures_trend + oiObvCapped + score.max_pain + score.iv_skew;
     return score;
 }
 
@@ -6977,8 +7504,8 @@ function _renderGtbOverview(score, marketSignal) {
     var n50ad = jQ('#gtb-adr-n50').text().replace('N50 A/D', '').replace('N50', '').trim();
     var bnad  = jQ('#gtb-adr-bn').text().replace('BN A/D', '').replace('BN', '').trim();
     var vix   = jQ('#gtb-vix-val').text().trim();
-    _both('gtb-ov-n50ad').text(n50ad || '—');
-    _both('gtb-ov-bnad').text(bnad || '—');
+    _both('gtb-ov-n50ad').text(n50ad || '—').css('cursor', 'pointer').attr('title', 'Click to list the stocks').attr('data-ad-list', 'N50');
+    _both('gtb-ov-bnad').text(bnad || '—').css('cursor', 'pointer').attr('title', 'Click to list the stocks').attr('data-ad-list', 'BN');
     _both('gtb-ov-vix').text(vix || '—');
 
     // 9:15 breakout counts — ASO/AST (above) vs BSO/BST (below) across constituents
@@ -7882,6 +8409,45 @@ jQ(document).on('click', '.gtb-cfg-jump-link', function (e) {
     e.preventDefault();
     var target = document.getElementById(jQ(this).data('jump'));
     if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+
+// Advance/Decline stock list popup — the A/D chips (KEY STATS and the topbar-adjacent
+// #gtb-adr-n50/#gtb-adr-bn widgets) only ever showed counts; window._GTB_AD_DETAIL (set
+// alongside those counts, see the A/D display block above) already has the actual per-stock
+// breakdown (name/LTP/the ASO or BSO level it crossed) — this just surfaces it on click
+// instead of throwing it away after building the summary.
+function _gtbShowADDetailPopup(which) {
+    var detail = (window._GTB_AD_DETAIL || {})[which];
+    if (!detail) return;
+    var title = which === 'N50' ? 'NIFTY 50' : 'BANK NIFTY';
+    function rowsHtml(list, isAdv) {
+        if (!list.length) return '<div style="font-size:0.5rem;color:var(--gtb-muted);padding:4px 0;">None</div>';
+        return list.slice().sort(function (a, b) { return a.name.localeCompare(b.name); }).map(function (s) {
+            return '<div style="display:flex;justify-content:space-between;gap:8px;padding:2px 0;font-size:0.52rem;">'
+                + '<span style="font-weight:700;">' + s.name + '</span>'
+                + '<span style="font-family:var(--gtb-mono);color:var(--gtb-muted);">' + s.ltp.toLocaleString('en-IN', { maximumFractionDigits: 2 })
+                + ' <span style="color:' + (isAdv ? 'var(--gtb-green)' : 'var(--gtb-red)') + ';">(' + (isAdv ? 'ASO ' : 'BSO ') + s.level.toFixed(2) + ')</span></span>'
+                + '</div>';
+        }).join('');
+    }
+    var body = '<div style="padding:10px 12px;font-size:0.6rem;display:grid;grid-template-columns:1fr 1fr;gap:12px;">'
+        + '<div><div style="font-weight:800;color:var(--gtb-green);margin-bottom:4px;">ADVANCING (' + detail.advNames.length + ')</div>' + rowsHtml(detail.advNames, true) + '</div>'
+        + '<div><div style="font-weight:800;color:var(--gtb-red);margin-bottom:4px;">DECLINING (' + detail.decNames.length + ')</div>' + rowsHtml(detail.decNames, false) + '</div>'
+        + '</div>';
+    showPopUpWindow('ad-detail', body, title + ' Advance / Decline', 480, 420);
+    var _cls = 'popup-custom-style-ad-detail';
+    var _title = '<div style="display:flex;align-items:center;gap:6px;width:100%;">'
+        + '<span style="font-weight:800;font-size:0.7rem;"><i class="bi bi-bar-chart-steps"></i> ' + title.toUpperCase() + ' ADVANCE / DECLINE</span>'
+        + popupWinControls(_cls)
+        + '</div>';
+    jQ('.' + _cls).find('.popupwindow_titlebar_text').html(_title);
+    hideNativePopupButtons(_cls);
+    jQ('.' + _cls).find('.popupwindow_titlebar').removeClass('popupwindow_titlebar_draggable');
+    jQ('.' + _cls).toggleClass('gtb-light', (localStorage.getItem('GTB_THEME') || 'dark') === 'light');
+}
+jQ(document).on('click', '[data-ad-list]', function (e) {
+    e.preventDefault();
+    _gtbShowADDetailPopup(jQ(this).attr('data-ad-list'));
 });
 
 jQ(document).on('click', '#gtb-open-market-settings', function (e) {
@@ -8955,8 +9521,16 @@ var GTB_INFO = {
            + '• <b>Raw OBV flow</b> (25%) — fast, today-only options-tape read<br>'
            + '• <b>OI wall pressure</b> (25%) — a strong R1/S1 wall close to spot dampens the side it sits on<br><br>'
            + 'The outer bands (AST/BST, and especially VIXU/VIXL) require progressively stronger conviction to light up, and VIXU/VIXL are additionally damped by how much of today\'s expected VIX range is already used up. These are <b>reasoned live estimates, not statistically fitted probabilities</b> — use as a likelihood ranking between levels, not a precise %.' },
+    'cmd-curve': { icon:'bi-graph-up-arrow', title:'Curve Structure',
+        body:'Compares the NEAR and next (FAR) MCX futures contract for this commodity. <b>Contango</b> (far priced above near) is the normal state — reflects storage/carry cost, no urgency, neutral-to-bearish backdrop. <b>Backwardation</b> (near priced above far) means the market is paying a premium for immediate supply — physical tightness/urgency, a bullish lean for the near contract you actually trade. The <b>Gap (Annualized)</b> number normalizes the raw % gap by how many days apart the two expiries are, so a small gap between near-dated contracts isn\'t misread the same as the same gap between far-dated ones. Unlike Fair Value Gap or IV Skew (which mostly confirm/veto another signal), this is one of the few inputs that can suggest a direction on its own — but only when the annualized rate is meaningfully outside normal carry-cost range, not on every reading. Kite only lists currently-active contracts, so MCX mini contracts (CRUDEOILM/GOLDM/SILVERM) will often show only one contract with nothing to compare against — expected, not a bug.' },
+    'gtb-master-consensus': { icon:'bi-columns-gap', title:'Master Consensus',
+        body:'Combines 9 independent engines (9:15 Zone, Composite SCORE, Futures Trend, OI/OBV, Max Pain, IV Skew, Level Probability, Order Flow, Curve Structure) into one weighted GO LONG / GO SHORT / WAIT per instrument. Weights aren\'t assumed — 9:15 Zone is always highest-weighted (the only signal with real historical backtesting); Futures Trend is upgraded to that same weight only when its own today\'s-accuracy-replay row proves out (≥55% win-rate, positive avg pts, ≥8 samples); OI/OBV is deliberately down-weighted since this app\'s own accuracy replay found negative expectancy in every bucket tested. A ⚠thin tag means the outcome is riding on very few actual directional votes even if most other engines have data — treat those as one engine’s call, not a broad agreement. Curve Structure only votes when its own panel has been opened at least once this session (caches its read) and the reading is non-neutral. Click any row for the full engine-by-engine breakdown. Excludes the (currently suspect) Depth Δ and the standalone Range Scoreboard/Predict cards — shown separately to avoid double-counting the same inputs.<br><br>The banner at the TOP combines every instrument’s own outcome into ONE final call — NIFTY 50 and NIFTY BANK (the actual tradeable indices) weighted 3x each, every weighted-constituent stock a 1x breadth vote (same index-vs-breadth distinction the Index Impact Verdict already applies). A ⚠ CAUTION flag means the two core indices disagree with the direction the broader stock breadth is leaning — not a clean agreement, read the breakdown before trusting it.' },
     'dv-futacc': { icon:'bi-bullseye', title:'Futures Remark Accuracy',
         body:'Replays today\'s 5-min futures candles and checks, for each REMARK category this instrument\'s own futures contract produced (LONG/SHORT/SHOT_COVERING/LONG_UNWINDING/etc.), how often the next candle actually moved the direction that REMARK implied. <b>Win-rate</b> = % of times it was right; <b>Avg pts</b> = average next-candle move (signed). Rows with <8 samples are dimmed (not enough data yet); a ★ marks a REMARK that\'s both frequent (≥8 samples) and reliable (≥60% win-rate, positive avg pts) for THIS instrument today — not a guarantee, just today\'s reconstructed track record.' },
+    'dv-wtc': { icon:'bi-bar-chart-fill', title:'Weighted Trend Confirmation',
+        body:'Same aggregation as <b>Component Score</b> — weight% × each constituent\'s raw composite SCORE (computeInstrumentScore().total), summed and divided by covered index weight — surfaced here as its own standalone verdict instead of being silently folded into the composite SCORE total. Different from <b>Index Impact</b> (Signals tab), which weights by today\'s already-REALIZED price change%, not the score. <b>Top Drivers</b> ranks by weight × |score|, so a huge stock sitting near-flat won\'t outrank a smaller mover with real conviction. The split bar\'s proportions are scaled against this app\'s own ±10 SCORE gauge range purely for visualization — the weighted-average score itself is the number that matters.' },
+    'dv-shortcov': { icon:'bi-arrow-repeat', title:'Short Covering / Long Unwinding Probability',
+        body:'A short is closed by BUYING, so a wave of <b>short covering</b> shows up as price RISING while OI FALLS (positions closing, not new ones opening) — the same pattern the futures classifier already labels SHOT_COVERING. <b>Long unwinding</b> is the mirror: price FALLING while OI FALLS (longs booking out). Both get sharply more likely into expiry for three real mechanical reasons: (1) margin/MTM pressure forces the position closed regardless of the trader\'s view, (2) option-seller gamma hedging — if the street is one-sidedly positioned (extreme PCR), dealers must buy/sell futures to stay hedged as price approaches their strikes, amplifying any small move, (3) Max Pain / pin risk. This combines: is the remark actively firing right now, days to expiry (≤2d = mechanical squeeze window), how extreme the standing PCR was beforehand, and this instrument\'s own historical win-rate for that exact remark — into one composite probability. A reasoned live estimate, not a fitted statistic.' },
     'dv-futures': { icon:'bi-graph-up', title:'Futures',
         body:'Futures positioning for this instrument: <b>Primary chip</b> = OI-based REMARK (Long Buildup / Short Buildup / Short Covering / Long Unwinding etc.) colour-coded green/red. <b>Secondary chip</b> = VWAP direction — amber with ⚠ when the two signals conflict. Also shows: VWAP, PCR, premium/discount vs spot, and 5-min OI trend.' },
     'dv-oimatrix':{ icon:'bi-table', title:'OI Matrix',
@@ -9372,7 +9946,11 @@ async function _gtbBuild915Trend(lookback) {
     // Computed rows are cacheable per day (past days don't change) — avoids re-fetching
     // ~16 chunked requests on every open.
     var ckey = 'GTB_915TREND_' + moment().format('YYYY-MM-DD') + '_' + lookback + '_v6';  // v6 = + vixu_gift/vixl_gift (GIFT NIFTY's own VIX range, was wrongly reusing NIFTY's)
-    try { var cached = localStorage.getItem(ckey); if (cached) return JSON.parse(cached); } catch (e) {}
+    try {
+        var cached = localStorage.getItem(ckey);
+        if (cached) { console.log('[915 backtest] cache HIT for ' + ckey); return JSON.parse(cached); }
+        console.log('[915 backtest] cache MISS for ' + ckey + ' — rebuilding from scratch (~16 chunked fetches).');
+    } catch (e) { console.warn('[915 backtest] cache read/parse failed for ' + ckey + ' — rebuilding.', e); }
 
     var toM   = moment();
     // Calendar span to cover `lookback` trading days (~5 trading days per 7 calendar days).
@@ -9495,7 +10073,18 @@ async function _gtbBuild915Trend(lookback) {
                  vix: vix, vixu: vixu, vixl: vixl, vixu_bank: vixu_bank, vixl_bank: vixl_bank,
                  vixu_gift: vixu_gift, vixl_gift: vixl_gift };
     });
-    try { localStorage.setItem(ckey, JSON.stringify(rows)); } catch (e) {}
+    try {
+        var _serialized = JSON.stringify(rows);
+        localStorage.setItem(ckey, _serialized);
+        console.log('[915 backtest] cached ' + rows.length + ' day(s) under ' + ckey + ' (' + (_serialized.length / 1024).toFixed(0) + ' KB) — next open today should hit cache.');
+    } catch (e) {
+        // Most likely QuotaExceededError — this is exactly the silent-failure case that
+        // would make the popup look like it "always refetches": the build itself succeeds
+        // and renders fine, but the cache write fails every time, so the NEXT open finds
+        // nothing cached and pays the full ~16-chunk fetch again. Surfaced loudly instead of
+        // swallowed so this is diagnosable from the console rather than guessed at.
+        console.error('[915 backtest] FAILED to cache under ' + ckey + ' — every future open will refetch from scratch until this is fixed.', e);
+    }
     return rows;
 }
 
@@ -9850,7 +10439,12 @@ async function _gtbShow915Backtest() {
         var rows = await _gtbBuild915Trend(250);
         jQ('#groot-maximize-body').html(_render915Trend(rows));
     } catch (err) {
-        jQ('#groot-maximize-body').html('<div style="padding:24px;color:var(--gtb-red);">Error: ' + (err && err.message) + '</div>');
+        // Any failure here means _gtbBuild915Trend never reached its own cache-write line —
+        // so the NEXT open pays the full ~16-chunk fetch again and hits this same error,
+        // which is exactly what "it fetches every time" looks like from the outside. Logged
+        // with the full error (not just .message) so the real cause is visible in console.
+        console.error('[915 backtest] build failed — nothing was cached, next open will refetch and likely fail the same way:', err);
+        jQ('#groot-maximize-body').html('<div style="padding:24px;color:var(--gtb-red);">Error: ' + (err && (err.message || err)) + '<br><br><span style="color:var(--gtb-muted);font-size:0.7rem;">Check the browser console for the full error — this also means nothing was cached, so reopening this popup will re-fetch and likely fail the same way until the underlying error is fixed.</span></div>');
     }
 }
 jQ(document).on('click', '#show-915-backtest', function (e) { e.preventDefault(); _gtbShow915Backtest(); });
@@ -10061,8 +10655,214 @@ async function _gtbFetchFutCandles(name) {
     return { lotSize: fut.lot_size, prevDay: pcs[pcs.length - 1], intraday: intr };
 }
 
+// ── Short Covering / Long Unwinding Probability ─────────────────────────────────────────
+// The mechanics: a short is closed by BUYING, so a wave of short covering shows up as price
+// RISING while OI FALLS (positions closing, not new ones opening) — exactly what the existing
+// futures classifier already labels 'SHOT_COVERING' (see _gtbClassifyFutures below: Price↑ +
+// OI↓ + strong close). The mirror case — price FALLING while OI FALLS — is LONG_UNWINDING
+// (longs booking out, not fresh shorts). Both get sharply more likely into expiry because of
+// three real, mechanical (not sentiment) pressures that stack in the last 1-2 days: (1) MTM/
+// margin pressure forces the position closed regardless of the trader's view, since rolling
+// costs a fresh spread+margin; (2) option-seller gamma hedging — if the street is one-sidedly
+// short calls or long puts (extreme PCR), the dealers who sold that protection are short
+// gamma and must buy futures as price approaches their strikes, mechanically amplifying any
+// small bounce; (3) Max Pain / pin risk pulls price toward the strike where writers lose
+// least. This function combines: is the remark ACTIVELY firing right now, how close to
+// expiry, how extreme the OI positioning was beforehand (the "everyone was one-sided" setup),
+// and this instrument's own historical win-rate for that exact remark (futAccMap, already
+// built by _dvLoadFutAcc/_gtbMcxDashRenderFutAcc) — into one composite probability.
+function _gtbDaysToExpiry(name) {
+    try {
+        if (_gtbIsMcxFuture(name)) {
+            var mcxEntry = (typeof COMMODITIES_FUTURE_INSTRUMENT_LIST !== 'undefined')
+                ? COMMODITIES_FUTURE_INSTRUMENT_LIST.find(function (f) { return f.name === name; }) : null;
+            if (mcxEntry && mcxEntry.expiry) return moment(mcxEntry.expiry, 'DD-MM-YYYY').diff(moment().startOf('day'), 'days');
+            return null;
+        }
+        // Indices are stored under a different raw name in FUTURE_INTRUMENT_LIST (e.g.
+        // 'NIFTY' for 'NIFTY 50') — same reverse-lookup _gtbTokenForName already uses.
+        var rawName = name;
+        if (typeof _DL_INDEX_NAME_TO_DISPLAY !== 'undefined') {
+            for (var k in _DL_INDEX_NAME_TO_DISPLAY) { if (_DL_INDEX_NAME_TO_DISPLAY[k] === name) { rawName = k; break; } }
+        }
+        var futEntry = (typeof FUTURE_INTRUMENT_LIST !== 'undefined' ? FUTURE_INTRUMENT_LIST : [])
+            .find(function (f) { return f.name === rawName; });
+        if (futEntry && futEntry.expiry) return moment(futEntry.expiry, 'DD-MM-YYYY').diff(moment().startOf('day'), 'days');
+        return null;
+    } catch (e) { return null; }
+}
+
+function _gtbShortCoveringSignal(name) {
+    var out = { ok: false };
+    try {
+        var sm = INSTRUMENT_SCORE_MAP[name] || {};
+        var remark = sm.futures_trend_remark;
+        var isCovering = remark === 'SHOT_COVERING';
+        var isUnwinding = remark === 'LONG_UNWINDING';
+        var type = isCovering ? 'SHORT_COVERING' : isUnwinding ? 'LONG_UNWINDING' : 'NONE';
+
+        var days = _gtbDaysToExpiry(name);
+        var nearExpiry = (days != null && days <= 2);
+
+        // "Everyone was one-sided" precondition — extreme standing PCR from the OI table.
+        // High PCR (lots of puts relative to calls) is the bearish-positioning setup that
+        // precedes short covering; low PCR (lots of calls) is the bullish setup that
+        // precedes long unwinding.
+        var pcr = (sm.oiData && sm.oiData.pcr) ? parseFloat(sm.oiData.pcr) : null;
+        var extremePositioning = false;
+        if (pcr != null) {
+            if (isCovering && pcr >= 1.4) extremePositioning = true;
+            if (isUnwinding && pcr <= 0.7) extremePositioning = true;
+        }
+
+        var todayChg = 0; try { todayChg = parseFloat(generateTrend(name).change) || 0; } catch (e0) {}
+
+        // Historical reliability of THIS exact remark for THIS instrument, if already
+        // reconstructed (futAccMap — _dvLoadFutAcc for NSE, _gtbMcxDashRenderFutAcc for MCX).
+        var acc = null;
+        if (sm.futAccMap && remark && sm.futAccMap[remark]) {
+            var a = sm.futAccMap[remark];
+            if (a.total) {
+                var avgMove = (a.eodPts !== undefined) ? (a.eodPts / a.total) : null;
+                var ltpForPct = 0;
+                try { ltpForPct = parseFloat(generateTrend(name).ltp) || 0; } catch (e1) {}
+                if (!ltpForPct) ltpForPct = parseFloat(sm.mcxLtp) || 0;
+                acc = {
+                    winRate: Math.round(a.hits / a.total * 100), samples: a.total,
+                    // Historical avg move from fire-time to day's close, in the direction the
+                    // remark implies (signed positive = "moved further that way") — a genuine
+                    // magnitude estimate, not just direction accuracy. Undefined for older
+                    // cached futAccMap entries built before eodPts existed.
+                    avgMove: avgMove,
+                    avgMovePct: (avgMove != null && ltpForPct) ? (avgMove / ltpForPct * 100) : null,
+                };
+            }
+        }
+
+        // Composite probability — heuristic, not a fitted statistic (same "reasoned live
+        // estimate, not a backtested %" framing as _gtbLevelProb).
+        var prob = (isCovering || isUnwinding) ? 40 : 15;
+        if (nearExpiry) prob += 25;
+        if (extremePositioning) prob += 15;
+        if (acc) { if (acc.winRate >= 60 && acc.samples >= 8) prob += 10; else if (acc.winRate <= 40 && acc.samples >= 8) prob -= 10; }
+        prob = Math.max(5, Math.min(95, prob));
+
+        out = {
+            ok: true, type: type, remark: remark, active: isCovering || isUnwinding,
+            daysToExpiry: days, nearExpiry: nearExpiry, pcr: pcr, extremePositioning: extremePositioning,
+            todayChgPct: todayChg, acc: acc, probability: prob,
+        };
+    } catch (e) {}
+    return out;
+}
+
+function _gtbShortCoveringHtml(name) {
+    var s = _gtbShortCoveringSignal(name);
+    if (!s.ok) return '<span class="gtb-row-na" style="margin:auto">—</span>';
+    var isBull = s.type === 'SHORT_COVERING';
+    var typeLabel = s.type === 'SHORT_COVERING' ? 'Short Covering' : s.type === 'LONG_UNWINDING' ? 'Long Unwinding' : 'No active squeeze';
+    var typeCol = s.type === 'SHORT_COVERING' ? 'var(--gtb-green)' : s.type === 'LONG_UNWINDING' ? 'var(--gtb-red)' : 'var(--gtb-muted)';
+    var probCol = s.probability >= 65 ? 'var(--gtb-green)' : s.probability >= 40 ? 'var(--gtb-amber)' : 'var(--gtb-muted)';
+    var reasons = [];
+    if (s.active) reasons.push(typeLabel + ' actively firing (' + s.remark + ')');
+    else reasons.push('No ' + (s.type === 'NONE' ? 'squeeze' : typeLabel.toLowerCase()) + ' signal right now');
+    if (s.daysToExpiry != null) reasons.push(s.nearExpiry
+        ? '<b style="color:var(--gtb-amber);">' + s.daysToExpiry + 'd to expiry — mechanical squeeze window</b>'
+        : s.daysToExpiry + 'd to expiry');
+    if (s.pcr != null) reasons.push('PCR ' + s.pcr.toFixed(2) + (s.extremePositioning ? ' <b style="color:var(--gtb-amber);">(one-sided positioning)</b>' : ''));
+    if (s.acc) {
+        reasons.push('Historically ' + s.acc.winRate + '% win-rate for this remark (n=' + s.acc.samples + ')');
+        if (s.acc.avgMove != null) {
+            reasons.push('<b>Avg move to EOD when this fires: ' + (s.acc.avgMove >= 0 ? '+' : '') + s.acc.avgMove.toFixed(2)
+                + (s.acc.avgMovePct != null ? ' (' + (s.acc.avgMovePct >= 0 ? '+' : '') + s.acc.avgMovePct.toFixed(2) + '%)' : '') + '</b>'
+                + (s.acc.avgMove < 0 ? ' — historically this remark has NOT followed through by EOD, be cautious' : ''));
+        }
+    }
+    return '<div style="font-size:0.5rem;">'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">'
+        +   '<span style="font-weight:800;color:' + typeCol + ';">' + typeLabel + '</span>'
+        +   '<span style="font-weight:900;font-family:var(--gtb-mono);color:' + probCol + ';">' + s.probability + '%</span>'
+        + '</div>'
+        + '<div style="position:relative;height:5px;background:var(--gtb-border);margin-bottom:5px;">'
+        +   '<div style="height:5px;width:' + s.probability + '%;background:' + probCol + ';"></div>'
+        + '</div>'
+        + '<ul style="margin:0;padding-left:14px;color:var(--gtb-muted);">' + reasons.map(function (r) { return '<li>' + r + '</li>'; }).join('') + '</ul>'
+        + '</div>';
+}
+
+// Toast + beep the instant a NEW short-covering/long-unwinding remark starts firing — same
+// active-alert dedup pattern _svCheckWallProximityAlerts already uses for wall-proximity
+// alerts (a module-level "currently active" set, only alerting on the transition into
+// active, then clearing the key once the remark stops firing so a later re-entry alerts
+// again instead of firing once and going silent for the rest of the day).
+var _GTB_ACTIVE_SC_ALERTS = {};
+function _gtbCheckShortCoveringAlerts(rows) {
+    var seenKeys = {};
+    rows.forEach(function (r) {
+        var key = r.name + '|' + r.s.type;
+        seenKeys[key] = true;
+        if (!_GTB_ACTIVE_SC_ALERTS[key]) {
+            _GTB_ACTIVE_SC_ALERTS[key] = true;
+            var typeLabel = r.s.type === 'SHORT_COVERING' ? 'Short Covering' : 'Long Unwinding';
+            var toastType = r.s.type === 'SHORT_COVERING' ? 'success' : 'error';
+            _gtbToast(r.name + ' — ' + typeLabel + ' (' + r.s.probability + '%)' + (r.s.nearExpiry ? ', ' + r.s.daysToExpiry + 'd to expiry' : ''), toastType);
+            try { _svBeep(); } catch (e) {}
+        }
+    });
+    // Clear alerts for remarks that are no longer active, so a later re-entry alerts again.
+    Object.keys(_GTB_ACTIVE_SC_ALERTS).forEach(function (key) { if (!seenKeys[key]) delete _GTB_ACTIVE_SC_ALERTS[key]; });
+}
+
+// Market-wide scan across a name list — used by the NSE Dashboard's own
+// SHORT COVERING / LONG UNWINDING card, same idea as _gtbLevelProbLiveRowsHtml: every
+// instrument gets scored with _gtbShortCoveringSignal, ranked by probability, and only the
+// ones actually showing a live squeeze (active remark) are listed, so it reads as "watch
+// these names right now" instead of a wall of "no signal" rows for a whole universe.
+function _gtbShortCoveringRowsHtmlFor(names) {
+    var seen = {};
+    names = names.filter(function (n) { return seen[n] ? false : (seen[n] = true); });
+    var rows = [];
+    names.forEach(function (name) {
+        var s; try { s = _gtbShortCoveringSignal(name); } catch (e) { s = { ok: false }; }
+        if (s.ok && s.active) rows.push({ name: name, s: s });
+    });
+    rows.sort(function (a, b) { return b.s.probability - a.s.probability; });
+    _gtbCheckShortCoveringAlerts(rows);
+    if (!rows.length) {
+        return '<div style="font-size:0.5rem;color:var(--gtb-muted);padding:4px 0;">No active short-covering/long-unwinding signal right now.</div>';
+    }
+    return '<div style="font-size:0.52rem;line-height:1.4;color:var(--gtb-muted);padding:0 0 6px;">Only instruments with an ACTIVE remark right now are listed — probability reflects expiry proximity, one-sided positioning, and this instrument\'s own historical reliability for that remark. "Exp. move" is the historical average move from fire-time to day\'s close when this exact remark has fired before, not a guarantee.</div>'
+        + rows.map(function (r) {
+            var s = r.s;
+            var typeLabel = s.type === 'SHORT_COVERING' ? 'Short Covering' : 'Long Unwinding';
+            var typeCol = s.type === 'SHORT_COVERING' ? 'var(--gtb-green)' : 'var(--gtb-red)';
+            var probCol = s.probability >= 65 ? 'var(--gtb-green)' : s.probability >= 40 ? 'var(--gtb-amber)' : 'var(--gtb-muted)';
+            var moveTxt = '—';
+            if (s.acc && s.acc.avgMove != null) {
+                var moveCol = s.acc.avgMove >= 0 ? 'var(--gtb-green)' : 'var(--gtb-red)';
+                moveTxt = '<span style="color:' + moveCol + ';font-weight:700;">' + (s.acc.avgMove >= 0 ? '+' : '') + s.acc.avgMove.toFixed(1)
+                    + (s.acc.avgMovePct != null ? ' (' + (s.acc.avgMovePct >= 0 ? '+' : '') + s.acc.avgMovePct.toFixed(2) + '%)' : '') + '</span>';
+            }
+            return '<div style="display:grid;grid-template-columns:90px 100px 1fr 90px 40px;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid var(--gtb-border)18;font-size:0.44rem;">'
+                + '<span style="color:var(--gtb-text);font-weight:700;">' + r.name + '</span>'
+                + '<span style="color:' + typeCol + ';font-weight:700;">' + typeLabel + '</span>'
+                + '<span style="color:var(--gtb-muted);">' + (s.nearExpiry ? s.daysToExpiry + 'd to expiry' : '') + (s.extremePositioning ? (s.nearExpiry ? ' &middot; ' : '') + 'one-sided PCR ' + s.pcr.toFixed(2) : '') + (s.acc ? (s.nearExpiry || s.extremePositioning ? ' &middot; ' : '') + s.acc.winRate + '% hist. win (n=' + s.acc.samples + ')' : '') + '</span>'
+                + '<span style="text-align:right;font-family:var(--gtb-mono);">' + moveTxt + '</span>'
+                + '<span style="font-weight:900;font-family:var(--gtb-mono);color:' + probCol + ';text-align:right;">' + s.probability + '%</span>'
+                + '</div>';
+        }).join('');
+}
+
+function _gtbShortCoveringLiveRowsHtml() {
+    var names = ['NIFTY 50', 'NIFTY BANK']
+        .concat(Object.keys(NIFTY_50_WEIGHTED_STOCKS || {}))
+        .concat(Object.keys(NIFTY_BANK_WEIGHTED_STOCKS || {}));
+    return _gtbShortCoveringRowsHtmlFor(names);
+}
+
 function _gtbReconstructFutAccuracy(cd, vix, accMap) {
     var intr = cd.intraday, prevDay = cd.prevDay, lot = cd.lotSize;
+    var lastClose = parseFloat(intr[intr.length - 1].close);
     for (var i = 1; i < intr.length - 1; i++) {            // need prev (momentum) and next (outcome)
         var upTo = intr.slice(0, i + 1);
         var hi = 0, lo = Infinity, vol = 0;
@@ -10072,9 +10872,17 @@ function _gtbReconstructFutAccuracy(cd, vix, accMap) {
         var dir = res.dir;
         if (dir === 0) continue;
         var realized = parseFloat(intr[i + 1].close) - parseFloat(intr[i].close);  // next 5-min move
-        var a = accMap[res.remark] || { hits: 0, total: 0, pts: 0 };
+        // Move from THIS candle to today's last available close (not just the next 5-min
+        // candle) — a genuine historical magnitude estimate for "if this remark fires, how
+        // much further does it typically go by end of day", not just direction accuracy.
+        // Signed so a positive number always means "moved further in the direction the
+        // remark implied" regardless of whether that's up (LONG/SHOT_COVERING) or down
+        // (SHORT/LONG_UNWINDING).
+        var eodMove = lastClose - parseFloat(intr[i].close);
+        var a = accMap[res.remark] || { hits: 0, total: 0, pts: 0, eodPts: 0 };
         a.total++; if ((dir > 0 && realized > 0) || (dir < 0 && realized < 0)) a.hits++;
         a.pts += (dir > 0 ? realized : -realized);
+        a.eodPts += (dir > 0 ? eodMove : -eodMove);
         accMap[res.remark] = a;
     }
 }
@@ -10480,7 +11288,7 @@ function _gtbOITableHtml(oiData, pc) {
             + '</tr>';
     });
     h += '</tbody></table>'
-        + '<div style="font-size:0.44rem;color:var(--gtb-muted);margin-top:3px;">'
+        + '<div style="font-size:0.54rem;color:var(--gtb-muted);margin-top:3px;">'
         + '<span title="Ranked by OTM call/put-writing OBV volume at that strike, not the strike\'s combined CE+PE score — a strike can have a bigger total score and still not be primary if its own OBV pressure is smaller."><b style="color:#dc3545;">R1</b>/<b style="color:#28a745;">S1</b> = primary — the strongest real resistance/support (trust this one most)</span>' + _ii('sig-oi-walls') + ' &nbsp; '
         + '<b style="color:#dc3545;opacity:0.75;">R2</b>/<b style="color:#28a745;opacity:0.75;">S2</b> = secondary — a real but weaker wall, shown only when it\'s at least 60% as strong as the primary (use with more caution) &nbsp; '
         + '(ITM) = lower-conviction, often rollover/hedging noise' + _ii('sig-oi-itm')
@@ -10751,6 +11559,7 @@ function _gtbMarketProfile(candles) {
     };
 }
 
+
 function _cmdBuildVerdict(name, oiData, priceChange, mpd) {
     // out.raw carries the exact numbers behind the labels above (composite score, wall
     // distance, order-flow agreement) — kept separate from the display strings so a
@@ -10960,7 +11769,7 @@ function _gtbShowTradeIdeas() {
         var col = part.ok === true ? 'var(--gtb-green)' : part.ok === false ? 'var(--gtb-red)' : 'var(--gtb-muted)';
         var icon = part.ok === true ? 'bi-check-circle-fill' : part.ok === false ? 'bi-x-circle-fill' : 'bi-dash-circle';
         return '<div style="color:' + col + ';font-weight:700;font-size:0.5rem;"><i class="bi ' + icon + '"></i> ' + part.label + '</div>'
-            + '<div style="color:var(--gtb-muted);font-size:0.42rem;line-height:1.4;margin-top:2px;">' + part.lines.join('<br>') + '</div>';
+            + '<div style="color:var(--gtb-muted);font-size:0.52rem;line-height:1.4;margin-top:2px;">' + part.lines.join('<br>') + '</div>';
     };
     var rows = names.map(_gtbBuildTradeIdeaRow);
     var body = '<div style="padding:8px;overflow-y:auto;height:100%;box-sizing:border-box;">'
@@ -10991,7 +11800,7 @@ function _gtbShowTradeIdeas() {
             var vCell = '<span style="color:' + v.col + ';font-weight:800;">' + v.label + '</span>'
                 + (hc ? ' <span title="High Conviction — all layers strongly agree" style="color:var(--gtb-accent);">★</span>' : '');
             if (v.trade) {
-                vCell += '<div style="font-size:0.42rem;color:var(--gtb-muted);margin-top:2px;font-family:var(--gtb-mono);">'
+                vCell += '<div style="font-size:0.52rem;color:var(--gtb-muted);margin-top:2px;font-family:var(--gtb-mono);">'
                     + 'E ' + v.trade.entry + ' · SL <span style="color:var(--gtb-red);">' + v.trade.stop + '</span> · T <span style="color:var(--gtb-green);">' + v.trade.target + '</span></div>';
             }
             return '<tr class="gtb-ti-row" data-hc="' + (hc ? '1' : '0') + '" style="border-bottom:1px solid var(--gtb-border);vertical-align:top;' + (hc ? 'background:var(--gtb-accent)0d;' : '') + '">'
@@ -11312,7 +12121,7 @@ function _cmdRenderOI(oiData, oiSel, obvSel, priceChange) {
     // Legend so the solid/faded/dimmed distinctions are self-explanatory
     var legEl = document.getElementById(oiSel.replace('#','') + '-legend');
     if (legEl) {
-        legEl.innerHTML = '<span style="color:var(--gtb-muted);font-size:0.42rem;">'
+        legEl.innerHTML = '<span style="color:var(--gtb-muted);font-size:0.52rem;">'
             + '<span title="Red/pink = CE (call) side, at any conviction level"><span style="display:inline-block;width:8px;height:8px;background:rgba(220,53,69,0.9);border-radius:1px;vertical-align:middle;"></span> Red = CE</span>'
             + '&nbsp;&nbsp;<span title="Green = PE (put) side, at any conviction level"><span style="display:inline-block;width:8px;height:8px;background:rgba(40,167,69,0.9);border-radius:1px;vertical-align:middle;"></span> Green = PE</span>'
             + '&nbsp;&nbsp;<span title="No clear signal at that strike — OI change was flat or too small to classify as WRITE/BUY/COV/UNWIND"><span style="display:inline-block;width:8px;height:8px;background:rgba(125,133,144,0.4);border-radius:1px;vertical-align:middle;"></span> Grey = Neutral</span>'
@@ -11876,13 +12685,17 @@ function _gtbLevelConfirmSideHtml(sideLabel, side, level, direction, comboKey) {
         else verdict = { text: 'Skip — most signals disagree with this call', col: 'var(--gtb-red)' };
     }
     var maxPainTxt = _gtbMaxPainInfo('NIFTY 50');
+    // Detail checklist collapsed by default — per explicit request, it was taking a lot of
+    // vertical space on the Dashboard tab; the tally + verdict + historical win-rate line
+    // stay visible as the compact summary, individual checks expand on click.
+    var detailsId = 'gtb-lc-details-' + sideLabel.replace(/[^a-zA-Z0-9]/g, '');
 
     return '<div style="flex:1;min-width:0;background:var(--gtb-surface2);border:1px solid var(--gtb-border);padding:6px 8px;">'
-        + '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px;">'
-        + '<span style="font-weight:800;font-size:0.56rem;">' + sideLabel + '</span>'
+        + '<div class="gtb-lc-toggle" data-target="' + detailsId + '" style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px;cursor:pointer;">'
+        + '<span style="font-weight:800;font-size:0.56rem;"><i class="bi bi-chevron-right gtb-lc-chevron" style="font-size:0.42rem;margin-right:3px;transition:transform 0.15s;"></i>' + sideLabel + '</span>'
         + '<span style="font-weight:800;font-size:0.56rem;color:' + tallyCol + ';">' + confirmedN + '/' + totalN + ' confirmed</span>'
         + '</div>'
-        + rows
+        + '<div id="' + detailsId + '" style="display:none;">' + rows + '</div>'
         + '<div style="margin-top:5px;padding:3px 5px;background:rgba(0,0,0,0.15);font-weight:800;font-size:0.5rem;color:' + verdict.col + ';">' + verdict.text + '</div>'
         + '<div style="margin-top:4px;padding-top:3px;border-top:1px solid var(--gtb-border);font-size:0.46rem;color:var(--gtb-muted);">'
         + (stats ? 'Historical: <b style="color:' + (stats.winPct >= 60 ? 'var(--gtb-green)' : stats.winPct <= 40 ? 'var(--gtb-red)' : 'var(--gtb-amber)') + ';">' + stats.winPct + '% win-rate</b> (' + stats.legs + ' legs) for this combo — separate context, not part of the tally above.'
@@ -11894,6 +12707,13 @@ function _gtbLevelConfirmSideHtml(sideLabel, side, level, direction, comboKey) {
 
 // Main entry — call from the Dashboard tab. Renders nothing when today's strategy is
 // Sideways/no-trade; renders one side-panel for Sell-at-ASO/AST, Buy-at-BSO/BST, or both.
+jQ(document).on('click', '.gtb-lc-toggle', function () {
+    var $target = jQ('#' + jQ(this).data('target'));
+    var willOpen = !$target.is(':visible');
+    $target.slideToggle(120);
+    jQ(this).find('.gtb-lc-chevron').css('transform', willOpen ? 'rotate(90deg)' : 'rotate(0deg)');
+});
+
 function _gtbLevelConfirmHtml() {
     try {
         var b915 = JSON.parse(localStorage.getItem('VALID_BREAKOUT_NINE_FIFTEEN') || '{}');
@@ -11970,10 +12790,11 @@ function _gtbLevelsTouchedToday(name) {
     return out;
 }
 
-function _gtbLevelProbLiveRowsHtml() {
-    var lvlNames = ['NIFTY 50', 'NIFTY BANK']
-        .concat(Object.keys(NIFTY_50_WEIGHTED_STOCKS || {}))
-        .concat(Object.keys(NIFTY_BANK_WEIGHTED_STOCKS || {}));
+// Extracted from the original NSE-only implementation so the MCX Dashboard (_gtbShowMcxDashboard)
+// can render the identical live-signal-probability list for commodities — _gtbLevelProb(name)
+// already has its own isMcx branch (v26.80), so nothing here needed to change, just the
+// hardcoded NSE name list needed to become a parameter.
+function _gtbLevelProbRowsHtmlFor(lvlNames) {
     var seenLvl = {};
     lvlNames = lvlNames.filter(function(n) { return seenLvl[n] ? false : (seenLvl[n] = true); });
 
@@ -11985,7 +12806,7 @@ function _gtbLevelProbLiveRowsHtml() {
     };
     var rowHtml = function(name, p) {
         var t; try { t = _gtbLevelsTouchedToday(name); } catch (e) { t = {}; }
-        return '<div style="display:grid;grid-template-columns:70px 1fr 1fr;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid var(--gtb-border)18;font-size:0.44rem;">'
+        return '<div style="display:grid;grid-template-columns:80px 1fr 1fr;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--gtb-border)18;font-size:0.58rem;">'
             + '<span style="color:var(--gtb-text);font-weight:700;">' + name + '</span>'
             + '<span style="color:var(--gtb-green);">' + lbl('ASO ' + p.pASO + '%', t.aso) + ' &middot; ' + lbl('AST ' + p.pAST + '%', t.ast) + ' &middot; ' + lbl('VIXU ' + p.pVIXU + '%', t.vixu) + '</span>'
             + '<span style="color:var(--gtb-red);">' + lbl('BSO ' + p.pBSO + '%', t.bso) + ' &middot; ' + lbl('BST ' + p.pBST + '%', t.bst) + ' &middot; ' + lbl('VIXL ' + p.pVIXL + '%', t.vixl) + '</span>'
@@ -12010,13 +12831,20 @@ function _gtbLevelProbLiveRowsHtml() {
         return '<div style="font-size:0.5rem;color:var(--gtb-muted);padding:4px 0;">No data yet — run a refresh</div>';
     }
     var sectionHdr = function(label, color) {
-        return '<div style="font-size:0.42rem;font-weight:800;letter-spacing:0.05em;text-transform:uppercase;color:' + color + ';padding:6px 0 3px;">' + label + '</div>';
+        return '<div style="font-size:0.54rem;font-weight:800;letter-spacing:0.05em;text-transform:uppercase;color:' + color + ';padding:6px 0 3px;">' + label + '</div>';
     };
-    return '<div style="font-size:0.4rem;color:var(--gtb-muted);padding:0 0 4px;"><b style="text-decoration:underline;">✓</b> = price has actually touched that level today (today\'s high/low vs the level), independent of the live % estimate next to it.</div>'
+    return '<div style="font-size:0.52rem;color:var(--gtb-text);opacity:0.75;padding:0 0 4px;"><b style="text-decoration:underline;">✓</b> = price has actually touched that level today (today\'s high/low vs the level), independent of the live % estimate next to it.</div>'
         + sectionHdr('ASO-leaning (' + upGroup.length + ')', 'var(--gtb-green)')
         + upGroup.map(function(r) { return rowHtml(r.name, r.p); }).join('')
         + sectionHdr('BSO-leaning (' + downGroup.length + ')', 'var(--gtb-red)')
         + downGroup.map(function(r) { return rowHtml(r.name, r.p); }).join('');
+}
+
+function _gtbLevelProbLiveRowsHtml() {
+    var lvlNames = ['NIFTY 50', 'NIFTY BANK']
+        .concat(Object.keys(NIFTY_50_WEIGHTED_STOCKS || {}))
+        .concat(Object.keys(NIFTY_BANK_WEIGHTED_STOCKS || {}));
+    return _gtbLevelProbRowsHtmlFor(lvlNames);
 }
 
 function _gtbLevelProbHtml(name) {
@@ -12032,15 +12860,15 @@ function _gtbLevelProbHtml(name) {
     var up = 'var(--gtb-green)', dn = 'var(--gtb-red)';
     return '<div style="display:flex;gap:10px;">'
         + '<div style="flex:1;">'
-        +   '<div style="font-size:0.42rem;font-weight:700;color:var(--gtb-muted);text-transform:uppercase;margin-bottom:3px;">Upside (today)</div>'
+        +   '<div style="font-size:0.52rem;font-weight:700;color:var(--gtb-muted);text-transform:uppercase;margin-bottom:3px;">Upside (today)</div>'
         +   _bar('ASO', p.pASO, up) + _bar('AST', p.pAST, up) + _bar('VIXU', p.pVIXU, up)
         + '</div>'
         + '<div style="flex:1;">'
-        +   '<div style="font-size:0.42rem;font-weight:700;color:var(--gtb-muted);text-transform:uppercase;margin-bottom:3px;">Downside (today)</div>'
+        +   '<div style="font-size:0.52rem;font-weight:700;color:var(--gtb-muted);text-transform:uppercase;margin-bottom:3px;">Downside (today)</div>'
         +   _bar('BSO', p.pBSO, dn) + _bar('BST', p.pBST, dn) + _bar('VIXL', p.pVIXL, dn)
         + '</div>'
         + '</div>'
-        + '<div style="font-size:0.42rem;color:var(--gtb-muted);margin-top:3px;">Live-signal likelihood (score + OBV flow + OI wall pressure + VIX-range room used) — a reasoned estimate, not a statistically fitted probability.</div>';
+        + '<div style="font-size:0.52rem;color:var(--gtb-muted);margin-top:3px;">Live-signal likelihood (score + OBV flow + OI wall pressure + VIX-range room used) — a reasoned estimate, not a statistically fitted probability.</div>';
 }
 
 // ── Level Probability history (5-min interval snapshots) ─────────────────────
@@ -12495,14 +13323,24 @@ function _cmdMeta(name) {
 // every OTHER commodity in this popup (GOLDM/SILVERM/NATGASMINI/USDINR) fell through to its
 // NSE-futures branch and returned null — the token was never actually missing from the
 // list, just never being looked up in the right list for these names.
+// Was MCX-only (looked up name only in COMMODITIES_FUTURE_INSTRUMENT_LIST) — fine for its
+// original caller (the Commodities popup, always MCX), but reusing it for the Instrument
+// Detail View's identity link (any name, MCX or NSE/BSE) meant a plain NSE/BSE name like
+// LODHA never matched, silently building a URL with an empty token. Now checks the MCX list
+// first (unchanged behavior for commodities), falling back to INSTRUMENT_TOKENS + the correct
+// NSE/BSE exchange for everything else.
 function _cmdChartLink(name) {
     try {
-        var exch = (typeof _qwExchangeFor === 'function') ? _qwExchangeFor(name) : 'MCX';
-        var entry = (typeof COMMODITIES_FUTURE_INSTRUMENT_LIST !== 'undefined')
+        var mcxEntry = (typeof COMMODITIES_FUTURE_INSTRUMENT_LIST !== 'undefined')
             ? COMMODITIES_FUTURE_INSTRUMENT_LIST.find(function (r) { return r.name === name; })
             : null;
-        var token = entry ? entry.instrument_token : '';
-        return 'https://kite.zerodha.com/markets/ext/chart/web/tvc/' + exch + '/' + name + '/' + token;
+        if (mcxEntry) {
+            var mcxExch = (typeof _qwExchangeFor === 'function') ? _qwExchangeFor(name) : 'MCX';
+            return 'https://kite.zerodha.com/markets/ext/chart/web/tvc/' + mcxExch + '/' + name + '/' + mcxEntry.instrument_token;
+        }
+        var exch = (name === 'SENSEX') ? 'BSE' : 'NSE';
+        var token = (typeof INSTRUMENT_TOKENS !== 'undefined') ? INSTRUMENT_TOKENS[name] : '';
+        return 'https://kite.zerodha.com/markets/ext/chart/web/tvc/' + exch + '/' + encodeURIComponent(name) + '/' + (token || '');
     } catch (e) { return '#'; }
 }
 
@@ -12571,6 +13409,7 @@ jQ(document).on('click', '#show-commodities', function (e) {
         +         '<div id="cmd-crude-chart"  style="height:240px;"></div>'
         +       '</div>'
         +       '<div id="cmd-crude-global" class="cmd-card" style="margin-top:8px;"></div>'
+        +       '<div id="cmd-curve-structure" class="cmd-card" style="margin-top:8px;"></div>'
         +       '<div id="cmd-gift-crude-corr" class="cmd-card" style="margin-top:8px;"></div>'
         // Prediction — same per-instrument model used in Stock Viewer / Instrument Detail
         // View (MCX-aware: strike levels + OVX-based VIXU/VIXL come from strikeMap/.open,
@@ -12622,7 +13461,7 @@ jQ(document).on('click', '#show-commodities', function (e) {
         +       '</div>'
         +     '</div>' // end cmd-panel-oi
 
-        // ── Analysis: futures remark accuracy, trade recommender, global context (crude) ──
+        // ── Analysis: futures remark accuracy, trade recommender ──────────────────────
         +     '<div id="cmd-panel-analysis" class="cmd-panel">'
         +       '<div class="cmd-grid2">'
         +         '<div class="cmd-card">'
@@ -12845,6 +13684,118 @@ jQ(document).on('click', '#show-commodities', function (e) {
     // "live" branch below was dead in practice and always fell through to manual entry.
     function _cmdFetchLiveUsdInr() { return _cmdFetchYahooQuote('USDINR=X'); }
 
+    // ── Curve Structure (contango/backwardation) ────────────────────────────────────
+    // Compares the NEAR and NEXT MCX futures contract for the active commodity — the one
+    // input from the earlier "how does Bloomberg trade commodities" discussion that can
+    // independently suggest a direction (not just confirm/veto another signal): near month
+    // priced ABOVE the far month (backwardation) implies physical urgency/tightness →
+    // bullish lean for the near contract you actually trade; near BELOW far (contango,
+    // the normal/storage-cost state) → no urgency, neutral-to-bearish lean, and a bad
+    // backdrop to trust an aggressive long in.
+    //
+    // Needs MCX_FUT_CURVE (constants-commodities.js, populated by dataLoad.js) — the full
+    // multi-expiry list per commodity, since COMMODITIES_FUTURE_INSTRUMENT_LIST only ever
+    // carries the single resolved "current" contract. Kite's instrument dump only ever lists
+    // currently-active contracts (same hard limitation documented in fetch/futures_lookup.py
+    // for the ML research side) — most MCX minis (CRUDEOILM/GOLDM/SILVERM) commonly list
+    // just ONE active contract at a time, so "no second contract yet" is an expected, not
+    // broken, result for those — this feature will mostly be usable on the non-mini
+    // contracts (CRUDEOIL/GOLD/SILVER) when Kite is listing more than one expiry.
+    async function _cmdLoadCurveStructure() {
+        jQ('#cmd-curve-structure').html('<div class="cmd-st"><i class="bi bi-graph-up-arrow"></i> CURVE STRUCTURE' + _ii('cmd-curve') + '</div><div class="cmd-load"><i class="bi bi-hourglass-split"></i> Loading contract curve…</div>');
+        try {
+            var curve = (typeof MCX_FUT_CURVE !== 'undefined' ? MCX_FUT_CURVE[_cmdName] : null) || [];
+            if (curve.length < 2) {
+                jQ('#cmd-curve-structure').html(
+                    '<div class="cmd-st"><i class="bi bi-graph-up-arrow"></i> CURVE STRUCTURE' + _ii('cmd-curve') + '</div>'
+                    + '<div style="padding:6px;color:var(--gtb-muted);font-size:0.46rem;">Kite is only listing ' + curve.length + ' active contract' + (curve.length === 1 ? '' : 's') + ' for ' + _cmdMeta(_cmdName).label + ' right now — no second (far-month) contract to compare against. Kite\'s instrument list only ever carries currently-active contracts, so this is expected for mini contracts most of the time; try the full-size contract or check back closer to expiry rollover.</div>'
+                );
+                return;
+            }
+            var near = curve[0], far = curve[1];
+            var from = moment().subtract(10, 'days').format('YYYY-MM-DD');
+            var to = moment().format('YYYY-MM-DD');
+            var results = await Promise.all([
+                getHistoricalDataUsingPromise(near.token, from, to, 'day'),
+                getHistoricalDataUsingPromise(far.token, from, to, 'day'),
+            ]);
+            var nearCandles = results[0] && results[0].data && results[0].data.candles;
+            var farCandles  = results[1] && results[1].data && results[1].data.candles;
+            if (!nearCandles || !nearCandles.length || !farCandles || !farCandles.length) {
+                jQ('#cmd-curve-structure').html(
+                    '<div class="cmd-st"><i class="bi bi-graph-up-arrow"></i> CURVE STRUCTURE' + _ii('cmd-curve') + '</div>'
+                    + '<div style="padding:6px;color:var(--gtb-red);font-size:0.46rem;">No candle data for one or both contracts.</div>'
+                );
+                return;
+            }
+            var nearLtp = parseFloat(nearCandles[nearCandles.length - 1][4]);
+            var farLtp  = parseFloat(farCandles[farCandles.length - 1][4]);
+            var diffPct = nearLtp ? ((farLtp - nearLtp) / nearLtp * 100) : 0;
+            // Annualized rate — normalizes the gap by how far apart the two expiries actually
+            // are, so a 0.3% gap between contracts 2 weeks apart (steep) doesn't look the same
+            // as a 0.3% gap between contracts 4 months apart (shallow, just normal carry cost).
+            var daysGap = Math.max(1, moment(far.expiry).diff(moment(near.expiry), 'days'));
+            var annualizedPct = diffPct * (365 / daysGap);
+
+            var state, stateCol, lean, leanCol, leanNote;
+            if (diffPct > 0.05) {
+                state = 'CONTANGO'; stateCol = 'var(--gtb-muted)';
+            } else if (diffPct < -0.05) {
+                state = 'BACKWARDATION'; stateCol = 'var(--gtb-amber)';
+            } else {
+                state = 'FLAT'; stateCol = 'var(--gtb-muted)';
+            }
+            // Thresholds on the ANNUALIZED rate (comparable across different expiry gaps) —
+            // a mild contango is the normal storage-cost baseline, so only a meaningfully
+            // negative (backwardated) or steep contango annualized rate gets a directional
+            // lean; anything in between is genuinely neutral, not a weak signal either way.
+            if (annualizedPct < -3) {
+                lean = 'BULLISH LEAN'; leanCol = 'var(--gtb-green)';
+                leanNote = 'Backwardated — near contract trading at a premium to far month, consistent with physical tightness/urgency for ' + _cmdMeta(_cmdName).label + '.';
+            } else if (annualizedPct > 8) {
+                lean = 'BEARISH / CAUTION'; leanCol = 'var(--gtb-red)';
+                leanNote = 'Steep contango — far month priced well above near, consistent with ample supply/no urgency. A weak backdrop to trust an aggressive long in.';
+            } else {
+                lean = 'NEUTRAL'; leanCol = 'var(--gtb-muted)';
+                leanNote = 'Within normal carry-cost range for a ' + daysGap + '-day gap — not a directional signal on its own.';
+            }
+
+            // Cache for Master Consensus (sync engine, reads this instead of re-fetching).
+            var curveDir = annualizedPct < -3 ? 1 : annualizedPct > 8 ? -1 : 0;
+            if (!INSTRUMENT_SCORE_MAP[_cmdName]) INSTRUMENT_SCORE_MAP[_cmdName] = {};
+            INSTRUMENT_SCORE_MAP[_cmdName].curveState = { state: state, diffPct: diffPct, annualizedPct: annualizedPct, lean: lean, dir: curveDir, ts: Date.now() };
+
+            jQ('#cmd-curve-structure').html(
+                '<div class="cmd-st"><i class="bi bi-graph-up-arrow"></i> CURVE STRUCTURE' + _ii('cmd-curve') + '</div>'
+                + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;font-size:0.46rem;">'
+                +   '<div><div style="color:var(--gtb-muted);">NEAR — ' + near.tradingsymbol + ' (exp ' + near.expiry + ')</div><div style="font-family:var(--gtb-mono);font-weight:800;font-size:0.62rem;">' + nearLtp.toLocaleString('en-IN') + '</div></div>'
+                +   '<div><div style="color:var(--gtb-muted);">FAR — ' + far.tradingsymbol + ' (exp ' + far.expiry + ')</div><div style="font-family:var(--gtb-mono);font-weight:800;font-size:0.62rem;">' + farLtp.toLocaleString('en-IN') + '</div></div>'
+                + '</div>'
+                + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:8px;">'
+                +   '<div style="background:var(--gtb-bg);border:1px solid var(--gtb-border);padding:6px;text-align:center;">'
+                +     '<div style="color:var(--gtb-muted);font-size:0.4rem;">STATE</div>'
+                +     '<div style="font-weight:800;color:' + stateCol + ';font-size:0.56rem;">' + state + '</div>'
+                +   '</div>'
+                +   '<div style="background:var(--gtb-bg);border:1px solid var(--gtb-border);padding:6px;text-align:center;">'
+                +     '<div style="color:var(--gtb-muted);font-size:0.4rem;">GAP (RAW)</div>'
+                +     '<div style="font-weight:800;font-family:var(--gtb-mono);font-size:0.56rem;">' + (diffPct >= 0 ? '+' : '') + diffPct.toFixed(2) + '%</div>'
+                +   '</div>'
+                +   '<div style="background:var(--gtb-bg);border:1px solid var(--gtb-border);padding:6px;text-align:center;">'
+                +     '<div style="color:var(--gtb-muted);font-size:0.4rem;">GAP (ANNUALIZED)</div>'
+                +     '<div style="font-weight:800;font-family:var(--gtb-mono);font-size:0.56rem;">' + (annualizedPct >= 0 ? '+' : '') + annualizedPct.toFixed(1) + '%</div>'
+                +   '</div>'
+                + '</div>'
+                + '<div style="background:' + leanCol + '18;outline:1px solid ' + leanCol + '44;padding:6px;">'
+                +   '<div style="font-weight:800;color:' + leanCol + ';font-size:0.56rem;margin-bottom:2px;">' + lean + '</div>'
+                +   '<div style="color:var(--gtb-muted);font-size:0.54rem;">' + leanNote + '</div>'
+                + '</div>'
+            );
+        } catch (e) {
+            jQ('#cmd-curve-structure').html('<div class="cmd-st"><i class="bi bi-graph-up-arrow"></i> CURVE STRUCTURE' + _ii('cmd-curve') + '</div><div style="padding:6px;color:var(--gtb-red);font-size:0.46rem;">Error loading curve structure.</div>');
+            console.log('_cmdLoadCurveStructure', e);
+        }
+    }
+
     function _cmdRenderGlobalContext() {
         // WTI fair-value cross-check is crude-specific (MCX Crude Oil's contract spec
         // settles against NYMEX WTI) — there's no equivalent single global benchmark wired
@@ -12954,7 +13905,7 @@ jQ(document).on('click', '#show-commodities', function (e) {
             // Header
             + '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">'
             +   '<i class="bi bi-globe2" style="color:var(--gtb-blue);"></i>'
-            +   '<span style="font-weight:800;letter-spacing:0.04em;color:var(--gtb-muted);font-size:0.42rem;">GLOBAL CONTEXT' + _ii('cmdglobal') + '</span>'
+            +   '<span style="font-weight:800;letter-spacing:0.04em;color:var(--gtb-muted);font-size:0.52rem;">GLOBAL CONTEXT' + _ii('cmdglobal') + '</span>'
             +   '<button id="cmd-wti-fetch-live" style="margin-left:auto;background:var(--gtb-bg);border:1px solid var(--gtb-border);color:var(--gtb-text);'
             +     'padding:2px 6px;font-size:0.4rem;cursor:pointer;"><i class="bi bi-cloud-download"></i> Fetch Live (WTI + USD/INR)</button>'
             + '</div>'
@@ -12985,20 +13936,20 @@ jQ(document).on('click', '#show-commodities', function (e) {
             // replaced was easy to miss next to the bordered/colored session-alert chips above it)
             + '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:8px;">'
             +   '<div style="padding:6px 8px;background:var(--gtb-bg);border:1px solid var(--gtb-border);">'
-            +     '<div style="color:var(--gtb-muted);font-size:0.42rem;letter-spacing:0.04em;text-transform:uppercase;margin-bottom:2px;">USD/INR</div>'
+            +     '<div style="color:var(--gtb-muted);font-size:0.52rem;letter-spacing:0.04em;text-transform:uppercase;margin-bottom:2px;">USD/INR</div>'
             +     '<div style="font-family:var(--gtb-mono);font-size:0.85rem;font-weight:800;color:' + (usdInrStale ? 'var(--gtb-red)' : 'var(--gtb-text)') + ';line-height:1.1;">' + (usdInr ? _fmtRate(usdInr) : '—') + '</div>'
-            +     (usdInrLive ? '<div style="color:var(--gtb-green);font-size:0.42rem;margin-top:1px;">● live</div>' : usdInrStale ? '<div style="color:var(--gtb-red);font-size:0.42rem;margin-top:1px;">⚠ stale — update below</div>' : '<div style="color:var(--gtb-muted);font-size:0.42rem;margin-top:1px;">manual</div>')
+            +     (usdInrLive ? '<div style="color:var(--gtb-green);font-size:0.42rem;margin-top:1px;">● live</div>' : usdInrStale ? '<div style="color:var(--gtb-red);font-size:0.42rem;margin-top:1px;">⚠ stale — update below</div>' : '<div style="color:var(--gtb-muted);font-size:0.52rem;margin-top:1px;">manual</div>')
             +   '</div>'
             +   '<div style="padding:6px 8px;background:var(--gtb-bg);border:1px solid var(--gtb-border);">'
-            +     '<div style="color:var(--gtb-muted);font-size:0.42rem;letter-spacing:0.04em;text-transform:uppercase;margin-bottom:2px;">Fair Value</div>'
+            +     '<div style="color:var(--gtb-muted);font-size:0.52rem;letter-spacing:0.04em;text-transform:uppercase;margin-bottom:2px;">Fair Value</div>'
             +     '<div style="font-family:var(--gtb-mono);font-size:0.85rem;font-weight:800;color:var(--gtb-text);line-height:1.1;">' + (fairVal ? '₹' + fairVal.toLocaleString('en-IN') : '—') + '</div>'
             +   '</div>'
             +   '<div style="padding:6px 8px;background:var(--gtb-bg);border:1px solid var(--gtb-border);">'
-            +     '<div style="color:var(--gtb-muted);font-size:0.42rem;letter-spacing:0.04em;text-transform:uppercase;margin-bottom:2px;">MCX LTP</div>'
+            +     '<div style="color:var(--gtb-muted);font-size:0.52rem;letter-spacing:0.04em;text-transform:uppercase;margin-bottom:2px;">MCX LTP</div>'
             +     '<div style="font-family:var(--gtb-mono);font-size:0.85rem;font-weight:800;color:var(--gtb-text);line-height:1.1;">' + (mcxLtp ? '₹' + mcxLtp.toLocaleString('en-IN') : '—') + '</div>'
             +   '</div>'
             +   '<div style="padding:6px 8px;background:var(--gtb-bg);border:1px solid ' + gapCol + ';border-left-width:3px;">'
-            +     '<div style="color:var(--gtb-muted);font-size:0.42rem;letter-spacing:0.04em;text-transform:uppercase;margin-bottom:2px;">Gap</div>'
+            +     '<div style="color:var(--gtb-muted);font-size:0.52rem;letter-spacing:0.04em;text-transform:uppercase;margin-bottom:2px;">Gap</div>'
             +     '<div style="font-family:var(--gtb-mono);font-size:0.85rem;font-weight:800;color:' + gapCol + ';line-height:1.1;">' + _fmtPct(gap) + '</div>'
             +     (gap !== null && Math.abs(gap) > 1 ? '<div style="color:' + gapCol + ';font-size:0.42rem;margin-top:1px;">' + (gap > 0 ? '↓ reversion risk' : '↑ catch-up') + '</div>' : '')
             +   '</div>'
@@ -13133,6 +14084,9 @@ jQ(document).on('click', '#show-commodities', function (e) {
         }
         // Re-render global context now that MCX data is loaded (LTP available from generateTrend)
         try { _cmdRenderGlobalContext(); } catch(_gce) {}
+        // Curve structure — independent of MCX LTP above, fetches its own near/far contract
+        // candles; fire-and-forget so it doesn't block the rest of this refresh cycle.
+        try { _cmdLoadCurveStructure(); } catch(_cse) {}
         // Re-render the top meta bar's LTP chip now that .mcxLtp is fresh from the fetch
         // above — the earlier call (before this function ran) only had last cycle's value.
         try { _cmdRenderCrudeMeta(); } catch(_cme) {}
@@ -13161,7 +14115,7 @@ jQ(document).on('click', '#show-commodities', function (e) {
                         + '<div><span style="color:var(--gtb-muted);font-size:0.4rem;">DISTANCE</span><br><b style="color:'+_mdc+';font-family:var(--gtb-mono);">'+((_mpd.maxPainDist>0?'+':'')+_mpd.maxPainDist.toFixed(0)+' ('+((_mpd.maxPainPct>0?'+':'')+_mpd.maxPainPct.toFixed(1))+'%)')+'</b></div>'
                         + '<div><span style="color:var(--gtb-muted);font-size:0.4rem;">NET GEX</span><br><b style="color:'+_mgc+';font-family:var(--gtb-mono);">'+(_mpd.netGEX>0?'+':'')+_mpd.netGEX.toFixed(0)+'</b> <span style="color:'+_mgc+';">'+(_mpd.netGEX>0?'Stabilising':'Trending')+'</span></div>'
                         + '<div><span style="color:var(--gtb-muted);font-size:0.4rem;">FLIP ZONES</span><br>'+_mfHtml+'</div>'
-                        + '<div style="grid-column:1/-1;"><span style="color:var(--gtb-muted);font-size:0.4rem;">OUTCOME</span><br><b style="color:'+_moc.color+';">'+_moc.label+'</b><div style="font-size:0.42rem;color:var(--gtb-muted);margin-top:3px;line-height:1.4;">'+_moc.reason+'</div></div>'
+                        + '<div style="grid-column:1/-1;"><span style="color:var(--gtb-muted);font-size:0.4rem;">OUTCOME</span><br><b style="color:'+_moc.color+';">'+_moc.label+'</b><div style="font-size:0.52rem;color:var(--gtb-muted);margin-top:3px;line-height:1.4;">'+_moc.reason+'</div></div>'
                         + '</div>'
                         + _gtbMaxPainGEXHtml(_cmdName, false);
                     jQ('#cmd-crude-mpgex').html(_mSummary);
@@ -13353,10 +14307,10 @@ function _cmdRenderGiftCrudeCorrPlaceholder() {
     el.innerHTML = '<div style="padding:6px;background:var(--gtb-surface);border:1px solid var(--gtb-border);font-size:0.48rem;">'
         + '<div style="display:flex;align-items:center;gap:6px;">'
         + '<i class="bi bi-diagram-3-fill" style="color:var(--gtb-blue);"></i>'
-        + '<span style="font-weight:800;letter-spacing:0.04em;color:var(--gtb-muted);font-size:0.42rem;">GIFT NIFTY &harr; CRUDE CORRELATION</span>'
+        + '<span style="font-weight:800;letter-spacing:0.04em;color:var(--gtb-muted);font-size:0.52rem;">GIFT NIFTY &harr; CRUDE CORRELATION</span>'
         + '<button id="cmd-gift-crude-corr-btn" style="margin-left:auto;background:var(--gtb-bg);border:1px solid var(--gtb-border);color:var(--gtb-text);padding:2px 6px;font-size:0.4rem;cursor:pointer;"><i class="bi bi-play-fill"></i> Check (120 trading days)</button>'
         + '</div>'
-        + '<div style="color:var(--gtb-muted);font-size:0.42rem;margin-top:4px;">Verifies the observed "GIFT down &rarr; crude up" pattern against real daily closes before treating it as a signal.</div>'
+        + '<div style="color:var(--gtb-muted);font-size:0.52rem;margin-top:4px;">Verifies the observed "GIFT down &rarr; crude up" pattern against real daily closes before treating it as a signal.</div>'
         + '</div>';
 }
 
@@ -13449,11 +14403,11 @@ function _cmdRenderGiftCrudeCorrResult(result) {
     el.innerHTML = '<div style="padding:6px;background:var(--gtb-surface);border:1px solid var(--gtb-border);font-size:0.48rem;">'
         + '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">'
         + '<i class="bi bi-diagram-3-fill" style="color:var(--gtb-blue);"></i>'
-        + '<span style="font-weight:800;letter-spacing:0.04em;color:var(--gtb-muted);font-size:0.42rem;">GIFT NIFTY &harr; CRUDE CORRELATION</span>'
+        + '<span style="font-weight:800;letter-spacing:0.04em;color:var(--gtb-muted);font-size:0.52rem;">GIFT NIFTY &harr; CRUDE CORRELATION</span>'
         + '<button id="cmd-gift-crude-corr-btn" style="margin-left:auto;background:var(--gtb-bg);border:1px solid var(--gtb-border);color:var(--gtb-text);padding:2px 6px;font-size:0.4rem;cursor:pointer;"><i class="bi bi-arrow-clockwise"></i> Recheck</button>'
         + '</div>'
         + '<div style="font-weight:800;font-size:0.6rem;color:' + col + ';margin-bottom:3px;">' + verdict + '</div>'
-        + '<div style="color:var(--gtb-muted);font-size:0.42rem;">Based on ' + result.n + ' trading-day pairs. Opposite-direction days: ' + result.disagree + '/' + result.n + ' (' + result.invPct + '%) — same-direction days: ' + result.agree + '/' + result.n + '.</div>'
+        + '<div style="color:var(--gtb-muted);font-size:0.52rem;">Based on ' + result.n + ' trading-day pairs. Opposite-direction days: ' + result.disagree + '/' + result.n + ' (' + result.invPct + '%) — same-direction days: ' + result.agree + '/' + result.n + '.</div>'
         + '</div>';
 }
 
@@ -14196,6 +15150,70 @@ function _svComputePrediction(name, suffix) {
     };
 }
 
+// ── Weighted Trend Confirmation ──────────────────────────────────────────────────────────
+// Same aggregation Component Score already uses — weight% × computeInstrumentScore().total,
+// summed and divided by covered weight — surfaced here as its OWN readable verdict (lean
+// label + split bar + ranked top drivers) instead of being silently folded into the
+// composite SCORE total with no standalone display. Originally this weighted each stock's
+// clamped Predict-card probability instead of its raw score, but that probability is itself
+// derived from the same score components squashed through a ±88%-capped sigmoid-like curve —
+// aggregating the clamped version flattens the real gap between a strongly vs. moderately
+// convicted stock. Raw score preserves that gap.
+function _gtbWeightedTrendConfirmation(indexName) {
+    var wMap = indexName === 'NIFTY 50' ? NIFTY_50_WEIGHTED_STOCKS : NIFTY_BANK_WEIGHTED_STOCKS;
+    var names = Object.keys(wMap || {});
+    var totalW = 0, weightedScore = 0, rows = [];
+    names.forEach(function (name) {
+        var w = parseFloat(wMap[name]) || 0;
+        if (!w) return;
+        var cs; try { cs = computeInstrumentScore(name); } catch (e) { cs = null; }
+        if (!cs || cs.total == null) return;
+        totalW += w;
+        weightedScore += w * cs.total;
+        rows.push({ name: name, weight: w, score: cs.total });
+    });
+    if (!totalW) return null;
+    var netScore = weightedScore / totalW; // weighted-average raw score, same units/scale as Component Score
+    // Drivers = biggest weight×|score| contributors, not just biggest weight or biggest score
+    // alone — a huge stock sitting near-flat shouldn't rank above a smaller mover with real
+    // conviction, and vice versa.
+    rows.sort(function (a, b) { return Math.abs(b.weight * b.score) - Math.abs(a.weight * a.score); });
+    return { indexName: indexName, netScore: netScore, rows: rows, totalW: totalW };
+}
+
+function _gtbWeightedTrendConfirmationHtml(indexName) {
+    var d = _gtbWeightedTrendConfirmation(indexName);
+    if (!d) return '<div style="font-size:0.5rem;color:var(--gtb-muted);padding:4px 0;">No score data yet — run a refresh.</div>';
+    var leanCol = d.netScore > 4 ? 'var(--gtb-green)' : d.netScore < -4 ? 'var(--gtb-red)' : 'var(--gtb-amber)';
+    var leanLabel = d.netScore > 8 ? 'STRONG BULLISH LEAN' : d.netScore > 4 ? 'BULLISH LEAN'
+        : d.netScore < -8 ? 'STRONG BEARISH LEAN' : d.netScore < -4 ? 'BEARISH LEAN' : 'NEUTRAL / MIXED';
+    // Visual split bar — netScore has no fixed max, so scale it against ±10 (this app's own
+    // established gauge scale, see the composite SCORE thresholds: red<0, orange 0-4,
+    // yellow 4-8, green≥8) purely for the bar's proportions, not as a probability.
+    var bullPct = Math.max(0, Math.min(100, 50 + d.netScore * 5));
+    var bearPct = 100 - bullPct;
+    var top = d.rows.slice(0, 4);
+    return '<div style="font-size:0.5rem;">'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">'
+        +   '<span style="font-weight:800;color:' + leanCol + ';">' + leanLabel + '</span>'
+        +   '<span style="font-weight:900;font-family:var(--gtb-mono);color:' + leanCol + ';">' + (d.netScore >= 0 ? '+' : '') + d.netScore.toFixed(2) + '</span>'
+        + '</div>'
+        + '<div style="position:relative;height:6px;background:var(--gtb-border);margin-bottom:6px;">'
+        +   '<div style="position:absolute;top:0;left:0;height:6px;width:' + bullPct.toFixed(1) + '%;background:var(--gtb-green);"></div>'
+        +   '<div style="position:absolute;top:0;right:0;height:6px;width:' + bearPct.toFixed(1) + '%;background:var(--gtb-red);"></div>'
+        + '</div>'
+        + '<div style="color:var(--gtb-muted);font-size:0.52rem;margin-bottom:4px;">Weighted-average score ' + (d.netScore >= 0 ? '+' : '') + d.netScore.toFixed(2) + ' (across ' + d.rows.length + ' components, ' + d.totalW.toFixed(0) + '% index weight covered)</div>'
+        + '<div style="color:var(--gtb-muted);font-size:0.52rem;font-weight:700;margin-bottom:2px;">TOP DRIVERS</div>'
+        + top.map(function (r) {
+            var rc = r.score > 0 ? 'var(--gtb-green)' : r.score < 0 ? 'var(--gtb-red)' : 'var(--gtb-muted)';
+            return '<div style="display:flex;justify-content:space-between;font-size:0.44rem;padding:1px 0;">'
+                + '<span style="font-weight:700;">' + r.name + ' <span style="color:var(--gtb-muted);font-weight:400;">(' + r.weight.toFixed(1) + '%)</span></span>'
+                + '<span style="color:' + rc + ';font-family:var(--gtb-mono);">' + (r.score >= 0 ? '+' : '') + r.score.toFixed(2) + '</span>'
+                + '</div>';
+        }).join('')
+        + '</div>';
+}
+
 function _svBuildPrediction(name, sfx) {
     var d = _svComputePrediction(name, sfx);
     var zone915 = d.zone915, nudges = d.nudges, cs = d.cs, sm = d.sm, isMcx = d.isMcx;
@@ -14355,7 +15373,7 @@ function _svPredictCompactHtml(name, suffix) {
     return '<div class="sv-predict-compact" data-name="' + name + '" data-sfx="' + (suffix || '') + '" data-confidence="' + d.confidence + '" title="Click for full prediction" style="cursor:pointer;padding:4px 6px;display:flex;flex-direction:column;gap:3px;height:100%;justify-content:center;">'
         + '<div style="display:flex;align-items:center;justify-content:space-between;gap:4px;">'
         +   '<span style="font-size:0.5rem;font-weight:900;color:' + headlineColor + ';border:1px solid ' + headlineColor + ';padding:1px 5px;border-radius:3px;white-space:nowrap;">' + d.tradeAction + '</span>'
-        +   '<span style="font-size:0.42rem;color:var(--gtb-muted);">' + (d.vixVal ? d.vixVal.toFixed(1) : '—') + '</span>'
+        +   '<span style="font-size:0.52rem;color:var(--gtb-muted);">' + (d.vixVal ? d.vixVal.toFixed(1) : '—') + '</span>'
         + '</div>'
         + '<div style="font-size:0.46rem;font-weight:800;color:' + scColor + ';">' + sc.label + ' <span style="font-family:var(--gtb-mono);">' + sc.prob + '%</span></div>'
         + '<div style="position:relative;height:5px;background:var(--gtb-border);border-radius:2px;">'
@@ -16435,8 +17453,18 @@ function showOIOBVBarChart(name, suffix, _oiDataOverride) {
         let svg = '<svg viewBox="0 0 ' + W + ' 18" width="100%" height="18" xmlns="http://www.w3.org/2000/svg" style="display:block;" preserveAspectRatio="none">';
         for (let i = 0; i < n; i++) {
             let cx = i * slotW + slotW / 2;
-            let lbl = String(strikes[i]);
-            let short = lbl.length > 5 ? lbl.slice(-4) : lbl;
+            // Was lbl.slice(-4) for anything over 5 digits — fine for NIFTY BANK-range
+            // 5-digit strikes (56000), but for 6-digit strikes (SILVER futures, ~238000)
+            // that DROPS THE LEADING digits instead of abbreviating, turning 238000/239000/
+            // 240000/241000 into the meaningless "8000/9000/0000/1000" sequence. Abbreviate
+            // with a 'k' suffix instead, which keeps every strike visually distinguishable.
+            let strikeNum = parseFloat(strikes[i]);
+            let short;
+            if (isFinite(strikeNum) && Math.abs(strikeNum) >= 100000) {
+                short = (strikeNum / 1000).toFixed(0) + 'k';
+            } else {
+                short = String(strikes[i]);
+            }
             let isAtm = (i === atmIndex);
             svg += '<text x="' + cx + '" y="13" text-anchor="middle" font-size="' + (isAtm ? '9' : '8.5') + '" '
                  + 'fill="' + (isAtm ? '#fbbf24' : '#7d8590') + '" font-weight="' + (isAtm ? '700' : '400') + '">'
@@ -16471,7 +17499,7 @@ function showOIOBVBarChart(name, suffix, _oiDataOverride) {
         signalRowHtml += '<div style="font-size:0.6rem;color:' + scoreColor + ';font-weight:700;">' + (s.score > 0 ? '+' : '') + parseFloat(s.score).toFixed(2) + '</div>';
         signalRowHtml += '</div>';
     }
-    signalRowHtml += '<div style="flex-basis:100%;font-size:0.44rem;color:var(--gtb-muted);padding:2px 0;">'
+    signalRowHtml += '<div style="flex-basis:100%;font-size:0.54rem;color:var(--gtb-muted);padding:2px 0;">'
         + '<span title="Ranked by OTM call/put-writing OBV volume at that strike, not the strike\'s combined CE+PE score."><b style="color:#dc3545;">R1</b>/<b style="color:#28a745;">S1</b> primary</span>' + _ii('sig-oi-walls') + ' &nbsp; '
         + '<b style="color:#dc3545;opacity:0.75;">R2</b>/<b style="color:#28a745;opacity:0.75;">S2</b> secondary &nbsp; (ITM) = lower conviction' + _ii('sig-oi-itm')
         + '</div>';
@@ -17307,6 +18335,8 @@ async function showAdvacenDeclineScanner() {
     let allTotal = allAdvances + allDeclines;
     ALL_ADVANCE_DECLINE_SCORE = allTotal > 0
         ? parseFloat(((allAdvances - allDeclines) / allTotal).toFixed(2)) : 0;
+    ALL_ADVANCE_DECLINE_SAMPLE = allTotal;
+    ALL_ADVANCE_DECLINE_UNIVERSE = activeScanList.length;
 
     let niftyTotal = allNiftyAdvances + allNiftyDeclines;
     NIFTY_50_ADVANCE_DECLINE_SCORE = niftyTotal > 0
@@ -17340,7 +18370,7 @@ async function showAdvacenDeclineScanner() {
             var openDetails = JSON.parse(localStorage.getItem('INSTRUMENT_LIST_GLOBAL') || '{}');
 
             function _countAD(list) {
-                var adv = 0, dec = 0;
+                var adv = 0, dec = 0, advNames = [], decNames = [], neutralNames = [];
                 for (var i = 0; i < list.length; i++) {
                     var sym = list[i];
                     var ltp = ltpPrices[sym] && ltpPrices[sym].ltp ? parseFloat(ltpPrices[sym].ltp) : null;
@@ -17350,10 +18380,11 @@ async function showAdvacenDeclineScanner() {
                     var sd = getStrikeDetails({ price: open }, sym);
                     var aso = parseFloat(sd.ustrikeOne);
                     var bso = parseFloat(sd.bstrikeOne);
-                    if (ltp >= aso) adv++;
-                    else if (ltp <= bso) dec++;
+                    if (ltp >= aso) { adv++; advNames.push({ name: sym, ltp: ltp, level: aso }); }
+                    else if (ltp <= bso) { dec++; decNames.push({ name: sym, ltp: ltp, level: bso }); }
+                    else neutralNames.push({ name: sym, ltp: ltp, aso: aso, bso: bso });
                 }
-                return { adv: adv, dec: dec, total: list.length };
+                return { adv: adv, dec: dec, total: list.length, advNames: advNames, decNames: decNames, neutralNames: neutralNames };
             }
 
             function _adrHtml(label, r) {
@@ -17370,8 +18401,14 @@ async function showAdvacenDeclineScanner() {
                      + '<span style="color:#58a6ff;font-weight:700;margin-left:4px;">' + ratio + '</span>';
             }
 
-            jQ('#gtb-adr-n50').html(_adrHtml('N50', _countAD(NIFTY_50_LIST)));
-            jQ('#gtb-adr-bn').html(_adrHtml('BN',  _countAD(NIFTY_BANK_LIST)));
+            var _n50AD = _countAD(NIFTY_50_LIST);
+            var _bnAD  = _countAD(NIFTY_BANK_LIST);
+            // Cached so clicking the chip (see the delegated click handler right below) can
+            // show the actual stock names — same underlying breakdown _adrHtml already
+            // summarized into counts, just not thrown away this time.
+            window._GTB_AD_DETAIL = { N50: _n50AD, BN: _bnAD };
+            jQ('#gtb-adr-n50').html(_adrHtml('N50', _n50AD)).css('cursor', 'pointer').attr('title', 'Click to list the stocks').attr('data-ad-list', 'N50');
+            jQ('#gtb-adr-bn').html(_adrHtml('BN',  _bnAD)).css('cursor', 'pointer').attr('title', 'Click to list the stocks').attr('data-ad-list', 'BN');
         } catch(e) {}
     })();
     let adBN = _adCols(adVanceDeclineColumnsNiftyBank);
@@ -19036,20 +20073,248 @@ function _gtbBuildPrediction(threeCol) {
 // Constituents OI + Futures Accuracy sections — all reusing the exact same render
 // functions the source tabs use (into new -dash-suffixed containers), so this tab
 // stays in sync automatically on every refresh rather than being a static copy.
+// Small numbered circle badge — lets the Dashboard tab's cards/tiles carry an explicit
+// "check these in this order before taking a trade" sequence per user request. Dashboard-
+// tab-only by design (this function and its call sites all live in _gtbRenderDashboardPane/
+// _gtbDashboardOverviewHtml) — the same cards elsewhere (Instrument Detail View, Metrics
+// tab, Commodities popup) are untouched, since those serve different purposes and this
+// numbering is specifically a personal pre-trade checklist order, not a global ranking.
+function _gtbDashNum(n) {
+    return '<span class="gtb-dash-num" style="display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;background:var(--gtb-accent,#58a6ff);color:#fff;font-size:0.5rem;font-weight:800;margin-right:5px;flex-shrink:0;">' + n + '</span>';
+}
+
+// ── Market Fear & Greed Index — NSE-adapted, contrarian sentiment gauge ──────────────────
+// Concept from CNN's Fear & Greed Index, rebuilt from NSE-native inputs already computed
+// elsewhere in this app (no new data source, only new arithmetic on cached globals) —
+// deliberately only 3 of CNN's original 7 components, not a forced 1:1 port:
+//   - Momentum   : NIFTY 50 LTP vs its own 20-day SMA (needs one small daily fetch)
+//   - Breadth    : ALL_ADVANCE_DECLINE_SCORE (already computed live every refresh)
+//   - Volatility : India VIX, inverted (low VIX = complacency/greed, high VIX = fear)
+// CNN's Put/Call ratio component was deliberately LEFT OUT: this app's own PCR
+// (computeOIScoreFromData) is an OI-WRITING/support-vs-resistance signal — high PCR here
+// means put WRITERS are building a support floor, scored as bullish — the opposite
+// direction from CNN's put-BUYING-volume fear reading. Folding it in under the "Fear &
+// Greed" label without flagging that reversal would silently contradict this app's own
+// existing PCR interpretation, so it's excluded rather than mislabeled.
+//
+// This is a CONTRARIAN CONVICTION MODIFIER, not a 10th Master Consensus vote — it doesn't
+// pick a direction, it flags when the crowd (per these 3 inputs) already agrees so strongly
+// that acting further in that same direction is more crowded/fragile, same role VIX-regime
+// gates and Dead Zone already play (context, not a directional call).
+
+var _GTB_FG_MOMENTUM = { value: null, date: null }; // {value: -1..+1, date: 'YYYY-MM-DD'}
+
+async function _gtbFetchNiftyMomentum() {
+    var today = moment().format('YYYY-MM-DD');
+    if (_GTB_FG_MOMENTUM.date === today && _GTB_FG_MOMENTUM.value !== null) return _GTB_FG_MOMENTUM.value;
+    try {
+        var token = _gtbTokenForName('NIFTY 50');
+        if (!token) return null;
+        var from = moment().subtract(35, 'days').format('YYYY-MM-DD');
+        var to = moment().format('YYYY-MM-DD');
+        var res = await getHistoricalDataUsingPromise(token, from, to, 'day');
+        var candles = (res && res.data && res.data.candles) ? res.data.candles : [];
+        if (candles.length < 10) return null;
+        var last20 = candles.slice(-20);
+        var sma20 = last20.reduce(function (a, c) { return a + parseFloat(c[4]); }, 0) / last20.length;
+        var ltp = parseFloat(candles[candles.length - 1][4]);
+        var pct = sma20 ? (ltp - sma20) / sma20 * 100 : 0;
+        // Clamp ±5% around the 20-day SMA to the full -1..+1 range — a NIFTY move of that
+        // size relative to its own 20-day average is already a strong momentum reading.
+        var normalized = Math.max(-1, Math.min(1, pct / 5));
+        _GTB_FG_MOMENTUM = { value: normalized, date: today };
+        return normalized;
+    } catch (e) { return null; }
+}
+
+// Sync — reads whatever's already cached/computed live. Momentum is null until
+// _gtbFetchNiftyMomentum has resolved at least once this session (Dashboard triggers it
+// automatically on render; falls back to "pending" display until then).
+// Below this fraction of the full F&O universe having actually broken its 9:15 zone
+// (advances+declines), the Breadth ratio is treated as an incomplete sample and shrunk
+// toward neutral rather than trusted at face value — see ALL_ADVANCE_DECLINE_SAMPLE/
+// ALL_ADVANCE_DECLINE_UNIVERSE above. 15% is a judgment call: roughly "the market has
+// started showing its hand," not a statistically derived threshold.
+var GTB_FG_BREADTH_MIN_COVERAGE = 0.15;
+
+function _gtbFearGreedComponents() {
+    var breadthRaw = 0; try { breadthRaw = parseFloat(ALL_ADVANCE_DECLINE_SCORE) || 0; } catch (e) {}
+    var breadthRawScore = Math.max(0, Math.min(100, (breadthRaw + 1) / 2 * 100));
+    // Confidence-shrinkage toward neutral (50) when the A/D ratio is based on only a thin
+    // slice of the universe (most stocks still inside their 9:15 band, excluded from the
+    // ratio's denominator entirely) — same "don't trust a thin sample at full weight"
+    // pattern as Master Consensus's own thin-consensus discount. Reaches full confidence
+    // once GTB_FG_BREADTH_MIN_COVERAGE of the universe has actually broken out.
+    var breadthSample = ALL_ADVANCE_DECLINE_SAMPLE || 0;
+    var breadthUniverse = ALL_ADVANCE_DECLINE_UNIVERSE || 0;
+    var breadthCoverage = breadthUniverse > 0 ? breadthSample / breadthUniverse : 0;
+    var breadthConfidence = Math.max(0, Math.min(1, breadthCoverage / GTB_FG_BREADTH_MIN_COVERAGE));
+    var breadthScore = 50 + (breadthRawScore - 50) * breadthConfidence;
+    var breadthDetail = breadthUniverse > 0
+        ? breadthSample + ' / ' + breadthUniverse + ' stocks broken out'
+            + (breadthConfidence < 1 ? ' (thin sample, shrunk toward neutral)' : '')
+        : null;
+
+    var vix = 0; try { vix = parseFloat((JSON.parse(localStorage.getItem('INSTRUMENT_LTP_PRICE') || '{}')['INDIA VIX'] || {}).ltp) || 0; } catch (e) {}
+    // Inverted: LOW vix (~10) => greed (100), HIGH vix (~30+) => fear (0).
+    var vixScore = vix ? Math.max(0, Math.min(100, 100 - (vix - 10) / 20 * 100)) : null;
+
+    var momentumScore = (_GTB_FG_MOMENTUM.value !== null && _GTB_FG_MOMENTUM.date === moment().format('YYYY-MM-DD'))
+        ? Math.max(0, Math.min(100, (_GTB_FG_MOMENTUM.value + 1) / 2 * 100)) : null;
+
+    var parts = [{ label: 'Momentum (N50 vs 20d SMA)', score: momentumScore },
+                 { label: 'Breadth (Advance/Decline)', score: breadthScore, detail: breadthDetail },
+                 { label: 'Volatility (India VIX, inverted)', score: vixScore }];
+    var available = parts.filter(function (p) { return p.score !== null; });
+    var composite = available.length ? available.reduce(function (a, p) { return a + p.score; }, 0) / available.length : null;
+    return { parts: parts, composite: composite };
+}
+
+function _gtbFearGreedLabel(score) {
+    // Deliberately NOT CNN's own red-at-both-ends convention. Framed as a contrarian trading
+    // lean (see _gtbFearGreedOutcome below): low score/Fear = a potential buy-the-dip
+    // opportunity = green; high score/Greed = stretched, caution-to-sell = red. Green-to-red
+    // across the whole scale, not a green-in-the-middle/red-at-the-edges scheme.
+    if (score === null) return { label: 'PENDING', col: 'var(--gtb-muted)' };
+    if (score < 25) return { label: 'EXTREME FEAR', col: 'var(--gtb-green)' };
+    if (score < 45) return { label: 'FEAR', col: 'var(--gtb-amber)' };
+    if (score <= 55) return { label: 'NEUTRAL', col: 'var(--gtb-muted)' };
+    if (score <= 75) return { label: 'GREED', col: 'var(--gtb-amber)' };
+    return { label: 'EXTREME GREED', col: 'var(--gtb-red)' };
+}
+
+// Plain-English "so what do I do" outcome, matching the composite score's zone. Framed as
+// a contrarian LEAN, not an instruction — deliberately keeps "consider"/"suggests" language
+// rather than a bare BUY/SELL, since this never overrides Master Consensus's own call (see
+// that card's own note) — it only says how much to trust/size whatever call Master
+// Consensus already gave.
+// Every non-neutral zone gets a banner whose wording matches its own badge label (a real
+// screenshot showed a "67 · GREED" badge sitting above a "Neutral zone (25-75)" note —
+// contradictory copy, since 67 is labeled GREED, not neutral). Only the genuine 45-55
+// NEUTRAL band (see _gtbFearGreedLabel) returns null — that's the only zone with nothing
+// directional to say. EXTREME zones keep the strongest color/wording; the milder FEAR/GREED
+// bands get the same lean, worded as "mild" rather than urgent.
+function _gtbFearGreedOutcome(score) {
+    if (score === null) return null;
+    if (score < 25) {
+        return { col: 'var(--gtb-green)', icon: 'bi-arrow-repeat',
+            text: '<b>Extreme Fear zone (&lt;25)</b> — historically a favorable backdrop for fresh LONG positions: markets are often oversold here and prone to bounce. Still confirm direction with Master Consensus first — this is a "trust it more if it agrees" signal, not a standalone buy call.' };
+    }
+    if (score < 45) {
+        return { col: 'var(--gtb-amber)', icon: 'bi-arrow-repeat',
+            text: '<b>Fear zone (25-45)</b> — a mild version of the Extreme Fear lean: some caution against adding to shorts, but not yet the "coiled spring" read of a genuinely oversold market.' };
+    }
+    if (score <= 55) {
+        return null; // genuine neutral — nothing directional to say either way
+    }
+    if (score <= 75) {
+        return { col: 'var(--gtb-amber)', icon: 'bi-arrow-repeat',
+            text: '<b>Greed zone (55-75)</b> — a mild version of the Extreme Greed lean: some caution against aggressively adding to longs, but not yet the "everyone\'s already in" read of a genuinely overbought market.' };
+    }
+    return { col: 'var(--gtb-red)', icon: 'bi-arrow-repeat',
+        text: '<b>Extreme Greed zone (&gt;75)</b> — suggests caution opening fresh LONG positions: markets may be overbought here and prone to pull back. If Master Consensus says GO LONG anyway, consider smaller size and a tighter stop rather than skipping it outright.' };
+}
+
+// CNN-style semicircular dial — 5 fixed colored bands (same thresholds as
+// _gtbFearGreedLabel/_gtbFearGreedOutcome, so the dial can never disagree with the badge/
+// banner text below it) plus a needle pointing at the live composite score. Pure inline
+// SVG, computed fresh each render — no charting library needed for a static-band gauge
+// like this one (unlike _renderGauge's single-color ApexCharts radialBar, which can't
+// show fixed multi-color zone bands the way this reference design calls for).
+var _GTB_FG_GAUGE_SEQ = 0; // unique gradient id per render — a page can host more than one
+                            // gauge at once (Dashboard card + a future popup instance), and
+                            // SVG gradient ids are global to the document, not scoped per-svg.
+
+function _gtbFearGreedGaugeSvg(score, needleCol) {
+    var cx = 120, cy = 112, r = 92, sw = 16;
+    function pt(s, radius) {
+        var theta = Math.PI * (1 - Math.max(0, Math.min(100, s)) / 100); // 180°=left(0) .. 0°=right(100)
+        return { x: cx + radius * Math.cos(theta), y: cy - radius * Math.sin(theta) };
+    }
+    var p0 = pt(0, r), p100 = pt(100, r);
+    var arcPath = 'M ' + p0.x.toFixed(1) + ' ' + p0.y.toFixed(1) + ' A ' + r + ' ' + r + ' 0 0 1 ' + p100.x.toFixed(1) + ' ' + p100.y.toFixed(1);
+
+    // Smooth continuous gradient (matching the reference CNN-style dial — a real blend, not
+    // discrete flat-colored chunks with hard seams) — stops sampled at the exact same score
+    // thresholds/colors _gtbFearGreedLabel already uses, so the gradient's color at any point
+    // still can't drift out of sync with the text labels, just blended between them now
+    // instead of switching abruptly.
+    var gradId = 'gtb-fg-grad-' + (_GTB_FG_GAUGE_SEQ++);
+    var stops = [0, 12.5, 25, 45, 50, 55, 75, 87.5, 100].map(function (s) {
+        return '<stop offset="' + s + '%" stop-color="' + _gtbFearGreedLabel(s).col + '"/>';
+    }).join('');
+    // gradientUnits="userSpaceOnUse" with x1/x2 spanning the arc's own left-right extent —
+    // a plain linear (not angular) gradient, but for a single semicircle arc this reads as
+    // a smooth left-to-right blend that closely matches the reference image.
+    var defs = '<defs><linearGradient id="' + gradId + '" gradientUnits="userSpaceOnUse" x1="' + (cx - r) + '" y1="0" x2="' + (cx + r) + '" y2="0">' + stops + '</linearGradient></defs>';
+
+    var hasScore = score !== null;
+    var needleP = pt(hasScore ? score : 50, r - sw / 2 - 8);
+    var needleSvg = hasScore
+        ? '<line x1="' + cx + '" y1="' + cy + '" x2="' + needleP.x.toFixed(1) + '" y2="' + needleP.y.toFixed(1) + '" stroke="' + needleCol + '" stroke-width="4" stroke-linecap="round"/>'
+          + '<circle cx="' + cx + '" cy="' + cy + '" r="6" fill="' + needleCol + '"/>'
+        : '';
+    return '<svg viewBox="0 0 240 122" style="width:100%;max-width:200px;height:auto;">' + defs
+        + '<path d="' + arcPath + '" stroke="url(#' + gradId + ')" stroke-width="' + sw + '" fill="none"/>'
+        + needleSvg + '</svg>';
+}
+
+function _gtbFearGreedHtml() {
+    var fg = _gtbFearGreedComponents();
+    var t = _gtbFearGreedLabel(fg.composite);
+    var sectionLabel = function (n, text) {
+        return '<div style="font-size:0.52rem;font-weight:800;color:var(--gtb-muted);letter-spacing:0.05em;text-transform:uppercase;margin:' + (n === 1 ? '0 0 8px' : '14px 0 8px') + ';' + (n === 2 ? 'border-top:1px solid var(--gtb-border);padding-top:10px;' : '') + '">' + n + ' · ' + text + '</div>';
+    };
+
+    // ── Section 1: Overall Gauge ──────────────────────────────────────────────────────
+    var section1 = sectionLabel(1, 'OVERALL GAUGE')
+        + '<div style="text-align:center;">'
+        +   _gtbFearGreedGaugeSvg(fg.composite, t.col)
+        +   '<div style="font-size:1.5rem;font-weight:800;color:' + t.col + ';margin-top:-8px;">' + (fg.composite === null ? '—' : Math.round(fg.composite)) + '</div>'
+        +   '<div style="font-size:0.6rem;font-weight:800;color:' + t.col + ';letter-spacing:0.05em;">' + t.label + '</div>'
+        + '</div>';
+
+    // ── Section 2: Component Breakdown ───────────────────────────────────────────────
+    var barHtml = fg.parts.map(function (p) {
+        var pct = p.score === null ? 0 : p.score;
+        var pt = _gtbFearGreedLabel(p.score);
+        return '<div style="margin-bottom:6px;">'
+            + '<div style="display:flex;justify-content:space-between;font-size:0.5rem;color:var(--gtb-muted);margin-bottom:2px;"><span>' + p.label + '</span><span style="color:' + pt.col + ';font-weight:700;">' + (p.score === null ? 'pending…' : Math.round(p.score) + ' · ' + pt.label) + '</span></div>'
+            + '<div style="height:5px;background:var(--gtb-surface2);border-radius:3px;overflow:hidden;"><div style="width:' + pct + '%;height:100%;background:' + pt.col + ';"></div></div>'
+            + (p.detail ? '<div style="font-size:0.46rem;color:var(--gtb-muted);margin-top:2px;">' + p.detail + '</div>' : '')
+            + '</div>';
+    }).join('');
+    var outcome = _gtbFearGreedOutcome(fg.composite);
+    var section2 = sectionLabel(2, 'COMPONENT BREAKDOWN')
+        + barHtml
+        + (outcome
+            ? '<div style="margin-top:8px;background:' + outcome.col + '12;border-left:3px solid ' + outcome.col + ';padding:8px 10px;border-radius:2px;display:flex;align-items:flex-start;gap:8px;">'
+              +   '<i class="bi ' + outcome.icon + '" style="color:' + outcome.col + ';font-size:0.85rem;margin-top:1px;"></i>'
+              +   '<div style="font-size:0.58rem;color:var(--gtb-text);line-height:1.4;">' + outcome.text + '</div>'
+              + '</div>'
+            : '<div style="margin-top:8px;font-size:0.52rem;color:var(--gtb-muted);">Neutral zone (45-55) — no contrarian lean either way; go by the per-component bars above and Master Consensus\'s own call.</div>');
+
+    return '<div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap;">'
+        + '<div style="min-width:200px;">' + section1 + '</div>'
+        + '<div style="flex:1;min-width:240px;">' + section2 + '</div>'
+        + '</div>'
+        + '<div style="margin-top:10px;font-size:0.48rem;color:var(--gtb-muted);">Contrarian context, not a direction — never overrides Master Consensus\'s own call. PCR deliberately excluded — this app\'s own PCR is a support/hedging signal, scored opposite to CNN\'s put-buying fear convention.</div>';
+}
+
 function _gtbDashboardOverviewHtml() {
     return '<div id="gtb-overview-dash" class="gtb-overview">'
         + '<div class="gtb-ov-block gtb-ov-verdict-block">'
-        +   '<div class="gtb-ov-cap">MARKET VERDICT</div>'
+        +   '<div class="gtb-ov-cap">' + _gtbDashNum(6) + 'MARKET VERDICT</div>'
         +   '<div class="gtb-ov-verdict" id="gtb-ov-verdict-dash">—</div>'
         +   '<div class="gtb-ov-verdict-sub" id="gtb-ov-verdict-sub-dash">Awaiting data…</div>'
         + '</div>'
         + '<div class="gtb-ov-block gtb-ov-score-block">'
-        +   '<div class="gtb-ov-cap">COMPOSITE SCORE</div>'
+        +   '<div class="gtb-ov-cap">' + _gtbDashNum(5) + 'COMPOSITE SCORE</div>'
         +   '<div class="gtb-ov-score" id="gtb-ov-score-dash">—</div>'
         +   '<div class="gtb-ov-score-scale"><span>-40</span><span>0</span><span>+40</span></div>'
         + '</div>'
         + '<div class="gtb-ov-block gtb-ov-breadth-block">'
-        +   '<div class="gtb-ov-cap">INSTRUMENT BREADTH</div>'
+        +   '<div class="gtb-ov-cap">' + _gtbDashNum(4) + 'INSTRUMENT BREADTH</div>'
         +   '<div class="gtb-ov-breadth-bar" id="gtb-ov-breadth-bar-dash">'
         +     '<div class="gtb-ov-breadth-fill bull" id="gtb-ov-breadth-bull-dash" style="width:50%;"></div>'
         +     '<div class="gtb-ov-breadth-fill bear" id="gtb-ov-breadth-bear-dash" style="width:50%;"></div>'
@@ -19058,13 +20323,13 @@ function _gtbDashboardOverviewHtml() {
         +   '<span id="gtb-ov-breadth-bear-n-dash" class="bear">0 ▼</span></div>'
         + '</div>'
         + '<div class="gtb-ov-block gtb-ov-915-block">'
-        +   '<div class="gtb-ov-cap">9:15 BREAKOUT</div>'
+        +   '<div class="gtb-ov-cap">' + _gtbDashNum(2) + '9:15 BREAKOUT</div>'
         +   '<div class="gtb-ov-915-row"><span class="gtb-ov-915-lbl">N50</span><span class="gtb-ov-915-val" id="gtb-ov-915-n50-dash">—</span></div>'
         +   '<div class="gtb-ov-915-row"><span class="gtb-ov-915-lbl">BN</span><span class="gtb-ov-915-val" id="gtb-ov-915-bn-dash">—</span></div>'
         +   '<div class="gtb-ov-915-row"><span class="gtb-ov-915-lbl">ALL</span><span class="gtb-ov-915-val" id="gtb-ov-915-all-dash">—</span></div>'
         + '</div>'
         + '<div class="gtb-ov-block gtb-ov-stats-block">'
-        +   '<div class="gtb-ov-cap">KEY STATS</div>'
+        +   '<div class="gtb-ov-cap">' + _gtbDashNum(3) + 'KEY STATS</div>'
         +   '<div class="gtb-ov-stat"><span class="gtb-ov-stat-lbl">N50 A/D</span><span class="gtb-ov-stat-val" id="gtb-ov-n50ad-dash">—</span></div>'
         +   '<div class="gtb-ov-stat"><span class="gtb-ov-stat-lbl">BN A/D</span><span class="gtb-ov-stat-val" id="gtb-ov-bnad-dash">—</span></div>'
         +   '<div class="gtb-ov-stat"><span class="gtb-ov-stat-lbl">INDIA VIX</span><span class="gtb-ov-stat-val" id="gtb-ov-vix-dash">—</span></div>'
@@ -19094,6 +20359,18 @@ jQ(document).on('click', '.refresh-oi-dash', async function (e) {
     $btn.find('i').removeClass('bi-arrow-clockwise').addClass('bi-hourglass-split');
     try {
         if (_gtbIsMcxFuture(name)) {
+            // Delegate to the MCX Dashboard's own per-instrument fetch instead of duplicating
+            // its logic here — _gtbMcxDashFetchOne already does everything an individual
+            // refresh needs (Price Action chart, strikeMap for Level Probability, futures +
+            // OI/OBV, Predict, Futures Accuracy). Previously this branch only refreshed
+            // futures+OI, which is why clicking refresh on any card but CRUDEOILM (the only
+            // one whose Price Action cell had rendered from an earlier full-dashboard
+            // Refresh) never updated that card's own top chart.
+            if (typeof _gtbMcxDashFetchOne === 'function') {
+                await _gtbMcxDashFetchOne(name);
+                $btn.find('i').removeClass('bi-hourglass-split').addClass('bi-arrow-clockwise');
+                return;
+            }
             var fres = await showFutureDetailsMCX(name);
             if (fres) await showPrictionProbabiltyMCX(name, fres);
         } else {
@@ -19143,15 +20420,20 @@ function _gtbDashWeightedNames() {
 
 // Builds one Instrument Matrix panel (own header row + one row per name), for a given
 // name list and container id — called once per side of the 2-column split.
-function _gtbDashMatrixColHtml(names, matrixId, groupLabel) {
+// extraCol (optional) adds a 4th column — {label, idSuffix} — currently only used by the MCX
+// Dashboard for FUT ACC (win-rate chip). Omitted, this renders the exact same 3-column
+// Instrument|Predict|OI-OBV layout the NSE Dashboard has always used — adding it as an
+// opt-in param rather than always-on keeps that layout/CSS untouched for every existing caller.
+function _gtbDashMatrixColHtml(names, matrixId, groupLabel, extraCol) {
     var h = '<div class="gtb-card gtb-widget" style="margin:0 !important;">'
         +     '<div class="gtb-card-header"><span class="gtb-card-title"><i class="bi bi-grid-3x3-gap-fill"></i> ' + groupLabel + '</span></div>'
         +     '<div class="gtb-card-body" style="padding:0;overflow:auto;max-height:560px;">'
-        +       '<div id="' + matrixId + '">'
+        +       '<div id="' + matrixId + '"' + (extraCol ? ' class="gtb-dash-matrix-4col"' : '') + '>'
         +         '<div class="gtb-dash-matrix-head">'
         +           '<span class="gtb-rh-instr">INSTRUMENT</span>'
         +           '<span class="gtb-rh-predict"><i class="bi bi-lightbulb-fill"></i> PREDICT</span>'
         +           '<span class="gtb-rh-oiobv">OI / OBV</span>'
+        +           (extraCol ? '<span class="gtb-rh-futacc"><i class="bi bi-bullseye"></i> ' + extraCol.label + '</span>' : '')
         +         '</div>';
     if (!names.length) {
         h += '<div class="gtb-sig-wait">No instruments in this group.</div>';
@@ -19174,6 +20456,13 @@ function _gtbDashMatrixColHtml(names, matrixId, groupLabel) {
         +        '<div id="' + tid + '-obv-dash" class="gtb-chart-oi" style="height:120px;"></div>'
         +        '<div id="' + tid + '-oiobv-xaxis-dash" class="gtb-oiobv-xaxis"></div>'
         +      '</div>'
+        // Futures remark accuracy for the CURRENT remark — win-rate/sample-count chip, only
+        // ever populated by the MCX Dashboard today (_gtbMcxDashFetchOne caches
+        // INSTRUMENT_SCORE_MAP[name].futAccMap the same way _dvLoadFutAcc already does for the
+        // Instrument Detail View, then reads today's current remark's stats straight out of
+        // it). Its own column (via extraCol) rather than crammed into the Instrument cell —
+        // originally placed there, moved out per explicit request.
+        +      (extraCol ? '<div class="gtb-row-futacc" id="' + tid + extraCol.idSuffix + '"><span class="gtb-row-na" style="margin:auto">—</span></div>' : '')
         +    '</div>';
     });
     h +=     '</div>'  // end #<matrixId>
@@ -19303,6 +20592,7 @@ function _gtbRenderDashboardPane() {
     if (!$pane.children().length) {
       try {
         var h = '<div style="padding:8px 0;">';
+
         h += _gtbDashboardOverviewHtml();
 
         // Price Action grid — the same 8 instruments/order as the Overview tab's own
@@ -19316,7 +20606,7 @@ function _gtbRenderDashboardPane() {
         // per explicit request — "just the candle and lines".
         h += '<div class="gtb-card gtb-widget" style="margin:0 8px 8px;">'
         +      '<div class="gtb-card-header" style="display:flex;align-items:center;justify-content:space-between;">'
-        +        '<span class="gtb-card-title"><i class="bi bi-bar-chart-line-fill"></i> PRICE ACTION</span>'
+        +        '<span class="gtb-card-title">' + _gtbDashNum(14) + '<i class="bi bi-bar-chart-line-fill"></i> PRICE ACTION</span>'
         +        '<button id="gtb-dash-pa-refresh" style="background:transparent;border:1px solid var(--gtb-border);color:var(--gtb-muted);padding:2px 8px;font-size:0.46rem;cursor:pointer;"><i class="bi bi-arrow-clockwise"></i> Refresh</button>'
         +      '</div>'
         +      '<div class="gtb-card-body" id="gtb-dash-pa-grid" style="padding:6px;display:grid;grid-auto-flow:column;grid-auto-columns:minmax(140px, 1fr);gap:5px;overflow-x:auto;">'
@@ -19324,7 +20614,7 @@ function _gtbRenderDashboardPane() {
                      var tid = inst.name.replace(/\s+/g, '-').replace(/&/g, '-');
                      return '<div class="gtb-card" style="background:var(--gtb-surface);border:1px solid var(--gtb-border);display:flex;flex-direction:column;overflow:hidden;">'
                          + '<div style="padding:0 4px;line-height:1.3;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;justify-content:space-between;gap:4px;">'
-                         + '<span style="font-size:0.42rem;font-weight:700;color:var(--gtb-muted);overflow:hidden;text-overflow:ellipsis;">' + inst.label + '</span>'
+                         + '<span style="font-size:0.52rem;font-weight:700;color:var(--gtb-muted);overflow:hidden;text-overflow:ellipsis;">' + inst.label + '</span>'
                          + '<a href="' + _gtbDashPAChartLink(inst) + '" target="_blank" rel="noopener" title="Open on Kite chart" style="color:var(--gtb-muted);flex-shrink:0;line-height:1;"><i class="bi bi-box-arrow-up-right" style="font-size:0.5rem;"></i></a>'
                          + '</div>'
                          + '<div id="' + tid + '-chart-dash-pa" style="height:90px;position:relative;"></div>'
@@ -19336,7 +20626,7 @@ function _gtbRenderDashboardPane() {
         // Predict is a full-width row on its own, above the OI/OBV grid — not squeezed
         // into one grid cell among the (much shorter) instrument mini-cards.
         h += '<div class="gtb-card gtb-widget" style="margin:0 8px 8px;">'
-        +      '<div class="gtb-card-header"><span class="gtb-card-title"><i class="bi bi-graph-up"></i> PREDICT (9:15 COMBO)</span></div>'
+        +      '<div class="gtb-card-header"><span class="gtb-card-title">' + _gtbDashNum(1) + '<i class="bi bi-graph-up"></i> PREDICT (9:15 COMBO)</span></div>'
         +      '<div class="gtb-card-body" id="gtb-dash-predict" style="padding:6px 8px;"></div>'
         +    '</div>';
 
@@ -19347,7 +20637,7 @@ function _gtbRenderDashboardPane() {
         // win-rate as separate context. Dashboard-only per explicit request — the Pre-Trade
         // Checklist tab is intentionally left unchanged.
         h += '<div class="gtb-card gtb-widget" style="margin:0 8px 8px;">'
-        +      '<div class="gtb-card-header"><span class="gtb-card-title"><i class="bi bi-shield-check"></i> LEVEL CONFIRMATION</span></div>'
+        +      '<div class="gtb-card-header"><span class="gtb-card-title">' + _gtbDashNum(7) + '<i class="bi bi-shield-check"></i> LEVEL CONFIRMATION</span></div>'
         +      '<div class="gtb-card-body" id="gtb-dash-lvlconfirm" style="padding:6px 8px;"></div>'
         +    '</div>';
 
@@ -19367,11 +20657,11 @@ function _gtbRenderDashboardPane() {
         // flex parent Dashboard doesn't have).
         h += '<div class="gtb-dash-sig-cols" style="padding:0 8px 8px;">';
         h +=   '<div class="gtb-dash-sig-col gtb-card gtb-widget">'
-        +        '<div class="gtb-card-header"><span class="gtb-card-title"><i class="bi bi-layers-fill"></i> INDEX / STOCK OI</span></div>'
+        +        '<div class="gtb-card-header"><span class="gtb-card-title">' + _gtbDashNum(15) + '<i class="bi bi-layers-fill"></i> INDEX / STOCK OI</span></div>'
         +        '<div class="gtb-card-body" id="gtb-dash-sig-oi-index" style="padding:0;overflow:auto;"></div>'
         +      '</div>';
         h +=   '<div class="gtb-dash-sig-col gtb-card gtb-widget">'
-        +        '<div class="gtb-card-header"><span class="gtb-card-title"><i class="bi bi-diagram-3-fill"></i> WEIGHTED CONSTITUENTS OI</span></div>'
+        +        '<div class="gtb-card-header"><span class="gtb-card-title">' + _gtbDashNum(16) + '<i class="bi bi-diagram-3-fill"></i> WEIGHTED CONSTITUENTS OI</span></div>'
         +        '<div class="gtb-card-body" id="gtb-dash-sig-oi-wtd" style="padding:0;overflow:auto;"></div>'
         +      '</div>';
         h += '</div>'; // end .gtb-dash-sig-cols
@@ -19381,7 +20671,7 @@ function _gtbRenderDashboardPane() {
         // separate full-width rows with empty space either side, per explicit request.
         h += '<div class="gtb-dash-2col" style="padding:0 8px 8px;">';
         h +=   '<div class="gtb-card gtb-widget" style="margin:0;">'
-        +        '<div class="gtb-card-header"><span class="gtb-card-title"><i class="bi bi-bullseye"></i> FUTURES ACCURACY</span></div>'
+        +        '<div class="gtb-card-header"><span class="gtb-card-title">' + _gtbDashNum(9) + '<i class="bi bi-bullseye"></i> FUTURES ACCURACY</span></div>'
         +        '<div class="gtb-card-body" id="gtb-dash-sig-fut-body" style="padding:0;overflow:auto;max-height:320px;">'
         +          '<div class="gtb-sig-wait"><i class="bi bi-hourglass-split"></i> Replaying 5-min candles…</div>'
         +        '</div>'
@@ -19390,10 +20680,55 @@ function _gtbRenderDashboardPane() {
         // (_gtbLevelProbLiveRowsHtml, shared so both stay identical), not the separate
         // 5-minute-history matrix (_gtbRenderLevelProbPane) — per explicit request.
         h +=   '<div class="gtb-card gtb-widget" style="margin:0;">'
-        +        '<div class="gtb-card-header"><span class="gtb-card-title"><i class="bi bi-signpost-split-fill"></i> LEVEL PROBABILITY (LIVE SIGNALS)</span></div>'
+        +        '<div class="gtb-card-header"><span class="gtb-card-title">' + _gtbDashNum(10) + '<i class="bi bi-signpost-split-fill"></i> LEVEL PROBABILITY (LIVE SIGNALS)</span></div>'
         +        '<div class="gtb-card-body" id="gtb-dash-lvlprob" style="padding:6px 8px;overflow:auto;max-height:320px;"></div>'
         +      '</div>';
         h += '</div>'; // end .gtb-dash-2col
+
+        // Master Consensus — every tracked instrument, all 9 engines combined into one
+        // GO LONG / GO SHORT / WAIT outcome each, no dropdown. Full-width since the row
+        // list (indices + both indices' weighted constituents) is longer than a half-width
+        // column comfortably fits. See _gtbMasterConsensus's own comment for the full
+        // weighting rationale.
+        h += '<div class="gtb-card gtb-widget" style="margin:0 8px 8px;">'
+        +      '<div class="gtb-card-header"><span class="gtb-card-title">' + _gtbDashNum(8) + '<i class="bi bi-columns-gap"></i> MASTER CONSENSUS (ALL INSTRUMENTS)' + _ii('gtb-master-consensus') + '</span></div>'
+        +      '<div class="gtb-card-body" id="gtb-dash-consensus" style="padding:6px 8px;overflow:auto;max-height:420px;"></div>'
+        +    '</div>';
+
+        // Short Covering / Long Unwinding — see _gtbShortCoveringSignal's own comment for the
+        // mechanics (margin/MTM pressure, gamma hedging, Max Pain, all sharpest into expiry).
+        // Full-width, scanning core + weighted names, listing only instruments with an
+        // actively-firing remark right now.
+        h += '<div class="gtb-card gtb-widget" style="margin:0 8px 8px;">'
+        +      '<div class="gtb-card-header"><span class="gtb-card-title">' + _gtbDashNum(11) + '<i class="bi bi-arrow-repeat"></i> SHORT COVERING / LONG UNWINDING' + _ii('dv-shortcov') + '</span></div>'
+        +      '<div class="gtb-card-body" id="gtb-dash-shortcov" style="padding:6px 8px;overflow:auto;max-height:280px;"></div>'
+        +    '</div>';
+
+        // Weighted Trend Confirmation — weight% × each constituent's OWN Predict-card
+        // probability, combined into one forward-looking lean per index. See
+        // _gtbWeightedTrendConfirmation's own comment for how this differs from Component
+        // Score (weight×score) and Index Impact (weight×realized move), both of which
+        // already exist and sound similar but answer a different question.
+        h += '<div class="gtb-dash-2col" style="padding:0 8px 8px;">';
+        h +=   '<div class="gtb-card gtb-widget" style="margin:0;">'
+        +        '<div class="gtb-card-header"><span class="gtb-card-title">' + _gtbDashNum(12) + '<i class="bi bi-bar-chart-fill"></i> WEIGHTED TREND CONFIRMATION — NIFTY 50' + _ii('dv-wtc') + '</span></div>'
+        +        '<div class="gtb-card-body" id="gtb-dash-wtc-n50" style="padding:6px 8px;overflow:auto;max-height:260px;"></div>'
+        +      '</div>';
+        h +=   '<div class="gtb-card gtb-widget" style="margin:0;">'
+        +        '<div class="gtb-card-header"><span class="gtb-card-title">' + _gtbDashNum(13) + '<i class="bi bi-bar-chart-fill"></i> WEIGHTED TREND CONFIRMATION — BANK NIFTY' + _ii('dv-wtc') + '</span></div>'
+        +        '<div class="gtb-card-body" id="gtb-dash-wtc-bn" style="padding:6px 8px;overflow:auto;max-height:260px;"></div>'
+        +      '</div>';
+        h += '</div>'; // end .gtb-dash-2col
+
+        // Market Fear & Greed — a contrarian sentiment context card, deliberately placed
+        // at the BOTTOM of the tab rather than inside the numbered 1-16 checklist: it's
+        // context for how much to trust/size whatever call the checklist above already
+        // produced, not itself one of the sequential checks (see the function's own
+        // comment for the full rationale).
+        h += '<div class="gtb-card gtb-widget" style="margin:0 8px 8px;">'
+        +      '<div class="gtb-card-header"><span class="gtb-card-title"><i class="bi bi-thermometer-half"></i> MARKET FEAR &amp; GREED INDEX</span></div>'
+        +      '<div class="gtb-card-body" id="gtb-dash-feargreed" style="padding:8px;">' + _gtbFearGreedHtml() + '</div>'
+        +    '</div>';
 
         h += '</div>';
         $pane.html(h);
@@ -19462,6 +20797,17 @@ function _gtbRenderDashboardPane() {
     _gtbLoadFutAccInPane(['gtb-dash-sig-fut-body']);
 
     try { jQ('#gtb-dash-lvlprob').html(_gtbLevelProbLiveRowsHtml()); } catch (e) {}
+    try { jQ('#gtb-dash-consensus').html(_gtbMasterConsensusAllRowsHtml()); } catch (e) {}
+    try { jQ('#gtb-dash-shortcov').html(_gtbShortCoveringLiveRowsHtml()); } catch (e) {}
+    try { jQ('#gtb-dash-wtc-n50').html(_gtbWeightedTrendConfirmationHtml('NIFTY 50')); } catch (e) {}
+    try { jQ('#gtb-dash-wtc-bn').html(_gtbWeightedTrendConfirmationHtml('NIFTY BANK')); } catch (e) {}
+    // Fear & Greed: render immediately with whatever's cached (breadth/VIX are already
+    // live), then fetch NIFTY 50's momentum (once per day, cached) and re-render with the
+    // complete 3-component picture once it resolves.
+    try { jQ('#gtb-dash-feargreed').html(_gtbFearGreedHtml()); } catch (e) {}
+    _gtbFetchNiftyMomentum().then(function () {
+        try { jQ('#gtb-dash-feargreed').html(_gtbFearGreedHtml()); } catch (e) {}
+    });
 }
 
 function _gtbRenderMetricsPane() {
@@ -19580,17 +20926,17 @@ function _gtbRenderMetricsPane() {
     // ── Leading / Lagging summary bar ─────────────────────────────────────────
     h += '<div style="width:100%;margin:6px;padding:8px 10px;background:var(--gtb-surface);display:flex;gap:12px;align-items:center;">'
         + '<div style="flex:1;">'
-        +   '<div style="font-size:0.44rem;color:var(--gtb-muted);margin-bottom:2px;">⚡ LEADING (9:15 + A/D + Futures)</div>'
+        +   '<div style="font-size:0.54rem;color:var(--gtb-muted);margin-bottom:2px;">⚡ LEADING (9:15 + A/D + Futures)</div>'
         +   '<div style="font-size:0.72rem;font-weight:900;font-family:var(--gtb-mono);color:' + _col(leadingScore) + ';">' + _s(leadingScore) + '</div>'
         + '</div>'
         + '<div style="width:1px;background:var(--gtb-border);align-self:stretch;"></div>'
         + '<div style="flex:1;">'
-        +   '<div style="font-size:0.44rem;color:var(--gtb-muted);margin-bottom:2px;">🐢 LAGGING (OI/OBV + MP + IV + Components)</div>'
+        +   '<div style="font-size:0.54rem;color:var(--gtb-muted);margin-bottom:2px;">🐢 LAGGING (OI/OBV + MP + IV + Components)</div>'
         +   '<div style="font-size:0.72rem;font-weight:900;font-family:var(--gtb-mono);color:' + _col(laggingScore) + ';">' + (_includeLagging ? _s(laggingScore) : '<span style="color:var(--gtb-muted);font-size:0.5rem;">excluded</span>') + '</div>'
         + '</div>'
         + '<div style="width:1px;background:var(--gtb-border);align-self:stretch;"></div>'
         + '<div style="flex:1;">'
-        +   '<div style="font-size:0.44rem;color:var(--gtb-muted);margin-bottom:2px;">∑ COMPOSITE</div>'
+        +   '<div style="font-size:0.54rem;color:var(--gtb-muted);margin-bottom:2px;">∑ COMPOSITE</div>'
         +   '<div style="font-size:0.72rem;font-weight:900;font-family:var(--gtb-mono);color:' + _col(SCORE) + ';">' + _s(SCORE) + '</div>'
         + '</div>'
         + '</div>';
@@ -20003,7 +21349,7 @@ function _gtbRenderPreflightPane() {
         + '<div style="margin-top:14px;padding:10px 12px;background:var(--gtb-surface);border:1px solid var(--gtb-border);border-left:3px solid ' + AC + ';font-size:0.5rem;color:var(--gtb-text);line-height:1.6;">'
         + '<b>You don\'t have to assemble this by hand.</b> Per-instrument: Instrument Detail View &rarr; VERDICT panel, or the Commodities popup\'s VERDICT card. Across everything at once: Trade Ideas (flyout menu) &rarr; check &ldquo;High Conviction only&rdquo; for setups where every gate above passed strongly, not merely didn\'t fail.'
         + '</div>'
-        + '<div style="margin-top:14px;font-size:0.44rem;color:var(--gtb-muted);line-height:1.5;">This reproduces existing scoring logic — it doesn\'t add certainty the underlying signals don\'t have. A setup clearing every gate is a higher-conviction read, not a guaranteed outcome; size and stop-loss accordingly.</div>'
+        + '<div style="margin-top:14px;font-size:0.54rem;color:var(--gtb-muted);line-height:1.5;">This reproduces existing scoring logic — it doesn\'t add certainty the underlying signals don\'t have. A setup clearing every gate is a higher-conviction read, not a guaranteed outcome; size and stop-loss accordingly.</div>'
         + '</div>';
 
     $pane.html(html);
@@ -20537,6 +21883,640 @@ jQ(document).on('click', '#show-trade-checklist', function() {
     _gtbShowTradeChecklist();
 });
 
+// ── Master Consensus ─────────────────────────────────────────────────────────
+// Combines every independent scoring/verdict engine in this app into ONE weighted vote
+// and a single GO LONG / GO SHORT / WAIT outcome, with a per-engine breakdown table —
+// built specifically because this app now has ~16 separately-computed engines (SCORE,
+// Range Scoreboard, Predict/9:15 Combo, Level Confirmation, Level Probability, Order
+// Flow, Max Pain, IV Skew, Dead Zone, Curve Structure, etc.) that read overlapping
+// inputs with different weights and can genuinely disagree on the same day — this is
+// the "what do they add up to, on balance" view, not a 17th independent opinion.
+//
+// Weight classes reflect what THIS APP'S OWN accuracy backtests have actually shown
+// this session, not assumed trust:
+//   VALIDATED (3x)    — has shown real backtested edge: the 9:15 zone (the only signal
+//                       with historical backtesting per the Predict card's own banner),
+//                       or a futures REMARK whose OWN today's-replay row (futAccMap)
+//                       shows ≥55% win-rate AND positive avg-pts on ≥8 samples.
+//   REASONED (1.5x/1x)— sound live-signal logic, not yet backtested (Level Probability,
+//                       Order Flow, Max Pain, IV Skew, the blended composite SCORE).
+//   UNRELIABLE (0.5x) — OI/OBV standalone: this app's own accuracy replay (see session)
+//                       showed NEGATIVE expectancy in every time×VIX bucket tested —
+//                       kept visible for transparency, deliberately down-weighted
+//                       rather than trusted at face value just because it's loud.
+// A Dead Zone reading is a VETO/caution flag on the whole result, not a vote — it only
+// fires when conviction is already weak (|composite total| < 3), so it can't override
+// a genuinely strong reading, only downgrade an already-marginal one to WAIT.
+//
+// Curve Structure (engine #9) votes only when a cached read exists — see _dvLoadCurveStructure/
+// _cmdLoadCurveStructure, which cache INSTRUMENT_SCORE_MAP[name].curveState when their own
+// panel loads. Deliberately still excludes: the new Depth Δ (flagged as suspect pending the
+// ±100% investigation), and the removed OI/OBV Signal Accuracy panel — noted in the UI as
+// "not yet included" rather than silently missing, so this stays honest about its own coverage.
+function _gtbMasterConsensus(name) {
+    var rows = [];
+    var totalWeight = 0, weightedSum = 0;
+    // hasData distinguishes "computed a genuine neutral/zero reading" (dir=0, hasData=true
+    // → shown as FLAT) from "couldn't compute this at all" (dir=0, hasData=false → shown as
+    // NO DATA) — these look identical if collapsed into one "flat/no data" label, which is
+    // exactly the confusing case a real screenshot surfaced: several engines showing
+    // "flat/no data" with no way to tell whether they were genuinely neutral or just empty.
+    function vote(label, dir, weight, weightClass, note, hasData) {
+        if (hasData === undefined) hasData = true;
+        rows.push({ label: label, dir: dir, weight: weight, weightClass: weightClass, note: note, hasData: hasData });
+        if (dir !== 0) { totalWeight += weight; weightedSum += dir * weight; }
+    }
+
+    var cs = null; try { cs = computeInstrumentScore(name); } catch (e) {}
+
+    // 1. 9:15 zone — VALIDATED
+    var b915 = {}; try { b915 = JSON.parse(localStorage.getItem('VALID_BREAKOUT_NINE_FIFTEEN') || '{}'); } catch (e) {}
+    var zone = (b915[name] && b915[name].CLOSE_9_15) || null;
+    var zoneDir = (zone === 'AST' || zone === 'ASO') ? 1 : (zone === 'BST' || zone === 'BSO') ? -1 : 0;
+    vote('9:15 Zone (' + (zone || 'n/a') + ')', zoneDir, 3, 'VALIDATED', zone ? null : 'no 9:15 scan cached yet', !!zone);
+
+    // 2. Composite SCORE — REASONED (blends the sub-scores below into one number; voted
+    // once here at medium weight rather than re-summing the same inputs twice).
+    var scoreDir = cs ? (cs.total > 1.5 ? 1 : cs.total < -1.5 ? -1 : 0) : 0;
+    vote('Composite SCORE (' + (cs ? (cs.total >= 0 ? '+' : '') + cs.total.toFixed(1) : 'n/a') + ')', scoreDir, 1.5, 'REASONED', cs ? null : 'no score data', !!cs);
+
+    // 3. Futures trend — weight depends on THIS remark's own measured accuracy today.
+    var remark = null, futDir = 0, futWeight = 1, futClass = 'REASONED', futNote = null;
+    try {
+        remark = (INSTRUMENT_SCORE_MAP[name] || {}).futures_trend_remark;
+        if (remark) {
+            var fscore = getFuturesTrendScore(remark);
+            futDir = fscore > 0 ? 1 : fscore < 0 ? -1 : 0;
+            var acc = ((INSTRUMENT_SCORE_MAP[name] || {}).futAccMap || {})[remark];
+            if (acc && acc.total >= 8) {
+                var win = acc.hits / acc.total, avgPts = acc.pts / acc.total;
+                if (win >= 0.55 && avgPts > 0) {
+                    futWeight = 3; futClass = 'VALIDATED';
+                    futNote = 'today: ' + Math.round(win * 100) + '% win, +' + avgPts.toFixed(1) + ' avg pts (n=' + acc.total + ')';
+                } else {
+                    futWeight = 0.5; futClass = 'UNRELIABLE';
+                    futNote = 'today: ' + Math.round(win * 100) + '% win, ' + (avgPts >= 0 ? '+' : '') + avgPts.toFixed(1) + ' avg pts (n=' + acc.total + ') — not earning trust today';
+                }
+            } else {
+                futNote = 'no accuracy replay yet for this REMARK — open the Futures Accuracy panel first';
+            }
+        }
+    } catch (e) {}
+    vote('Futures Trend (' + (remark || 'n/a') + ')', futDir, futWeight, futClass, futNote, !!remark);
+
+    // 4. OI/OBV — UNRELIABLE per this app's own accuracy finding this session.
+    var oiDir = cs ? (cs.oi_obv > 1 ? 1 : cs.oi_obv < -1 ? -1 : 0) : 0;
+    vote('OI/OBV (' + (cs ? (cs.oi_obv >= 0 ? '+' : '') + cs.oi_obv.toFixed(1) : 'n/a') + ')', oiDir, 0.5, 'UNRELIABLE',
+        'this app’s own accuracy replay showed negative expectancy in every bucket tested — down-weighted, not trusted at face value', !!cs);
+
+    // 5. Max Pain — informational/support-resistance, never a primary driver by convention.
+    var mpDir = cs ? (cs.max_pain > 0 ? 1 : cs.max_pain < 0 ? -1 : 0) : 0;
+    vote('Max Pain', mpDir, 0.5, 'REASONED', 'informational target, not a primary driver by this app’s own convention', !!cs);
+
+    // 6. IV Skew
+    var ivDir = cs ? (cs.iv_skew > 0 ? 1 : cs.iv_skew < 0 ? -1 : 0) : 0;
+    vote('IV Skew', ivDir, 0.5, 'REASONED', cs ? null : 'no score data', !!cs);
+
+    // 7. Level Probability (live signals) — reasoned, explicitly not statistically fitted.
+    var lp = null; try { lp = _gtbLevelProb(name); } catch (e) {}
+    var lpOk = !!(lp && lp.ok);
+    var lpDir = lpOk ? (lp.netDir > 0.15 ? 1 : lp.netDir < -0.15 ? -1 : 0) : 0;
+    vote('Level Probability', lpDir, 1.5, 'REASONED', lpOk ? null : 'no data (needs OI fetch + strike levels first)', lpOk);
+
+    // 8. Order Flow Imbalance — live resting-order read (totalBuyQty/totalSellQty), not
+    // yet backtested. Deliberately the OLDER, simpler engine — NOT the new 5-level Depth
+    // Δ, which is still flagged as suspect pending the ±100% investigation.
+    var of = null; try { of = _gtbOrderFlowImbalance(name); } catch (e) {}
+    vote('Order Flow (resting orders)', of ? of.dir : 0, 1, 'REASONED', of ? null : 'not subscribed on WebSocket this session', !!of);
+
+    // 9. Curve Structure (contango/backwardation) — REASONED, not VALIDATED: sound theory
+    // (cost-of-carry, backwardation signaling tightness/urgency), but unlike the 9:15 Zone
+    // this has never been backtested against real outcomes. Reads the cache set by
+    // _dvLoadCurveStructure (NSE)/_cmdLoadCurveStructure (MCX) — only votes when a recent
+    // read exists AND that read is non-neutral (NEUTRAL readings correctly cast no vote,
+    // same as every other engine's "no signal" case).
+    var cst = (INSTRUMENT_SCORE_MAP[name] || {}).curveState;
+    var curveHasData = !!cst;
+    var curveDir = cst ? cst.dir : 0;
+    vote('Curve Structure' + (cst ? ' (' + cst.lean.split(' ')[0] + ')' : ''), curveDir, 1, 'REASONED',
+        cst ? (curveDir === 0 ? 'genuinely neutral reading, no vote' : 'not yet backtested, same caution as other REASONED engines') : 'no curve read cached yet — open the Curve Structure panel first',
+        curveHasData);
+
+    // Dead Zone — veto/caution flag, not a vote.
+    var deadZone = null; try { deadZone = _gtbDeadZone(name); } catch (e) {}
+
+    var net = totalWeight > 0 ? (weightedSum / totalWeight) : 0;
+    var dataCount = rows.filter(function (r) { return r.hasData; }).length;
+    var voting = rows.filter(function (r) { return r.dir !== 0; }).length;
+    var agree = rows.filter(function (r) { return r.dir !== 0 && ((net > 0 && r.dir > 0) || (net < 0 && r.dir < 0)); }).length;
+    // "Thin" = the outcome is riding on very few actual directional votes, even if most
+    // engines HAVE data (e.g. six engines genuinely read flat/neutral and only one leans
+    // a direction) — a real case a live screenshot surfaced: "GO SHORT" was being declared
+    // off exactly one engine while the rest were correctly, genuinely neutral. Net/outcome
+    // math doesn't change (one real vote is still a real vote) but the UI must say so loudly
+    // rather than presenting it with the same confidence as a genuine multi-engine agreement.
+    var thin = voting <= 1;
+
+    var outcome, outcomeCol;
+    if (deadZone) { outcome = 'WAIT — Dead Zone'; outcomeCol = 'var(--gtb-amber)'; }
+    else if (voting === 0) { outcome = 'WAIT — No Data'; outcomeCol = 'var(--gtb-muted)'; }
+    else if (net > 0.2)  { outcome = 'GO LONG';  outcomeCol = 'var(--gtb-green)'; }
+    else if (net < -0.2) { outcome = 'GO SHORT'; outcomeCol = 'var(--gtb-red)'; }
+    else { outcome = 'WAIT'; outcomeCol = 'var(--gtb-amber)'; }
+
+    return { name: name, rows: rows, net: net, agree: agree, voting: voting, dataCount: dataCount, thin: thin,
+              outcome: outcome, outcomeCol: outcomeCol, deadZone: deadZone };
+}
+
+// ── Position Size — Turtle-style volatility-adjusted sizing ──────────────────────────────
+// Direct port of the Turtle Traders' "N" (Average True Range) sizing formula from "The
+// Complete Turtle Trader": unit size = (account risk ₹) / (N × point value). A volatile
+// instrument gets a smaller size, a calm one a larger size, for the SAME ₹ risk — so no
+// single trade can disproportionately hurt the account regardless of which instrument it's
+// on. N is computed from DAILY candles (computeATR, already used elsewhere in this app),
+// not the 5-min intraday series Master Consensus's other engines read — daily volatility is
+// what the Turtles' formula was built around, and 5-min ATR would understate real
+// day-to-day risk by an order of magnitude.
+//
+// Conviction multiplier on top of the raw Turtle unit size — this is the piece the Turtle
+// system itself doesn't specify (it sized every signal the same way), added here because
+// Master Consensus already tells you how much to TRUST a given call:
+//   voting >= 3, not thin, not Dead Zone  → 1.0x (full Turtle unit)
+//   thin OR voting 1-2                    → 0.5x (half — Master Consensus's own ⚠thin flag)
+//   Dead Zone OR voting === 0             → 0x   (skip — no real signal to size against)
+
+// Fetches ~30 days of DAILY candles once per instrument per day (cached on
+// INSTRUMENT_SCORE_MAP[name].atrDaily) and computes ATR(14). Deliberately its own small,
+// cheap fetch (day-interval, ~30 rows) rather than reusing the 5-min oiData.spotCandles
+// every other Master Consensus engine reads — kept OUT of _gtbMasterConsensus itself so
+// that function stays fully synchronous; Position Size is loaded separately, only when the
+// single-instrument popup actually needs it.
+async function _gtbFetchDailyATR(name) {
+    var sm = INSTRUMENT_SCORE_MAP[name] || {};
+    var today = moment().format('YYYY-MM-DD');
+    if (sm.atrDaily && sm.atrDaily.date === today) return sm.atrDaily.value;
+    var token = _gtbTokenForName(name);
+    if (!token) return null;
+    try {
+        var from = moment().subtract(45, 'days').format('YYYY-MM-DD');
+        var to = moment().format('YYYY-MM-DD');
+        var res = await getHistoricalDataUsingPromise(token, from, to, 'day');
+        var candles = (res && res.data && res.data.candles) ? res.data.candles : [];
+        if (candles.length < 5) return null;
+        var atr = computeATR(candles, 14);
+        if (!INSTRUMENT_SCORE_MAP[name]) INSTRUMENT_SCORE_MAP[name] = {};
+        INSTRUMENT_SCORE_MAP[name].atrDaily = { value: atr, date: today };
+        return atr;
+    } catch (e) { return null; }
+}
+
+// Lot size — from the same NSE_FUT_CURVE/MCX_FUT_CURVE caches Curve Structure already
+// populates (near contract's lot_size), falling back to 1 (size in raw quantity/shares)
+// when no futures contract is cached for this name (e.g. a cash equity never opened in
+// Curve Structure this session).
+function _gtbLotSizeFor(name) {
+    try {
+        var curve = (typeof NSE_FUT_CURVE !== 'undefined' ? NSE_FUT_CURVE[name] : null)
+            || (typeof MCX_FUT_CURVE !== 'undefined' ? MCX_FUT_CURVE[name] : null);
+        if (curve && curve.length && curve[0].lot_size) return parseInt(curve[0].lot_size, 10) || 1;
+    } catch (e) {}
+    return 1;
+}
+
+// Pure calc — no fetch. atr must already be resolved (via _gtbFetchDailyATR) and passed in.
+function _gtbPositionSizeCalc(name, consensus, atr) {
+    var capital = parseFloat(MARGIN) || 0;
+    var riskPct = parseFloat(RISK_PCT_PER_TRADE) || 1;
+    var riskAmount = capital * riskPct / 100;
+    var lotSize = _gtbLotSizeFor(name);
+
+    var multiplier, tier;
+    if (consensus.deadZone || consensus.voting === 0) { multiplier = 0; tier = 'SKIP — no real signal to size against'; }
+    else if (consensus.thin) { multiplier = 0.5; tier = 'HALF — ⚠thin consensus'; }
+    else { multiplier = 1.0; tier = 'FULL — broad engine agreement'; }
+
+    if (!atr || atr <= 0 || !capital || !riskAmount) {
+        return { ok: false, capital: capital, riskPct: riskPct, riskAmount: riskAmount, atr: atr, lotSize: lotSize, multiplier: multiplier, tier: tier };
+    }
+    // Raw Turtle unit: how many shares/units of the underlying the risk amount buys,
+    // if a stop is placed one ATR away (the Turtles' own default stop distance).
+    var rawUnits = riskAmount / atr;
+    var adjustedUnits = rawUnits * multiplier;
+    var lots = lotSize > 1 ? Math.floor(adjustedUnits / lotSize) : Math.floor(adjustedUnits);
+    return { ok: true, capital: capital, riskPct: riskPct, riskAmount: riskAmount, atr: atr, lotSize: lotSize,
+              multiplier: multiplier, tier: tier, rawUnits: rawUnits, adjustedUnits: adjustedUnits, lots: lots };
+}
+
+function _gtbPositionSizeHtml(name, consensus, atr) {
+    var r = _gtbPositionSizeCalc(name, consensus, atr);
+    if (!r.capital) {
+        return '<div style="padding:6px;color:var(--gtb-muted);">Set Account Capital in Settings → Market Trend Settings (currently ' + '₹' + (r.capital || 0) + ') to compute a position size.</div>';
+    }
+    if (!r.ok) {
+        return '<div style="padding:6px;color:var(--gtb-muted);">No ATR data yet for ' + name + ' — computing…</div>';
+    }
+    var col = r.multiplier === 0 ? 'var(--gtb-red)' : r.multiplier < 1 ? 'var(--gtb-amber)' : 'var(--gtb-green)';
+    return '<div style="padding:6px;font-size:0.68rem;">'
+        + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px;">'
+        +   '<div style="background:var(--gtb-bg);border:1px solid var(--gtb-border);padding:6px;text-align:center;"><div style="color:var(--gtb-muted);font-size:0.55rem;">RISK AMOUNT</div><div style="font-weight:800;font-family:var(--gtb-mono);">₹' + r.riskAmount.toLocaleString('en-IN', {maximumFractionDigits:0}) + '</div><div style="font-size:0.5rem;color:var(--gtb-muted);">' + r.riskPct + '% of ₹' + r.capital.toLocaleString('en-IN') + '</div></div>'
+        +   '<div style="background:var(--gtb-bg);border:1px solid var(--gtb-border);padding:6px;text-align:center;"><div style="color:var(--gtb-muted);font-size:0.55rem;">N (ATR-14, daily)</div><div style="font-weight:800;font-family:var(--gtb-mono);">' + r.atr.toFixed(2) + '</div><div style="font-size:0.5rem;color:var(--gtb-muted);">stop = 1×N away</div></div>'
+        +   '<div style="background:var(--gtb-bg);border:1px solid var(--gtb-border);padding:6px;text-align:center;"><div style="color:var(--gtb-muted);font-size:0.55rem;">LOT SIZE</div><div style="font-weight:800;font-family:var(--gtb-mono);">' + r.lotSize + '</div></div>'
+        + '</div>'
+        + '<div style="background:' + col + '18;outline:1px solid ' + col + '55;padding:8px;text-align:center;">'
+        +   '<div style="font-size:1rem;font-weight:800;color:' + col + ';">' + (r.multiplier === 0 ? 'SKIP THIS TRADE' : (r.lotSize > 1 ? r.lots + ' lot' + (r.lots === 1 ? '' : 's') : Math.floor(r.adjustedUnits) + ' units')) + '</div>'
+        +   '<div style="font-size:0.58rem;color:var(--gtb-muted);margin-top:2px;">' + r.tier + ' — ' + r.multiplier + 'x of the raw Turtle unit (' + Math.floor(r.rawUnits) + (r.lotSize > 1 ? ' units, ' + Math.floor(r.rawUnits / r.lotSize) + ' lots' : ' units') + ')</div>'
+        + '</div>'
+        + '<div style="margin-top:6px;font-size:0.56rem;color:var(--gtb-muted);">Turtle-style sizing (Covel, "The Complete Turtle Trader"): size = risk₹ ÷ N, so a volatile instrument gets a smaller size for the SAME ₹ risk. The conviction multiplier is this app\'s own addition — Master Consensus\'s thin/Dead-Zone flags scale the raw Turtle unit down rather than sizing every signal identically. Not a guarantee — a real stop-loss order is still on you to place.</div>'
+        + '</div>';
+}
+
+// All-instruments summary for the Dashboard tab — same instrument-list convention as
+// _gtbLevelProbLiveRowsHtml (NIFTY 50 + NIFTY BANK + both indices' weighted constituents),
+// so "include weightage stocks" behaves identically to every other all-instruments card in
+// this app rather than inventing a new list. No dropdown — every instrument's own outcome
+// renders as its own row, grouped by outcome so LONG/SHORT/WAIT calls are easy to scan
+// separately instead of hunting through one flat NIFTY-first list.
+// coreWeightFn(name) -> weight for the ONE-outcome banner (default: NIFTY 50/BANK 3x,
+// everything else 1x — the "index vs breadth" convention). indexNames lists which
+// instruments count toward the caution check (core tradeable instruments vs breadth);
+// pass [] to skip the caution check entirely (nothing structurally plays that role, e.g.
+// commodities, where there's no single "index" a basket of stocks feeds into).
+function _gtbMasterConsensusAllRowsHtml(names, coreWeightFn, indexNames, weightNote) {
+    if (!names) {
+        names = ['NIFTY 50', 'NIFTY BANK']
+            .concat(Object.keys(NIFTY_50_WEIGHTED_STOCKS || {}))
+            .concat(Object.keys(NIFTY_BANK_WEIGHTED_STOCKS || {}));
+    }
+    coreWeightFn = coreWeightFn || function (name) { return (name === 'NIFTY 50' || name === 'NIFTY BANK') ? 3 : 1; };
+    indexNames = indexNames || ['NIFTY 50', 'NIFTY BANK'];
+    weightNote = weightNote || 'NIFTY 50/BANK weighted 3x, stocks 1x';
+    var seen = {}; names = names.filter(function (n) { return seen[n] ? false : (seen[n] = true); });
+
+    var longGroup = [], shortGroup = [], waitGroup = [];
+    var all = [];
+    names.forEach(function (name) {
+        var c; try { c = _gtbMasterConsensus(name); } catch (e) { return; }
+        all.push(c);
+        if (c.outcome === 'GO LONG') longGroup.push(c);
+        else if (c.outcome === 'GO SHORT') shortGroup.push(c);
+        else waitGroup.push(c);
+    });
+    longGroup.sort(function (a, b) { return b.net - a.net; });
+    shortGroup.sort(function (a, b) { return a.net - b.net; });
+    waitGroup.sort(function (a, b) { return Math.abs(b.net) - Math.abs(a.net); });
+
+    // ── ONE final outcome across every instrument on this list ──────────────────────
+    // Same "index vs breadth" distinction the app already applies elsewhere (Index Impact
+    // Verdict, NIFTY/BANK NIFTY Divergence) when indexNames is non-empty; equal-weight
+    // breadth otherwise (e.g. commodities, which have no index/constituent structure).
+    // Only instruments with a real directional vote (voting > 0) contribute — an
+    // instrument sitting at WAIT with net exactly 0 shouldn't silently drag the average
+    // toward neutral just by existing.
+    var ovWeight = 0, ovSum = 0;
+    all.forEach(function (c) {
+        if (c.voting === 0) return;
+        var w = coreWeightFn(c.name);
+        ovWeight += w; ovSum += c.net * w;
+    });
+    var ovNet = ovWeight > 0 ? (ovSum / ovWeight) : 0;
+    var ovOutcome, ovCol;
+    if (ovWeight === 0) { ovOutcome = 'WAIT — No Data'; ovCol = 'var(--gtb-muted)'; }
+    else if (ovNet > 0.2)  { ovOutcome = 'GO LONG';  ovCol = 'var(--gtb-green)'; }
+    else if (ovNet < -0.2) { ovOutcome = 'GO SHORT'; ovCol = 'var(--gtb-red)'; }
+    else { ovOutcome = 'WAIT'; ovCol = 'var(--gtb-amber)'; }
+
+    // Caution — same convention as the Index Impact Verdict: if the core instrument(s)
+    // disagree with the direction the broader breadth is leaning, that's worth surfacing
+    // explicitly rather than letting the breadth vote quietly outvote them. Skipped
+    // entirely when indexNames is empty (nothing plays that structural role).
+    var indexDir = 0;
+    indexNames.forEach(function (nm) {
+        var c = all.filter(function (x) { return x.name === nm; })[0];
+        if (c && c.voting > 0) indexDir += c.net > 0 ? 1 : c.net < 0 ? -1 : 0;
+    });
+    var ovDir = ovNet > 0.2 ? 1 : ovNet < -0.2 ? -1 : 0;
+    var caution = indexNames.length > 0 && (indexDir !== 0 && ovDir !== 0 && (indexDir > 0) !== (ovDir > 0));
+
+    var rowHtml = function (c) {
+        var col = c.outcomeCol;
+        var thinTag = c.thin && c.voting > 0 ? ' <span style="color:var(--gtb-amber);font-size:0.4rem;" title="Thin consensus — riding on very few directional votes">⚠thin</span>' : '';
+        return '<div class="gtb-mc-all-row" data-name="' + c.name + '" style="display:grid;grid-template-columns:110px 90px 1fr;align-items:center;gap:6px;padding:3px 4px;border-bottom:1px solid var(--gtb-border)18;font-size:0.46rem;cursor:pointer;">'
+            + '<span style="color:var(--gtb-text);font-weight:700;">' + c.name + '</span>'
+            + '<span style="color:' + col + ';font-weight:800;">' + c.outcome.replace('WAIT — ', '') + '</span>'
+            + '<span style="color:var(--gtb-muted);">' + c.agree + '/' + c.voting + ' vote' + (c.voting === 1 ? '' : 's') + ' · ' + c.dataCount + '/' + c.rows.length + ' data · net ' + (c.net >= 0 ? '+' : '') + c.net.toFixed(2) + thinTag + '</span>'
+            + '</div>';
+    };
+    // Collapsible group header — WAIT starts collapsed by default (it's usually the
+    // largest, least-actionable group, exactly the case a live screenshot showed: 17/17
+    // instruments sitting in Dead Zone WAIT, pushing everything else off-screen). LONG/
+    // SHORT start expanded since those are the groups actually worth scanning immediately.
+    var sectionHdr = function (label, color, count, groupKey, startCollapsed) {
+        return '<div class="gtb-mc-group-hdr" data-group="' + groupKey + '" style="cursor:pointer;user-select:none;font-size:0.42rem;font-weight:800;letter-spacing:0.05em;text-transform:uppercase;color:' + color + ';padding:6px 4px 3px;display:flex;align-items:center;gap:4px;">'
+            + '<i class="bi bi-chevron-' + (startCollapsed ? 'right' : 'down') + '" style="font-size:0.5rem;"></i>'
+            + label + ' (' + count + ')'
+            + '</div>';
+    };
+    var groupBody = function (groupKey, rows, startCollapsed) {
+        return '<div class="gtb-mc-group-body" data-group="' + groupKey + '" style="' + (startCollapsed ? 'display:none;' : '') + '">' + rows + '</div>';
+    };
+
+    if (!longGroup.length && !shortGroup.length && !waitGroup.length) {
+        return '<div style="font-size:0.5rem;color:var(--gtb-muted);padding:4px;">No data yet — run a refresh</div>';
+    }
+
+    var overallBanner = '<div style="background:' + ovCol + '18;outline:2px solid ' + ovCol + '55;padding:10px;text-align:center;margin-bottom:8px;">'
+        + '<div style="font-size:1.1rem;font-weight:800;color:' + ovCol + ';">' + ovOutcome + '</div>'
+        + '<div style="font-size:0.5rem;color:var(--gtb-muted);margin-top:2px;">' + longGroup.length + ' LONG · ' + shortGroup.length + ' SHORT · ' + waitGroup.length + ' WAIT (of ' + all.length + ') · ' + weightNote + ' · weighted net ' + (ovNet >= 0 ? '+' : '') + ovNet.toFixed(2) + '</div>'
+        + (caution ? '<div style="color:var(--gtb-amber);font-weight:700;font-size:0.5rem;margin-top:4px;">⚠ CAUTION — ' + indexNames.join('/') + ' lean' + (indexNames.length === 1 ? 's' : '') + ' ' + (indexDir > 0 ? 'LONG' : 'SHORT') + ' while broader breadth leans the other way. This overall call is not a clean agreement between the two.</div>' : '')
+        + '</div>';
+
+    return overallBanner
+        + '<div style="font-size:0.4rem;color:var(--gtb-muted);padding:2px 4px 4px;">Click a row to open its full engine-by-engine breakdown. Click a group header to collapse/expand it. Same 9-engine weighted vote as the Master Consensus popup — see its own info icon for the full weighting rationale.</div>'
+        + (longGroup.length ? sectionHdr('GO LONG', 'var(--gtb-green)', longGroup.length, 'long', false) + groupBody('long', longGroup.map(rowHtml).join(''), false) : '')
+        + (shortGroup.length ? sectionHdr('GO SHORT', 'var(--gtb-red)', shortGroup.length, 'short', false) + groupBody('short', shortGroup.map(rowHtml).join(''), false) : '')
+        + (waitGroup.length ? sectionHdr('WAIT', 'var(--gtb-muted)', waitGroup.length, 'wait', true) + groupBody('wait', waitGroup.map(rowHtml).join(''), true) : '');
+}
+jQ(document).off('click.gtb-mc-group-toggle').on('click.gtb-mc-group-toggle', '.gtb-mc-group-hdr', function () {
+    var key = jQ(this).data('group');
+    var $container = jQ(this).closest('.gtb-card-body, .popupwindow_content');
+    var $body = $container.find('.gtb-mc-group-body[data-group="' + key + '"]');
+    var $icon = jQ(this).find('i');
+    var collapsed = $body.is(':visible');
+    $body.toggle(!collapsed);
+    $icon.toggleClass('bi-chevron-down', !collapsed).toggleClass('bi-chevron-right', collapsed);
+});
+jQ(document).off('click.gtb-mc-all-row').on('click.gtb-mc-all-row', '.gtb-mc-all-row', function () {
+    _gtbShowMasterConsensus(jQ(this).data('name'));
+});
+
+// MCX commodities version — every tracked commodity (_gtbMcxDashNames, same list the MCX
+// Dashboard's own card row uses), equal-weight breadth (no index/constituent structure to
+// distinguish here, unlike NSE), so the caution check is skipped entirely (indexNames: []).
+function _gtbMasterConsensusMcxRowsHtml() {
+    var names = (typeof _gtbMcxDashNames === 'function') ? _gtbMcxDashNames() : [];
+    return _gtbMasterConsensusAllRowsHtml(names, function () { return 1; }, [], 'equal-weight across all commodities');
+}
+
+function _gtbMasterConsensusHtml(name) {
+    var c = _gtbMasterConsensus(name);
+    // FLAT (computed a genuine neutral/zero reading) and NO DATA (couldn't compute this at
+    // all) look identical if collapsed into one "flat/no data" label — a real screenshot
+    // showed exactly that confusion, so they're now visually distinct.
+    var dirChip = function (dir, hasData) {
+        if (dir > 0) return '<span style="color:var(--gtb-green);font-weight:800;">▲ LONG</span>';
+        if (dir < 0) return '<span style="color:var(--gtb-red);font-weight:800;">▼ SHORT</span>';
+        if (hasData) return '<span style="color:var(--gtb-text);">— FLAT</span>';
+        return '<span style="color:var(--gtb-muted);font-style:italic;">— NO DATA</span>';
+    };
+    var classCol = function (wc) { return wc === 'VALIDATED' ? 'var(--gtb-green)' : wc === 'UNRELIABLE' ? 'var(--gtb-red)' : 'var(--gtb-muted)'; };
+
+    var h = '<div style="padding:12px;font-size:0.75rem;">';
+    h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">'
+       + '<span style="font-size:0.6rem;color:var(--gtb-muted);">' + name + '</span>'
+       + '</div>';
+    h += '<div style="background:' + c.outcomeCol + '18;outline:2px solid ' + c.outcomeCol + '55;padding:12px;text-align:center;margin-bottom:10px;">'
+       + '<div style="font-size:1.3rem;font-weight:800;color:' + c.outcomeCol + ';">' + c.outcome + '</div>'
+       + '<div style="font-size:0.62rem;color:var(--gtb-muted);margin-top:4px;">' + c.agree + '/' + c.voting + ' voting engines agree · ' + c.dataCount + '/' + c.rows.length + ' engines had data · weighted net ' + (c.net >= 0 ? '+' : '') + c.net.toFixed(2) + ' (range -1..+1)</div>'
+       + (c.deadZone ? '<div style="color:var(--gtb-amber);font-size:0.6rem;margin-top:4px;">⚠ Inside Dead Zone — conviction was already weak before this veto</div>' : '')
+       + (c.thin && !c.deadZone && c.voting > 0 ? '<div style="color:var(--gtb-amber);font-weight:700;font-size:0.62rem;margin-top:4px;">⚠ THIN CONSENSUS — this outcome is riding on just ' + c.voting + ' directional vote' + (c.voting === 1 ? '' : 's') + '. Most other engines are genuinely FLAT (not missing data, actually neutral) — treat this as one engine\'s call, not broad agreement.</div>' : '')
+       + '</div>';
+
+    h += '<table class="gtb-t915-table"><thead><tr><th>Engine</th><th>Reading</th><th>Weight</th><th>Class</th><th>Note</th></tr></thead><tbody>';
+    c.rows.forEach(function (r) {
+        h += '<tr>'
+           + '<td>' + r.label + '</td>'
+           + '<td>' + dirChip(r.dir, r.hasData) + '</td>'
+           + '<td style="font-family:var(--gtb-mono);text-align:center;">' + r.weight + 'x</td>'
+           + '<td style="color:' + classCol(r.weightClass) + ';font-weight:700;">' + r.weightClass + '</td>'
+           + '<td style="color:var(--gtb-muted);font-size:0.6rem;">' + (r.note || '') + '</td>'
+           + '</tr>';
+    });
+    h += '</tbody></table>';
+
+    h += '<div style="margin-top:10px;font-size:0.6rem;color:var(--gtb-muted);">'
+       + 'Not yet included (pending validation): <b>Depth Δ</b> (flagged suspect — see the ±100% investigation), '
+       + '<b>Range Scoreboard</b> and <b>Predict/9:15 Combo card</b> (separate engines with their own weighting — shown standalone rather than folded in, to avoid double-counting the same inputs twice). '
+       + 'This is a weighted synthesis of CURRENT readings, not itself a backtested engine — treat disagreement between this and any single panel as information, not a bug.'
+       + '</div>';
+
+    h += '<div style="margin-top:14px;border-top:1px solid var(--gtb-border);padding-top:10px;">'
+       + '<div style="font-weight:800;font-size:0.68rem;margin-bottom:6px;"><i class="bi bi-rulers"></i> POSITION SIZE (Turtle-style, ATR-adjusted)</div>'
+       + '<div id="gtb-mc-possize"><div class="cmd-load"><i class="bi bi-hourglass-split"></i> Fetching daily ATR…</div></div>'
+       + '</div>';
+
+    h += '<div style="margin-top:14px;border-top:1px solid var(--gtb-border);padding-top:10px;">'
+       + '<div style="font-weight:800;font-size:0.68rem;margin-bottom:6px;"><i class="bi bi-graph-up-arrow"></i> SIGNAL QUALITY — Information Coefficient (Grinold &amp; Kahn)</div>'
+       + '<div id="gtb-mc-ic">' + _gtbEngineICHtml(name) + '</div>'
+       + '</div>';
+    h += '</div>';
+    return h;
+}
+
+// Loads the Position Size panel — separate from _gtbMasterConsensusHtml because it needs
+// an async daily-candle fetch (_gtbFetchDailyATR); the consensus itself stays fully sync.
+async function _gtbLoadPositionSize(name) {
+    var consensus = _gtbMasterConsensus(name);
+    var el = document.getElementById('gtb-mc-possize');
+    if (el) el.innerHTML = _gtbPositionSizeHtml(name, consensus, null);
+    var atr = await _gtbFetchDailyATR(name);
+    // Guard against a stale write: if the instrument dropdown moved on to a different
+    // name while this fetch was in flight, don't overwrite its freshly-rendered panel
+    // with this now-outdated instrument's numbers.
+    var currentSel = jQ('#gtb-mc-instr-select').val();
+    if (currentSel && currentSel !== name) return;
+    el = document.getElementById('gtb-mc-possize');
+    if (el) el.innerHTML = _gtbPositionSizeHtml(name, consensus, atr);
+}
+
+// ── Signal Quality — Information Coefficient (Grinold & Kahn, "Active Portfolio
+// Management") ──────────────────────────────────────────────────────────────────────
+// The book's Fundamental Law of Active Management treats every forecast as something
+// with a MEASURABLE quality (the Information Coefficient — the correlation between what
+// a signal predicted and what actually happened), rather than a heuristic trust category.
+// Master Consensus currently sorts engines into VALIDATED/REASONED/UNRELIABLE by hand
+// (backed by the accuracy replays already built this session for 9:15/Futures/OI-OBV) —
+// this is the more rigorous version: an actual correlation number per engine, computed
+// from today's session, the same way every other "replay today's candles" backtest in
+// this app already works (Futures Remark Accuracy, the removed OI/OBV Signal Accuracy).
+//
+// Only engines with a genuine per-candle historical reconstruction are measurable this
+// way. Two of Master Consensus's 9 rows have NO historical data at all and are excluded
+// with an explicit note rather than silently ignored:
+//   - Order Flow Imbalance: reads the LIVE WebSocket tick only — Kite never exposes
+//     historical order-book depth, so there is no past order-flow to replay, ever.
+//   - Curve Structure: only today's near/far contract prices are cached; reconstructing
+//     it historically would need every past day's contract identity, not attempted here.
+// 9:15 Zone is also excluded from this INTRADAY correlation — it's fixed for the whole
+// day (one value, not a per-candle series), so a same-day correlation isn't a meaningful
+// measure for it. Its real accuracy is the separate 250-day backtest (9:15 Backtest popup)
+// — already a far more robust measurement than anything a single day here could produce.
+
+// Standard Pearson correlation coefficient — the actual math behind "Information
+// Coefficient". Returns null (not 0) when there isn't enough variance/data to trust it,
+// rather than reporting a misleadingly precise-looking number off 2-3 points.
+function _gtbPearsonIC(xs, ys) {
+    var n = xs.length;
+    if (n < 8 || n !== ys.length) return null;
+    var mx = 0, my = 0;
+    for (var i = 0; i < n; i++) { mx += xs[i]; my += ys[i]; }
+    mx /= n; my /= n;
+    var num = 0, dx2 = 0, dy2 = 0;
+    for (i = 0; i < n; i++) {
+        var dx = xs[i] - mx, dy = ys[i] - my;
+        num += dx * dy; dx2 += dx * dx; dy2 += dy * dy;
+    }
+    var denom = Math.sqrt(dx2 * dy2);
+    if (!denom) return null;
+    return num / denom;
+}
+
+// Replays today's 5-min buckets (same bucket-list construction as
+// _gtbBuildLevelProbHistoryToday) and computes, at each bucket T, the signed score each
+// reconstructable engine would have shown, plus the realized next-candle return — then
+// correlates each engine's signal series against the return series. Pure sync arithmetic
+// over already-cached oiData (no new fetch) — same "reuse what's already cached" discipline
+// as everything else in this app that replays today's session.
+function _gtbComputeEngineIC(name) {
+    var sm = INSTRUMENT_SCORE_MAP[name];
+    var oiData = sm && sm.oiData;
+    if (!oiData || !oiData.spotCandles || !oiData.spotCandles.length || !oiData.tableData || !oiData.tableData.length) {
+        return { ok: false, reason: 'No OI/OBV data cached yet for ' + name + ' — load OI first.' };
+    }
+    var sc = oiData.spotCandles;
+    var lastDay = moment(sc[sc.length - 1][0]).format('YYYY-MM-DD');
+    var todays = sc.filter(function (c) { return moment(c[0]).format('YYYY-MM-DD') === lastDay; });
+    if (todays.length < 10) return { ok: false, reason: 'Not enough of today\'s session yet (need ~10+ candles) — check back later in the day.' };
+
+    var series = { oiObv: [], maxPain: [], ivSkew: [], levelProb: [], composite: [] };
+    var returns = [];
+    for (var i = 0; i < todays.length - 1; i++) {
+        var m = moment(todays[i][0]);
+        var mins = Math.floor(m.minutes() / 5) * 5;
+        var hhmm = m.format('HH:') + ('0' + mins).slice(-2);
+
+        var priceChangeT = _gtbPriceChangeAtTime(sc, hhmm);
+        var spotT = 0;
+        oiData.tableData.forEach(function (item) { if (item['ATM_STRIKE']) spotT = parseFloat(item['STRIKE']) || 0; });
+        var tableAtT = [];
+        oiData.tableData.forEach(function (item) {
+            var at = _gtbStrikeItemAtTime(item, hhmm);
+            if (!at) return;
+            at.STRIKE = item['STRIKE'];
+            tableAtT.push(at);
+        });
+        if (!tableAtT.length) continue;
+
+        var oiScoreT = 0;
+        tableAtT.forEach(function (at) { oiScoreT += scoreOIStrikeForSignal(at, !!at.ATM_STRIKE, priceChangeT, spotT).score; });
+        var maxPainT = _gtbMaxPainScoreAtTime(tableAtT);
+        var ivSkewT = _gtbIVSkewScoreAtTime(tableAtT);
+        var lp = _gtbLevelProbAtTime(name, hhmm);
+        var lpProxy = lp.ok ? ((lp.pASO + lp.pAST + lp.pVIXU) - (lp.pBSO + lp.pBST + lp.pVIXL)) / 300 : null;
+
+        var closeNow = parseFloat(todays[i][4]);
+        var closeNext = parseFloat(todays[i + 1][4]);
+        if (!closeNow) continue;
+        var fwdReturn = (closeNext - closeNow) / closeNow * 100;
+
+        series.oiObv.push(oiScoreT);
+        series.maxPain.push(maxPainT);
+        series.ivSkew.push(ivSkewT);
+        if (lpProxy !== null) series.levelProb.push(lpProxy);
+        series.composite.push(oiScoreT + maxPainT + ivSkewT);
+        returns.push(fwdReturn);
+
+        // Level Probability's series can be shorter than the others (its own .ok gate) —
+        // realign by pushing a matching return only when levelProb actually got a value,
+        // tracked separately so its IC isn't computed against a misaligned return array.
+        if (lpProxy !== null) { if (!series._lpReturns) series._lpReturns = []; series._lpReturns.push(fwdReturn); }
+    }
+
+    var rows = [
+        { key: 'oiObv', label: 'OI/OBV', xs: series.oiObv, ys: returns },
+        { key: 'maxPain', label: 'Max Pain', xs: series.maxPain, ys: returns },
+        { key: 'ivSkew', label: 'IV Skew', xs: series.ivSkew, ys: returns },
+        { key: 'levelProb', label: 'Level Probability', xs: series.levelProb, ys: series._lpReturns || [] },
+        { key: 'composite', label: 'Composite (OI+MaxPain+IVSkew)', xs: series.composite, ys: returns },
+    ].map(function (r) {
+        var ic = _gtbPearsonIC(r.xs, r.ys);
+        var hits = 0, voting = 0;
+        for (var i = 0; i < r.xs.length; i++) {
+            if (r.xs[i] === 0) continue;
+            voting++;
+            if ((r.xs[i] > 0 && r.ys[i] > 0) || (r.xs[i] < 0 && r.ys[i] < 0)) hits++;
+        }
+        return { label: r.label, ic: ic, n: r.xs.length, voting: voting, hitRate: voting ? hits / voting : null };
+    });
+
+    return { ok: true, rows: rows, sampleN: returns.length };
+}
+
+function _gtbEngineICHtml(name) {
+    var r = _gtbComputeEngineIC(name);
+    if (!r.ok) return '<div style="padding:6px;color:var(--gtb-muted);">' + r.reason + '</div>';
+    // Grinold & Kahn note real, useful systematic ICs are often quite small in absolute
+    // terms (0.05-0.10) — a genuinely working signal rarely looks impressive by this
+    // number alone, which is the whole point: skill is measured, not eyeballed.
+    var tier = function (ic) {
+        if (ic === null) return { label: 'INSUFFICIENT DATA', col: 'var(--gtb-muted)' };
+        var a = Math.abs(ic);
+        if (a < 0.02) return { label: 'NO MEASURABLE EDGE', col: 'var(--gtb-muted)' };
+        if (a < 0.05) return { label: 'WEAK', col: 'var(--gtb-amber)' };
+        return { label: ic > 0 ? 'REAL EDGE (agrees w/ score sign)' : 'REAL EDGE (INVERTED — fades its own score)', col: 'var(--gtb-green)' };
+    };
+    var h = '<div style="padding:6px;font-size:0.68rem;">'
+        + '<div style="font-size:0.58rem;color:var(--gtb-muted);margin-bottom:8px;">Today\'s session only (' + r.sampleN + ' 5-min buckets) — Information Coefficient = correlation between each engine\'s signed score at time T and the realized next-candle return. Order Flow, Curve Structure (no historical data at all) and 9:15 Zone (fixed all day — see the separate 250-day 9:15 Backtest instead) are not measurable this way and excluded.</div>'
+        + '<table class="gtb-t915-table"><thead><tr><th>Engine</th><th>IC</th><th>Samples</th><th>Directional Hit-Rate</th><th>Read</th></tr></thead><tbody>';
+    r.rows.forEach(function (row) {
+        var t = tier(row.ic);
+        h += '<tr>'
+            + '<td>' + row.label + '</td>'
+            + '<td style="font-family:var(--gtb-mono);font-weight:800;color:' + t.col + ';">' + (row.ic === null ? '—' : (row.ic >= 0 ? '+' : '') + row.ic.toFixed(3)) + '</td>'
+            + '<td class="gtb-t915-date">' + row.n + '</td>'
+            + '<td style="font-family:var(--gtb-mono);">' + (row.hitRate === null ? '—' : Math.round(row.hitRate * 100) + '% (n=' + row.voting + ')') + '</td>'
+            + '<td style="color:' + t.col + ';font-weight:700;font-size:0.6rem;">' + t.label + '</td>'
+            + '</tr>';
+    });
+    h += '</tbody></table>'
+        + '<div style="margin-top:8px;font-size:0.56rem;color:var(--gtb-muted);">Per Grinold & Kahn (Active Portfolio Management): a real, useful systematic signal often has an IC as small as 0.05–0.10 — don\'t expect an impressive-looking number even from a genuinely working signal. A NEGATIVE IC means the engine is anti-predictive today (fading it would have worked better than following it) — exactly the pattern this session\'s OI/OBV accuracy backtest already found once. This is ONE session\'s measurement, not a stable, validated weight — treat as a diagnostic, not yet a reason to change Master Consensus\'s weighting on its own.</div>'
+        + '</div>';
+    return h;
+}
+
+function _gtbShowMasterConsensus(name) {
+    name = name || 'NIFTY 50';
+    var h = _gtbMasterConsensusHtml(name);
+    showPopUpWindow('master-consensus', h, 'Master Consensus', 720, 640);
+    var _cls = 'popup-custom-style-master-consensus';
+    var _title = '<div style="display:flex;align-items:center;gap:6px;width:100%;">'
+        + '<span style="font-weight:800;font-size:0.7rem;"><i class="bi bi-columns-gap"></i> MASTER CONSENSUS</span>'
+        + '<select id="gtb-mc-instr-select" style="margin-left:8px;font-size:0.62rem;background:var(--gtb-bg);color:var(--gtb-text);border:1px solid var(--gtb-border);">'
+        + ['NIFTY 50', 'NIFTY BANK', 'SENSEX', 'RELIANCE', 'HDFCBANK', 'ICICIBANK'].map(function (n) {
+            return '<option value="' + n + '"' + (n === name ? ' selected' : '') + '>' + n + '</option>';
+          }).join('')
+        + '</select>'
+        + '<button id="gtb-mc-reload" class="gtb-sig-hdr-btn" style="margin-left:4px;"><i class="bi bi-arrow-clockwise"></i></button>'
+        + popupWinControls(_cls)
+        + '</div>';
+    jQ('.' + _cls).find('.popupwindow_titlebar_text').html(_title);
+    hideNativePopupButtons(_cls);
+    jQ('.' + _cls).find('.popupwindow_titlebar').removeClass('popupwindow_titlebar_draggable');
+    jQ('.' + _cls).toggleClass('gtb-light', (localStorage.getItem('GTB_THEME') || 'dark') === 'light');
+    _gtbLoadPositionSize(name);
+}
+jQ(document).off('click.gtb-mc-reload').on('click.gtb-mc-reload', '#gtb-mc-reload', function () {
+    var name = jQ('#gtb-mc-instr-select').val() || 'NIFTY 50';
+    jQ('.popup-custom-style-master-consensus .popupwindow_content').html(_gtbMasterConsensusHtml(name));
+    _gtbLoadPositionSize(name);
+});
+// Instrument switch lives in the titlebar (separate DOM from the body content below),
+// so re-rendering just the body on change is safe — the select itself isn't touched.
+jQ(document).off('change.gtb-mc-instr').on('change.gtb-mc-instr', '#gtb-mc-instr-select', function () {
+    var name = jQ(this).val();
+    jQ('.popup-custom-style-master-consensus .popupwindow_content').html(_gtbMasterConsensusHtml(name));
+    _gtbLoadPositionSize(name);
+});
+
 // ── Trend Combination Matrix ─────────────────────────────────────────────────
 // Shows every dimension of market state (9:15, strike zone, OI, A/D, score,
 // AVWAP/PCR) per instrument in a single matrix, then derives a verdict.
@@ -21037,7 +23017,7 @@ function _gtbShowTradeSetup(inPaneId, singleName) {
         ? '<div id="gtb-ts-wrap" style="display:flex;flex-direction:column;overflow:hidden;font-size:0.55rem;">'
             + '<div id="gtb-ts-body" style="padding:8px 0;"></div>'
             + '<div style="padding:3px 0;flex-shrink:0;display:flex;align-items:center;gap:6px;">'
-            + '<span id="gtb-ts-status" style="flex:1;font-size:0.42rem;color:var(--gtb-muted);"></span>'
+            + '<span id="gtb-ts-status" style="flex:1;font-size:0.52rem;color:var(--gtb-muted);"></span>'
             + '<button id="gtb-ts-refresh" style="background:var(--gtb-accent);color:#fff;border:none;padding:2px 8px;font-size:0.44rem;cursor:pointer;"><i class="bi bi-arrow-clockwise"></i> Refresh</button>'
             + '</div>'
             + '<div id="gtb-ts-info-pop" style="display:none;position:fixed;z-index:99999;max-width:300px;background:var(--gtb-surface2);border:1px solid var(--gtb-accent);padding:8px 10px;font-size:0.46rem;color:var(--gtb-text);box-shadow:0 4px 12px rgba(0,0,0,0.4);">'
@@ -21055,8 +23035,8 @@ function _gtbShowTradeSetup(inPaneId, singleName) {
             + '<div id="gtb-ts-body" style="flex:1;overflow-y:auto;padding:8px 10px;position:relative;"></div>'
             /* status bar + controls */
             + '<div style="padding:4px 10px;border-top:1px solid var(--gtb-border);background:var(--gtb-surface2);flex-shrink:0;display:flex;align-items:center;gap:6px;">'
-            + '<span id="gtb-ts-status" style="flex:1;font-size:0.44rem;color:var(--gtb-muted);">Analysing...</span>'
-            + '<button id="gtb-ts-help" style="background:var(--gtb-surface);border:1px solid var(--gtb-border);color:var(--gtb-muted);padding:2px 8px;font-size:0.44rem;cursor:pointer;" title="How this works"><i class="bi bi-question-circle"></i> How it works</button>'
+            + '<span id="gtb-ts-status" style="flex:1;font-size:0.54rem;color:var(--gtb-muted);">Analysing...</span>'
+            + '<button id="gtb-ts-help" style="background:var(--gtb-surface);border:1px solid var(--gtb-border);color:var(--gtb-muted);padding:2px 8px;font-size:0.54rem;cursor:pointer;" title="How this works"><i class="bi bi-question-circle"></i> How it works</button>'
             + '<button id="gtb-ts-refresh" style="background:var(--gtb-accent);color:#fff;border:none;padding:3px 10px;font-size:0.46rem;cursor:pointer;"><i class="bi bi-arrow-clockwise"></i> Refresh</button>'
             + '</div>'
             /* shared info popover — repositioned by JS on (i) click */
@@ -21541,9 +23521,9 @@ function _gtbShowTradeSetup(inPaneId, singleName) {
 
         function _tile(label, val, color, sub) {
             return '<div style="background:var(--gtb-bg);border:1px solid var(--gtb-border);padding:5px 8px;min-width:80px;flex:1;">'
-                + '<div style="color:var(--gtb-muted);font-size:0.42rem;text-transform:uppercase;letter-spacing:0.05em;">' + label + '</div>'
+                + '<div style="color:var(--gtb-muted);font-size:0.52rem;text-transform:uppercase;letter-spacing:0.05em;">' + label + '</div>'
                 + '<div style="font-size:0.6rem;font-weight:800;color:' + (color || 'var(--gtb-text)') + ';">' + val + '</div>'
-                + (sub ? '<div style="color:var(--gtb-muted);font-size:0.42rem;">' + sub + '</div>' : '')
+                + (sub ? '<div style="color:var(--gtb-muted);font-size:0.52rem;">' + sub + '</div>' : '')
                 + '</div>';
         }
 
@@ -21554,7 +23534,7 @@ function _gtbShowTradeSetup(inPaneId, singleName) {
         }
 
         function _sec(title, infoKey) {
-            return '<div style="font-size:0.42rem;font-weight:800;color:var(--gtb-muted);text-transform:uppercase;'
+            return '<div style="font-size:0.52rem;font-weight:800;color:var(--gtb-muted);text-transform:uppercase;'
                 + 'letter-spacing:0.08em;padding:4px 0 2px;margin-top:6px;border-top:1px solid var(--gtb-border);display:flex;align-items:center;">'
                 + title + (infoKey ? _ii(infoKey) : '')
                 + '</div>';
@@ -21590,10 +23570,10 @@ function _gtbShowTradeSetup(inPaneId, singleName) {
                         + 'onclick="event.stopPropagation()" '
                         + 'onmouseover="this.style.opacity=\'0.75\'" onmouseout="this.style.opacity=\'1\'">'
                         + label + ' <i class="bi bi-box-arrow-up-right" style="font-size:0.5rem;opacity:0.6;"></i></a>'
-                        + '<span style="font-size:0.42rem;color:var(--gtb-muted);">' + sym + '</span>';
+                        + '<span style="font-size:0.52rem;color:var(--gtb-muted);">' + sym + '</span>';
                 }
                 return '<span style="font-size:0.7rem;font-weight:900;color:' + dirColor + ';">' + label + '</span>'
-                    + (sym ? '<span style="font-size:0.44rem;color:var(--gtb-muted);">' + sym + '</span>' : '');
+                    + (sym ? '<span style="font-size:0.54rem;color:var(--gtb-muted);">' + sym + '</span>' : '');
             })()
             + '<span style="margin-left:auto;padding:2px 8px;background:' + prof.verdict.color + ';color:#fff;font-size:0.46rem;font-weight:800;">'
             + prof.verdict.label + '  ' + prof.passed + '/' + prof.sigs.length + '</span>'
@@ -21625,11 +23605,11 @@ function _gtbShowTradeSetup(inPaneId, singleName) {
         }
         h += '<div style="padding:5px 8px;background:var(--gtb-bg);border-left:3px solid ' + tColor + ';margin:4px 0;font-size:0.52rem;">'
             + '<b style="color:' + tColor + ';">' + triggerText + '</b>'
-            + (earlyEntry ? '<div style="margin-top:3px;font-size:0.42rem;color:var(--gtb-muted);">'
+            + (earlyEntry ? '<div style="margin-top:3px;font-size:0.52rem;color:var(--gtb-muted);">'
                 + '✓ Futures aligned &nbsp;|&nbsp; ✓ GEX trending &nbsp;|&nbsp; ✓ R:R ≥ 1.0 &nbsp;|&nbsp; ✓ 9:15 not opposing'
                 + '</div>' : '')
             + '</div>';
-        h += '<div style="font-size:0.42rem;color:var(--gtb-muted);margin:2px 0;">'
+        h += '<div style="font-size:0.52rem;color:var(--gtb-muted);margin:2px 0;">'
             + 'Key levels: BST ' + a.bst + '  |  BSO ' + a.bso + '  |  Spot ' + a.open.toFixed(0)
             + '  |  ASO ' + a.aso + '  |  AST ' + a.ast + '</div>';
 
@@ -21666,7 +23646,7 @@ function _gtbShowTradeSetup(inPaneId, singleName) {
                 + '<div style="position:absolute;left:' + ePct + '%;top:50%;transform:translate(-50%,-50%);width:8px;height:8px;background:#fff;border:1.5px solid #000;border-radius:50%;"></div>'
                 + '<span style="position:absolute;right:3px;top:50%;transform:translateY(-50%);font-size:0.4rem;color:#fff;font-weight:700;">Tgt ' + tp.target + '</span>'
                 + '</div>';
-            h += '<div style="font-size:0.42rem;color:var(--gtb-muted);">Exit SL: ' + a.name + ' falls '
+            h += '<div style="font-size:0.52rem;color:var(--gtb-muted);">Exit SL: ' + a.name + ' falls '
                 + (dir === 'CE' ? 'below BSO ' : 'above ASO ') + tp.uSL
                 + '  |  Book target: ' + a.name + ' reaches ' + (dir === 'CE' ? 'AST ' : 'BST ') + tp.uTgt
                 + '  |  Delta: ' + tp.delta.toFixed(3) + (a.strikeIV ? ' (B-S from IV ' + parseFloat(a.strikeIV).toFixed(1) + '%, ' + a.daysToExpiry + 'd expiry)' : ' (fallback)') + '</div>';
@@ -21681,7 +23661,7 @@ function _gtbShowTradeSetup(inPaneId, singleName) {
             + _pill('OI',    a.sc.oi_obv,        a.sc.oi_obv        !== 0 ? (a.sc.oi_obv        > 0) : null)
             + _pill('Total', a.total, a.total > 0 ? true : a.total < 0 ? false : null)
             + '</div>';
-        h += '<div style="font-size:0.42rem;color:var(--gtb-muted);">' + a.rationale + '</div>';
+        h += '<div style="font-size:0.52rem;color:var(--gtb-muted);">' + a.rationale + '</div>';
 
         // OI analysis
         h += _sec('OI / OBV Analysis', 'oi-analysis');
@@ -21859,7 +23839,7 @@ function _gtbShowTradeSetup(inPaneId, singleName) {
         try { b915 = JSON.parse(localStorage.getItem('VALID_BREAKOUT_NINE_FIFTEEN') || 'null'); } catch(e) {}
         var h = '<div style="border:1px solid var(--gtb-border);background:var(--gtb-surface);margin-bottom:8px;">'
             + '<div style="display:flex;align-items:center;gap:8px;padding:4px 8px;background:var(--gtb-surface2);border-bottom:1px solid var(--gtb-border);">'
-            + '<span style="font-size:0.42rem;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:var(--gtb-muted);">9:15 Breakout</span>'
+            + '<span style="font-size:0.52rem;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:var(--gtb-muted);">9:15 Breakout</span>'
             + '<span style="font-size:0.4rem;color:var(--gtb-muted);">— click a stock to add to search</span>'
             + '</div>';
         if (!b915 || !Object.keys(b915).length) {
@@ -21887,7 +23867,7 @@ function _gtbShowTradeSetup(inPaneId, singleName) {
                     + '<div style="font-size:0.4rem;font-weight:800;color:' + c.color + ';text-transform:uppercase;letter-spacing:0.06em;margin-bottom:3px;">'
                     + c.label + ' (' + groups[c.key].length + ')</div>'
                     + '<div style="display:flex;flex-wrap:wrap;gap:1px;">'
-                    + (pills || '<span style="font-size:0.44rem;color:var(--gtb-muted);">—</span>')
+                    + (pills || '<span style="font-size:0.54rem;color:var(--gtb-muted);">—</span>')
                     + '</div></div>';
             });
             h += '</div>';
@@ -22043,15 +24023,15 @@ function _gtbShowTradeSetup(inPaneId, singleName) {
 
         var sigC = msig.signal.indexOf('BUY') !== -1 ? 'var(--gtb-green)' : msig.signal.indexOf('SELL') !== -1 ? 'var(--gtb-red)' : 'var(--gtb-amber)';
         var out  = '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:6px 10px;margin-bottom:8px;border:1px solid var(--gtb-border);background:var(--gtb-surface);">'
-            + '<span style="font-size:0.44rem;color:var(--gtb-muted);text-transform:uppercase;font-weight:700;">Market Signal</span>'
+            + '<span style="font-size:0.54rem;color:var(--gtb-muted);text-transform:uppercase;font-weight:700;">Market Signal</span>'
             + '<span style="font-size:0.75rem;font-weight:900;color:' + sigC + ';">' + msig.signal + '</span>'
-            + '<span style="font-size:0.44rem;color:var(--gtb-muted);">' + (msig.reason || '') + '</span>'
+            + '<span style="font-size:0.54rem;color:var(--gtb-muted);">' + (msig.reason || '') + '</span>'
             + (msig.tradeSignal ? (function(ts) {
                 var txt = typeof ts === 'object' ? (ts.outcome || '') + (ts.level ? ' ' + ts.level : '') : String(ts);
                 return txt ? '<span style="margin-left:auto;font-size:0.55rem;font-weight:700;color:var(--gtb-accent);">' + txt + '</span>' : '';
               })(msig.tradeSignal) : '')
             + '</div>'
-            + '<div style="font-size:0.42rem;color:var(--gtb-muted);margin-bottom:8px;padding:0 2px;">'
+            + '<div style="font-size:0.52rem;color:var(--gtb-muted);margin-bottom:8px;padding:0 2px;">'
             + 'Data sourced from last dashboard refresh cycle. Open this popup AFTER a full refresh for current signals. Entry = spot crosses ASO (CE) or BSO (PE). SL/Target computed via Black-Scholes delta from strike IV.'
             + '</div>';
         // ── 9:15 Breakout Summary — re-read localStorage on each render (full mode only) ──
@@ -22272,7 +24252,7 @@ function _gtbShowTradeSetup(inPaneId, singleName) {
         + '<b style="color:var(--gtb-text);">Crude Oil?</b><br>'
         + 'CRUDEOILM is on MCX (not NSE). It appears automatically when loaded in the dashboard. Options are fetched from the MCX exchange. Use the search bar to add it if not shown.<br><br>'
 
-        + '<div style="color:var(--gtb-muted);font-size:0.42rem;">Click the <b>ⓘ</b> icons on each section header for detailed explanations of that specific metric.</div>'
+        + '<div style="color:var(--gtb-muted);font-size:0.52rem;">Click the <b>ⓘ</b> icons on each section header for detailed explanations of that specific metric.</div>'
         + '</div>';
 
     jQ(document).off('click.tsHelp').on('click.tsHelp', '#gtb-ts-help', function() {
@@ -22363,8 +24343,8 @@ function _gtbShowRsScanner() {
 
     var html = '<div id="rs-scanner-wrap" style="height:100%;display:flex;flex-direction:column;overflow:hidden;">'
         + '<div style="padding:6px 8px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--gtb-border);">'
-        +   '<span style="font-size:0.42rem;color:var(--gtb-muted);">Nifty %: <span id="rs-bench-pct" style="font-family:var(--gtb-mono);font-weight:700;color:var(--gtb-text);">—</span></span>'
-        +   '<span style="font-size:0.42rem;color:var(--gtb-muted);margin-left:auto;">Sort:</span>'
+        +   '<span style="font-size:0.52rem;color:var(--gtb-muted);">Nifty %: <span id="rs-bench-pct" style="font-family:var(--gtb-mono);font-weight:700;color:var(--gtb-text);">—</span></span>'
+        +   '<span style="font-size:0.52rem;color:var(--gtb-muted);margin-left:auto;">Sort:</span>'
         +   '<select id="rs-sort" style="font-size:0.42rem;padding:1px 4px;background:var(--gtb-surface2);border:1px solid var(--gtb-border);color:var(--gtb-text);">'
         +     '<option value="rs-desc">RS ▼</option>'
         +     '<option value="rs-asc">RS ▲</option>'
@@ -22388,7 +24368,7 @@ function _gtbShowRsScanner() {
     var _title = '<div style="display:flex;align-items:center;gap:6px;width:100%;">'
         + '<i class="bi bi-bar-chart-fill" style="color:var(--gtb-accent);"></i>'
         + '<span style="font-weight:800;font-size:0.7rem;">RELATIVE STRENGTH</span>'
-        + '<span style="font-size:0.38rem;color:var(--gtb-muted);">vs NIFTY 50</span>'
+        + '<span style="font-size:0.48rem;color:var(--gtb-muted);">vs NIFTY 50</span>'
         + popupWinControls(_cls)
         + '</div>';
     jQ('.' + _cls).find('.popupwindow_titlebar_text').html(_title);
@@ -22565,7 +24545,7 @@ function _ssBuildObvHtml() {
     if (!rows.length) return '<div style="padding:24px;text-align:center;color:var(--gtb-muted);font-size:0.5rem;">No OI/OBV data — run OI scan first.</div>';
 
     var divCount = rows.filter(function(r) { return r.div; }).length;
-    var h = '<div style="font-size:0.42rem;color:var(--gtb-muted);padding:4px 2px 6px;">'
+    var h = '<div style="font-size:0.52rem;color:var(--gtb-muted);padding:4px 2px 6px;">'
         + 'Nifty: <b style="color:' + (benchChg >= 0 ? 'var(--gtb-green)' : 'var(--gtb-red)') + ';">'
         + (benchChg >= 0 ? '+' : '') + benchChg.toFixed(2) + '%</b>'
         + ' &nbsp;|&nbsp; <b style="color:var(--gtb-accent);">' + divCount + '</b> divergences found'
@@ -22704,7 +24684,7 @@ function _ssBuildAbsorbHtml() {
     if (!rows.length) return '<div style="padding:24px;text-align:center;color:var(--gtb-muted);font-size:0.5rem;">No instruments near key levels, or OI scan not run yet.</div>';
 
     var wallCount = rows.filter(function(r) { return r.isAbsorbing; }).length;
-    var h = '<div style="font-size:0.42rem;color:var(--gtb-muted);padding:4px 2px 6px;">'
+    var h = '<div style="font-size:0.52rem;color:var(--gtb-muted);padding:4px 2px 6px;">'
         + rows.length + ' instruments near key levels &nbsp;|&nbsp; '
         + '<b style="color:var(--gtb-accent);">' + wallCount + '</b> active walls detected'
         + '</div>';
@@ -24936,6 +26916,7 @@ function _gtbCreateFloatingBar() {
         { id: 'show-fut-accuracy',           icon: 'bi-bullseye',             title: 'Futures Accuracy' },
         { id: 'show-futures-signal',         icon: 'bi-flag-fill',            title: 'Instrument Detail View' },
         { id: 'show-commodities',            icon: 'bi-droplet-fill',         title: 'Commodities' },
+        { id: 'show-mcx-dashboard',          icon: 'bi-collection-fill',      title: 'MCX Dashboard — all commodities' },
         { id: 'show-oi-viewer',              icon: 'bi-eye',                  title: 'OI Viewer' },
         { id: 'show-stock-viewer',           icon: 'bi-list-ul',              title: 'Stock Viewer' },
         { id: 'show-market-quote-analyzer',  icon: 'bi-graph-up',             title: 'Market Quotes' },
@@ -24946,6 +26927,7 @@ function _gtbCreateFloatingBar() {
         { id: 'show-snap-replay',            icon: 'bi-collection-play-fill', title: 'Historical Day Replay' },
         { id: 'show-trade-setup',            icon: 'bi-lightning-fill',       title: 'Trade Recommender' },
         { id: 'show-trade-checklist',        icon: 'bi-clipboard-check',      title: 'Pre-Trade Checklist' },
+        { id: 'show-master-consensus',       icon: 'bi-columns-gap',          title: 'Master Consensus (all engines, one outcome)' },
         { id: 'show-rs-scanner',             icon: 'bi-bar-chart-fill',       title: 'Relative Strength' },
         { id: 'show-signal-scanners',        icon: 'bi-toggles',              title: 'OBV Divergence + Strike Absorption' },
         { id: 'show-carry-scanner',          icon: 'bi-moon-stars-fill',      title: 'Overnight Carry Scanner' },
@@ -25006,6 +26988,7 @@ function _gtbCreateFloatingBar() {
             if (id === 'show-positional-screener') { _psShowPopup(); return; }
             if (id === 'show-data-load-popup')   { _dlShowPopup(); return; }
             if (id === 'show-market-trend-settings') { _gtbShowMarketTrendSettings(); return; }
+            if (id === 'show-master-consensus')  { _gtbShowMasterConsensus('NIFTY 50'); return; }
             var $el = jQ('#' + id);
             if ($el.length) {
                 $el[0].click();

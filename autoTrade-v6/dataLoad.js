@@ -718,6 +718,26 @@ function _dlRecomputeDerivedGlobals() {
         });
         summary.push('FUTURE_INTRUMENT_LIST: ' + FUTURE_INTRUMENT_LIST.length + ' contracts (NFO+BFO; shared filter/nearest)');
 
+        // Full multi-expiry curve per underlying (all expiries, not just the resolved
+        // "current" one above) — same raw byNameExpiry map used just above, keyed by DISPLAY
+        // name so the UI can look it up the same way it looks up every other instrument
+        // (e.g. 'NIFTY 50', not the raw Kite 'NIFTY'). Needed for curve-structure
+        // (contango/backwardation) comparison, which needs the near AND next contract at once.
+        try {
+            var nseCurve = {};
+            Object.keys(byNameExpiry).forEach(function (n) {
+                var displayName = _DL_INDEX_NAME_TO_DISPLAY[n] || n;
+                var byExpiry = byNameExpiry[n];
+                nseCurve[displayName] = Object.keys(byExpiry).sort().map(function (exp) {
+                    var r = byExpiry[exp];
+                    return { expiry: exp, token: String(r.token), tradingsymbol: r.tradingsymbol,
+                             lot_size: r.lot_size != null ? String(r.lot_size) : '' };
+                });
+            });
+            NSE_FUT_CURVE = nseCurve;
+            summary.push('NSE_FUT_CURVE: ' + Object.keys(nseCurve).length + ' underlyings (full multi-expiry curve)');
+        } catch (eCurve2) {}
+
         // Options: EVERY CE/PE contract for F&O stocks + indices, ALL expiries kept —
         // unlike futures (one contract per underlying), OPTION_STRIKE_LIST is consumed by
         // code that does its OWN expiry filtering downstream (oiAnalyzer.js's
@@ -896,6 +916,24 @@ function _dlRecomputeDerivedGlobals() {
             COMMODITIES_FUTURE_INSTRUMENT_LIST = mcxFutures;
             summary.push('COMMODITIES_FUTURE_INSTRUMENT_LIST: ' + mcxFutures.length + ' commodities (per-commodity override, else nearest expiry)');
         }
+
+        // Full multi-expiry curve per commodity (near + far contracts), from the SAME raw
+        // mcxFutByNameExpiry map used just above to resolve the single "current" contract —
+        // needed for curve-structure (contango/backwardation) comparison, which needs two
+        // contracts at once. Sorted by expiry ascending so [0] is always the nearest contract.
+        try {
+            var mcxCurve = {};
+            Object.keys(mcxFutByNameExpiry).forEach(function (n) {
+                var byExpiry = mcxFutByNameExpiry[n];
+                mcxCurve[n] = Object.keys(byExpiry).sort().map(function (exp) {
+                    var r = byExpiry[exp];
+                    return { expiry: exp, token: String(r.token), tradingsymbol: r.tradingsymbol,
+                             lot_size: r.lot_size != null ? String(r.lot_size) : '' };
+                });
+            });
+            MCX_FUT_CURVE = mcxCurve;
+            summary.push('MCX_FUT_CURVE: ' + Object.keys(mcxCurve).length + ' commodities (full multi-expiry curve)');
+        } catch (eCurve) {}
 
         // Options + strike-diff (inferred from the actual gap between consecutive sorted
         // strikes at each commodity's own options expiry — MCX has no published step-scheme

@@ -153,3 +153,9 @@ let NSE_FUTURE_STRIKE_DIFF = {}; // populated by dataLoad.js: same stock data + 
 let INSTRUMENT_TOKENS = {}; // populated by dataLoad.js from the Kite Instruments cache (indices + F&O stocks only)
 
 let FUTURE_INTRUMENT_LIST = []; // populated by dataLoad.js from the Kite Instruments cache, gated by FUTURE_EXPIRY_MONTH setting
+
+// Every NFO/BFO futures contract per underlying (all expiries, not just the resolved one
+// above), keyed by DISPLAY name (e.g. 'NIFTY 50', 'RELIANCE') — mirrors MCX_FUT_CURVE
+// (constants-commodities.js) for the same curve-structure (contango/backwardation) use case.
+// {name: [{expiry:'YYYY-MM-DD', token, tradingsymbol, lot_size}, ...]}, sorted by expiry asc.
+let NSE_FUT_CURVE = {};

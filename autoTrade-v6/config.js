@@ -112,9 +112,20 @@ const g_config = new MonkeyConfig({
             type: 'text',
             default: moment().format("YYYY-MM-DD")
         },
+        // Was an unused/dead field (defined, never read anywhere in the app) — repurposed
+        // as Account Capital, the input Master Consensus's new Position Size calculator
+        // needs (riskAmount = capital × risk_pct_per_trade / 100). Key kept as 'margin' so
+        // nothing that might already reference it elsewhere breaks; only the label/purpose
+        // changed.
         margin: {
+            'label': 'Account Capital (₹) — used for Position Size calculator',
             type: 'text',
-            default: 10000
+            default: 100000
+        },
+        risk_pct_per_trade: {
+            'label': 'Risk % per trade — used for Position Size calculator',
+            type: 'text',
+            default: 1
         },
         refresh_time: {
             type: 'text',
@@ -241,6 +252,7 @@ const CURRENT_DATE_TO_DATE = CURRENT_DAY + " 11:05:00";
 
 let date = new Date().toJSON().slice(0, 10);
 const MARGIN = g_config.get('margin');
+const RISK_PCT_PER_TRADE = parseFloat(g_config.get('risk_pct_per_trade')) || 1;
 let weightIndex = []
 const HISTORICAL_DATA_INTERVAL = g_config.get('historical_data_interval');
 const REFRESH_TIME = g_config.get('refresh_time');
