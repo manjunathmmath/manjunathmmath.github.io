@@ -1317,6 +1317,7 @@ function commonMarkupPlaceHolder() {
         + '<a id="gtb-add-instr-btn"         class="gtb-ctrl-link" title="Add instrument"><i class="bi bi-plus-circle-fill"></i></a>'
         + '<a id="gtb-settings-toggle"       class="gtb-ctrl-link" title="Settings"><i class="bi bi-gear-fill"></i></a>'
         + '<a id="gtb-tools-launcher"        class="gtb-ctrl-link" title="All Tools"><i class="bi bi-grid-3x3-gap-fill"></i></a>'
+        + '<a id="gtb-ws-toggle"             class="gtb-ctrl-link" title="WebSocket: click to connect"><i class="bi bi-broadcast"></i></a>'
         + '</div>';
 
     h += '<div id="gtb-main">';
@@ -3390,6 +3391,15 @@ async function commonShowPopupWindow() {
     try { renderComponentPanel(); } catch(e) { console.warn('renderComponentPanel error', e); }
     try { renderScoreHistory(); } catch(e) { console.warn('renderScoreHistory error', e); }
     try { _gtbMacroOnRefresh(); } catch(e) { console.warn('macro error', e); }
+    // Pre-Squeeze streak tracking must run every cycle regardless of which tab is open — it's
+    // watching for a MULTI-scan unreversed run, so a gap in tracking (e.g. user on another tab)
+    // would silently reset streaks that were actually still building.
+    try {
+        var _sqNames = ['NIFTY 50', 'NIFTY BANK']
+            .concat(Object.keys(typeof NIFTY_50_WEIGHTED_STOCKS !== 'undefined' ? NIFTY_50_WEIGHTED_STOCKS : {}))
+            .concat(Object.keys(typeof NIFTY_BANK_WEIGHTED_STOCKS !== 'undefined' ? NIFTY_BANK_WEIGHTED_STOCKS : {}));
+        _gtbUpdateSqueezeStreaks(_sqNames);
+    } catch(e) { console.warn('squeeze streak error', e); }
     try { _gtbBriefingOnRefresh(); } catch(e) { console.warn('briefing error', e); }
     try { _gtbApplyChecklistHighlights(); } catch(e) { console.warn('checklist highlight error', e); }
     // _gtbRenderLevelProbPane() (5-min history matrix) is no longer surfaced anywhere in the
@@ -6229,13 +6239,27 @@ jQ(document).off('click.dv-futacc-reload').on('click.dv-futacc-reload', '.dv-fut
 // risk-free rate minus expected dividend yield — a MILD contango, not commodities' storage-
 // cost contango — and backwardation here is usually a dividend/ex-date or rollover-flow
 // artifact rather than "physical tightness" (there's no physical commodity to be tight on).
+// Drops any contract whose expiry is already BEFORE the snapshot day from a curve array —
+// NSE_FUT_CURVE/MCX_FUT_CURVE (dataLoad.js) are built from whatever Kite Instruments sync last
+// ran and are NOT auto-refreshed on rollover, so on/after an expiry day (e.g. NIFTY26SEPFUT
+// expiring 2026-09-29) a curve cached from BEFORE that sync would still list the now-expired
+// contract as curve[0], silently treating it as "near" instead of rolling to the next one —
+// its token has no new candles after expiry, so the near price would just freeze rather than
+// error. Filtering here means the app self-corrects on stale/un-refreshed data; re-running
+// Data Load after rollover is still the fully correct fix (Kite itself removes expired
+// contracts from its own instrument dump), this is just a safety net on top of that.
+function _gtbFilterLiveCurve(curve, refDay) {
+    if (!refDay || !curve || !curve.length) return curve || [];
+    return curve.filter(function (c) { return !c.expiry || c.expiry >= refDay; });
+}
+
 async function _dvLoadCurveStructure(name, tid, sfx) {
     var elId = tid + '-curve' + sfx;
     var el = document.getElementById(elId);
     if (!el) return;
     el.innerHTML = '<div class="cmd-load"><i class="bi bi-hourglass-split"></i> Loading contract curve…</div>';
     try {
-        var curve = (typeof NSE_FUT_CURVE !== 'undefined' ? NSE_FUT_CURVE[name] : null) || [];
+        var curve = _gtbFilterLiveCurve((typeof NSE_FUT_CURVE !== 'undefined' ? NSE_FUT_CURVE[name] : null) || [], CURRENT_DAY);
         if (curve.length < 2) {
             el.innerHTML = '<div style="padding:6px;color:var(--gtb-muted);">Only ' + curve.length + ' active contract' + (curve.length === 1 ? '' : 's') + ' listed for ' + name + ' right now — no second (far-month) contract to compare against. Kite\'s instrument list only ever carries currently-active contracts.</div>';
             return;
@@ -6369,7 +6393,7 @@ async function _gtbFetchCurveRow(item) {
     // completely different (historical) day. The near contract's own historical candle is the
     // only price this app can correctly attribute to an arbitrary past snapshot day.
     var curveMap = item.isMcx ? (typeof MCX_FUT_CURVE !== 'undefined' ? MCX_FUT_CURVE : {}) : (typeof NSE_FUT_CURVE !== 'undefined' ? NSE_FUT_CURVE : {});
-    var curve = curveMap[item.name] || [];
+    var curve = _gtbFilterLiveCurve(curveMap[item.name] || [], item.isMcx ? MCX_CURRENT_DAY : CURRENT_DAY);
     if (curve.length < 2) {
         return { name: item.name, isMcx: item.isMcx, ok: false, spotLtp: null, reason: 'Only ' + curve.length + ' active contract(s) listed' };
     }
@@ -11261,6 +11285,85 @@ function _gtbShortCoveringSignal(name) {
     return out;
 }
 
+// ── Pre-Squeeze Watch: an EARLY-WARNING list, not a probability ───────────────────────────
+// _gtbShortCoveringSignal (above) is reactive — it only lights up once OI is ALREADY falling
+// with price ALREADY moving the right way, i.e. the squeeze has already started. This tracks
+// the PRECONDITION that has to exist before either squeeze type can happen at all: a sustained,
+// unreversed run of fresh one-sided positioning (futures REMARK 'SHORT' = fresh shorts building
+// = the fuel a future SHORT_COVERING burns through; 'LONG' = fresh longs building = the fuel a
+// future LONG_UNWINDING burns through). The longer that streak runs without reversing, the more
+// fuel exists for a squeeze WHENEVER one eventually fires — but there is no historical study
+// behind these specific thresholds (unlike the 9:15 zone backtest elsewhere in this app), so
+// this is presented as a "Setup Score" watchlist, explicitly NOT a probability of firing by any
+// particular time — see _gtbPreSqueezeScore's own comment.
+var _GTB_SQUEEZE_STREAK = {}; // name -> { remark, streak }
+function _gtbUpdateSqueezeStreaks(names) {
+    try {
+        var key = 'GTB_SQUEEZE_STREAK_' + (typeof CURRENT_DAY !== 'undefined' ? CURRENT_DAY : moment().format('YYYY-MM-DD'));
+        var stored = null;
+        try { stored = JSON.parse(localStorage.getItem(key) || 'null'); } catch (e0) {}
+        if (stored) _GTB_SQUEEZE_STREAK = stored;
+        names.forEach(function (name) {
+            var sm = (typeof INSTRUMENT_SCORE_MAP !== 'undefined' ? INSTRUMENT_SCORE_MAP[name] : null) || {};
+            var remark = sm.futures_trend_remark;
+            var isFuel = remark === 'SHORT' || remark === 'LONG';
+            var prev = _GTB_SQUEEZE_STREAK[name];
+            if (isFuel && prev && prev.remark === remark) prev.streak = (prev.streak || 1) + 1;
+            else if (isFuel) _GTB_SQUEEZE_STREAK[name] = { remark: remark, streak: 1 };
+            else delete _GTB_SQUEEZE_STREAK[name]; // fuel released (squeeze fired) or genuinely neutral — streak resets
+        });
+        try { localStorage.setItem(key, JSON.stringify(_GTB_SQUEEZE_STREAK)); } catch (e1) {}
+    } catch (e) {}
+}
+
+// Setup Score (5-95) — how much one-sided fuel has built up for a FUTURE squeeze, not a
+// probability of it firing within any given time. Components, each capped:
+//   Streak length   — up to 40 pts, the core signal (longer unreversed build-up = more fuel)
+//   PCR extremity   — up to 25 pts, in the direction that matches the fuel (crowded positioning)
+//   Expiry proximity — up to 20 pts (mechanical unwind pressure rises sharply near expiry)
+//   Historical accuracy of the EVENTUAL squeeze remark on this instrument — up to 15 pts
+// Returns null for anything not currently building fuel (streak < 3 scans, ~15+ min) or
+// already actively squeezing (that's _gtbShortCoveringSignal's job, not this watch's).
+function _gtbPreSqueezeScore(name) {
+    var st = _GTB_SQUEEZE_STREAK[name];
+    if (!st || st.streak < 3) return null;
+    var sm = (typeof INSTRUMENT_SCORE_MAP !== 'undefined' ? INSTRUMENT_SCORE_MAP[name] : null) || {};
+    var willBe = st.remark === 'SHORT' ? 'SHORT_COVERING' : 'LONG_UNWINDING'; // the eventual squeeze this fuel feeds
+    var pts = Math.min(40, st.streak * 8);
+    var pcr = (sm.oiData && sm.oiData.pcr) ? parseFloat(sm.oiData.pcr) : null;
+    var pcrExtreme = pcr != null && ((willBe === 'SHORT_COVERING' && pcr >= 1.4) || (willBe === 'LONG_UNWINDING' && pcr <= 0.7));
+    if (pcrExtreme) pts += 25;
+    var days = null; try { days = _gtbDaysToExpiry(name); } catch (e) {}
+    if (days != null && days <= 3) pts += Math.max(5, 20 - days * 5);
+    if (sm.futAccMap && sm.futAccMap[willBe] && sm.futAccMap[willBe].total >= 8) {
+        var wr = sm.futAccMap[willBe].hits / sm.futAccMap[willBe].total;
+        if (wr >= 0.6) pts += 15; else if (wr <= 0.4) pts -= 10;
+    }
+    return { name: name, willBe: willBe, streak: st.streak, pcr: pcr, pcrExtreme: pcrExtreme, daysToExpiry: days,
+              score: Math.max(5, Math.min(95, Math.round(pts))) };
+}
+
+function _gtbPreSqueezeWatchHtml(names) {
+    var seen = {}; names = names.filter(function (n) { return seen[n] ? false : (seen[n] = true); });
+    var rows = names.map(_gtbPreSqueezeScore).filter(Boolean).sort(function (a, b) { return b.score - a.score; });
+    if (!rows.length) return '';
+    return '<div style="margin-top:8px;padding-top:6px;border-top:1px dashed var(--gtb-border);">'
+        + '<div style="font-size:0.5rem;color:var(--gtb-muted);margin-bottom:4px;"><b>PRE-SQUEEZE WATCH</b> — building fuel, not yet firing. Setup Score reflects how much one-sided positioning has accumulated (streak length, PCR extremity, expiry proximity, historical remark accuracy) — it is NOT a probability the squeeze fires, or a timeframe for when.</div>'
+        + rows.map(function (r) {
+            var typeLabel = r.willBe === 'SHORT_COVERING' ? 'building toward Short Covering' : 'building toward Long Unwinding';
+            var col = r.willBe === 'SHORT_COVERING' ? 'var(--gtb-green)' : 'var(--gtb-red)';
+            var scoreCol = r.score >= 60 ? col : r.score >= 35 ? 'var(--gtb-amber)' : 'var(--gtb-muted)';
+            return '<div style="display:grid;grid-template-columns:90px 1fr 90px 40px;align-items:center;gap:6px;padding:2px 0;font-size:0.44rem;">'
+                + '<span style="color:var(--gtb-text);font-weight:700;">' + r.name + '</span>'
+                + '<span style="color:' + col + ';">' + typeLabel + ' &middot; ' + r.streak + ' scans unreversed'
+                    + (r.pcrExtreme ? ' &middot; one-sided PCR ' + r.pcr.toFixed(2) : '')
+                    + (r.daysToExpiry != null && r.daysToExpiry <= 3 ? ' &middot; ' + r.daysToExpiry + 'd to expiry' : '') + '</span>'
+                + '<span></span>'
+                + '<span style="font-weight:900;font-family:var(--gtb-mono);color:' + scoreCol + ';text-align:right;">' + r.score + '</span>'
+                + '</div>';
+        }).join('');
+}
+
 // Where a squeeze is likely to run to: the nearest levels in the direction of the move, from the
 // OI walls (call-writing wall for short covering, put-writing wall for long unwinding) and the
 // ASO/AST/VIXU or BSO/BST/VIXL ladder. A reasoned "next stop", not a fitted forecast.
@@ -11386,7 +11489,7 @@ function _gtbShortCoveringLiveRowsHtml() {
     var names = ['NIFTY 50', 'NIFTY BANK']
         .concat(Object.keys(NIFTY_50_WEIGHTED_STOCKS || {}))
         .concat(Object.keys(NIFTY_BANK_WEIGHTED_STOCKS || {}));
-    return _gtbShortCoveringRowsHtmlFor(names);
+    return _gtbShortCoveringRowsHtmlFor(names) + _gtbPreSqueezeWatchHtml(names);
 }
 
 function _gtbReconstructFutAccuracy(cd, vix, accMap) {
@@ -14237,7 +14340,7 @@ jQ(document).on('click', '#show-commodities', function (e) {
     async function _cmdLoadCurveStructure() {
         jQ('#cmd-curve-structure').html('<div class="cmd-st"><i class="bi bi-graph-up"></i> CURVE STRUCTURE' + _ii('cmd-curve') + '</div><div class="cmd-load"><i class="bi bi-hourglass-split"></i> Loading contract curve…</div>');
         try {
-            var curve = (typeof MCX_FUT_CURVE !== 'undefined' ? MCX_FUT_CURVE[_cmdName] : null) || [];
+            var curve = _gtbFilterLiveCurve((typeof MCX_FUT_CURVE !== 'undefined' ? MCX_FUT_CURVE[_cmdName] : null) || [], MCX_CURRENT_DAY);
             if (curve.length < 2) {
                 jQ('#cmd-curve-structure').html(
                     '<div class="cmd-st"><i class="bi bi-graph-up"></i> CURVE STRUCTURE' + _ii('cmd-curve') + '</div>'
@@ -21177,6 +21280,16 @@ function _gtbRenderDashboardPane() {
         +      '<div class="gtb-card-body" id="gtb-dash-predict" style="padding:6px 8px;"></div>'
         +    '</div>';
 
+        // One-line macro backdrop strip (Oil/Bond Yield/Fed proxy/Rupee/Dollar/India yield),
+        // right below Predict per explicit placement request. Kept deliberately to a single
+        // line -- the full multi-driver breakdown lives in the Macro tab; clicking this jumps
+        // there. Refreshes with the same global refresh cycle as everything else on this tab
+        // (see _gtbMacroOnRefresh in macro.js, which now also re-renders this strip regardless
+        // of which tab is active, not just when the Macro tab itself is open).
+        h += '<div class="gtb-card gtb-widget" style="margin:0 8px 8px;" id="gtb-dash-macro-card">'
+        +      '<div class="gtb-card-body" id="gtb-dash-macro" style="padding:5px 10px;cursor:pointer;" title="Click to open the Macro tab"></div>'
+        +    '</div>';
+
         // Level Confirmation — live pre-trade filter for today's Sell-at-ASO/AST or
         // Buy-at-BSO/BST call: 5 independent live checks (GIFT NIFTY's own level reaction,
         // a real OI wall at that level, which index is genuinely weak/strong, Level
@@ -21305,6 +21418,7 @@ function _gtbRenderDashboardPane() {
     });
 
     try { jQ('#gtb-dash-predict').html(_gtbBuildPrediction(true)); } catch (e) {}
+    try { if (typeof _gtbRenderDashMacroStrip === 'function') _gtbRenderDashMacroStrip(); } catch (e) {}
     try { jQ('#gtb-dash-lvlconfirm').html(_gtbLevelConfirmHtml()); } catch (e) {}
 
     _gtbDashGridNames().forEach(function (name) {
@@ -27621,7 +27735,9 @@ function _gtbCreateFloatingBar() {
         flyout.style.left = left + 'px';
         flyout.classList.add('gtb-tf-open');
         jQ(this).addClass('gtb-ctrl-link-active');
-        setTimeout(function () { searchWrap.querySelector('#gtb-tf-search-input').focus(); }, 30);
+        // Not auto-focusing the search box on open — it visibly highlighted (focus ring) the
+        // instant the flyout appeared, before the user asked to type anything. Typing still
+        // works immediately by clicking the box, same as any other search input in this app.
     });
 
     // Close on outside click, or on Escape anywhere while open.

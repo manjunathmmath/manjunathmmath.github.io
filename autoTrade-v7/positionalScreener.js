@@ -652,8 +652,15 @@ jQ(document).on('click', '.ps-explain-btn', function () {
     var r = _PS_CACHE[name];
     if (!r) return;
     var html = '<div style="padding:14px 16px;overflow-y:auto;height:100%;font-size:0.68rem;line-height:1.5;">' + _psExplainVerdict(r) + '</div>';
-    showPopUpWindow('ps-explain-' + name, html, name + ' -- Trade Recommendation', 480, 560);
-    var _cls = 'popup-custom-style-ps-explain-' + name;
+    // Slugify for the popup id/class -- multi-word names (NIFTY 50, NIFTY BANK) contain a
+    // space, which is invalid inside a CSS class name; the raw name here produced a class
+    // like "popup-custom-style-ps-explain-NIFTY 50", which jQ('.' + _cls) parses as TWO
+    // selectors ("...NIFTY" descendant "50"), silently matching nothing -- the titlebar/theme
+    // styling below never applied and the popup looked like it never opened. Single-word
+    // names (TCS, RELIANCE) never hit this, which is why it looked instrument-specific.
+    var slug = name.replace(/[^A-Za-z0-9]+/g, '-');
+    showPopUpWindow('ps-explain-' + slug, html, name + ' -- Trade Recommendation', 480, 560);
+    var _cls = 'popup-custom-style-ps-explain-' + slug;
     var _title = '<div style="display:flex;align-items:center;gap:6px;width:100%;">'
         + '<span style="font-weight:800;font-size:0.7rem;">' + name + ' — TRADE RECOMMENDATION</span>'
         + popupWinControls(_cls) + '</div>';

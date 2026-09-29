@@ -294,5 +294,27 @@ async function _gtbRenderMacroPane() {
 function _gtbMacroOnRefresh() {
     _mcRefresh(false).then(function () {
         if (typeof _gtbCurrentActiveTab !== 'undefined' && _gtbCurrentActiveTab === 'macro') _gtbRenderMacroPane();
+        // Dashboard's one-line macro strip refreshes every cycle regardless of which tab is
+        // active — it's a cheap DOM write (a single line, not the full per-driver tab), and
+        // the whole point is it's visible without switching to the Macro tab at all.
+        try { _gtbRenderDashMacroStrip(); } catch (e) {}
     }).catch(function () {});
 }
+
+// One-line macro backdrop strip on the Dashboard tab, right below Predict — see the dashboard
+// card markup in _gtbRenderDashboardPane (grootTradeBot.js). Deliberately just a single line;
+// the full per-driver breakdown lives on the Macro tab itself, which clicking this opens.
+function _gtbRenderDashMacroStrip() {
+    var $el = jQ('#gtb-dash-macro');
+    if (!$el.length) return;
+    var m = _GTB_MACRO;
+    if (!m) { $el.html('<span style="color:var(--gtb-muted);font-size:0.62rem;"><i class="bi bi-globe"></i> Macro backdrop: loading…</span>'); return; }
+    var col = m.tone === 'good' ? 'var(--gtb-green)' : m.tone === 'bad' ? 'var(--gtb-red)' : 'var(--gtb-amber)';
+    var html = '<div style="display:flex;align-items:center;gap:8px;font-size:0.62rem;line-height:1.3;">'
+        + '<i class="bi bi-globe" style="color:' + col + ';flex-shrink:0;"></i>'
+        + '<b style="color:' + col + ';flex-shrink:0;white-space:nowrap;">MACRO: ' + _mcEsc(m.label) + ' (' + (m.score >= 0 ? '+' : '') + m.score.toFixed(1) + ')</b>'
+        + '<span style="color:var(--gtb-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + _mcEsc(m.advice) + '</span>'
+        + '</div>';
+    $el.html(html);
+}
+jQ(document).on('click', '#gtb-dash-macro-card', function () { try { if (typeof _gtbActivateTab === 'function') _gtbActivateTab('macro'); } catch (e) {} });
