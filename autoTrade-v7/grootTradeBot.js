@@ -8036,11 +8036,65 @@ function _renderGtbOverview(score, marketSignal) {
         }
         var _n50list = (typeof NIFTY_50_LIST   !== 'undefined') ? NIFTY_50_LIST   : [];
         var _bnlist  = (typeof NIFTY_BANK_LIST !== 'undefined') ? NIFTY_BANK_LIST : [];
-        _both('gtb-ov-915-n50').html(_fmt915(_count915(_n50list)));
-        _both('gtb-ov-915-bn').html(_fmt915(_count915(_bnlist)));
-        _both('gtb-ov-915-all').html(_fmt915(_count915(Object.keys(b915))));
+        var _alllist = Object.keys(b915);
+        _both('gtb-ov-915-n50').html(_fmt915(_count915(_n50list))).css('cursor', 'pointer').attr('title', 'Click to list the stocks').attr('data-915-list', 'N50');
+        _both('gtb-ov-915-bn').html(_fmt915(_count915(_bnlist))).css('cursor', 'pointer').attr('title', 'Click to list the stocks').attr('data-915-list', 'BN');
+        _both('gtb-ov-915-all').html(_fmt915(_count915(_alllist))).css('cursor', 'pointer').attr('title', 'Click to list the stocks').attr('data-915-list', 'ALL');
+        // Stash the raw name lists (not just counts) for the click-to-popup below — same
+        // "computed once here, surfaced on click instead of thrown away" pattern
+        // window._GTB_AD_DETAIL already uses for the A/D chips.
+        window._GTB_915_LISTS = { N50: _n50list, BN: _bnlist, ALL: _alllist, b915: b915 };
     } catch (e) {}
 }
+
+// 9:15 Breakout stock-list popup — mirrors _gtbShowADDetailPopup's pattern exactly, just for
+// the 9:15 zone (ASO/AST vs BSO/BST) instead of live advance/decline. window._GTB_915_LISTS is
+// stashed alongside the N50/BN/ALL counts above so this needs no extra computation on click.
+function _gtbShowNineFifteenDetailPopup(which) {
+    var store = window._GTB_915_LISTS;
+    if (!store) return;
+    var names = store[which] || [];
+    var b915 = store.b915 || {};
+    var title = which === 'N50' ? 'NIFTY 50' : which === 'BN' ? 'BANK NIFTY' : 'All F&O';
+    var above = [], below = [], neutral = [];
+    names.forEach(function (nm) {
+        var c = (b915[nm] || {})['CLOSE_9_15'];
+        var ltp = null; try { ltp = parseFloat(generateTrend(nm).ltp); } catch (e) {}
+        var row = { name: nm, zone: c || 'B/W', ltp: ltp };
+        if (c === 'ASO' || c === 'AST') above.push(row);
+        else if (c === 'BSO' || c === 'BST') below.push(row);
+        else neutral.push(row);
+    });
+    function rowsHtml(list, col) {
+        if (!list.length) return '<div style="font-size:0.5rem;color:var(--gtb-muted);padding:4px 0;">None</div>';
+        return list.slice().sort(function (a, b) { return a.name.localeCompare(b.name); }).map(function (s) {
+            return '<div style="display:flex;justify-content:space-between;gap:8px;padding:2px 0;font-size:0.52rem;">'
+                + '<span style="font-weight:700;">' + s.name + '</span>'
+                + '<span style="font-family:var(--gtb-mono);color:var(--gtb-muted);">' + (s.ltp != null && !isNaN(s.ltp) ? s.ltp.toLocaleString('en-IN', { maximumFractionDigits: 2 }) : '—')
+                + ' <span style="color:' + col + ';">(' + s.zone + ')</span></span>'
+                + '</div>';
+        }).join('');
+    }
+    var body = '<div style="padding:10px 12px;font-size:0.6rem;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">'
+        + '<div><div style="font-weight:800;color:var(--gtb-green);margin-bottom:4px;">ABOVE — ASO/AST (' + above.length + ')</div>' + rowsHtml(above, 'var(--gtb-green)') + '</div>'
+        + '<div><div style="font-weight:800;color:var(--gtb-red);margin-bottom:4px;">BELOW — BSO/BST (' + below.length + ')</div>' + rowsHtml(below, 'var(--gtb-red)') + '</div>'
+        + '<div><div style="font-weight:800;color:var(--gtb-muted);margin-bottom:4px;">B/W — NEUTRAL (' + neutral.length + ')</div>' + rowsHtml(neutral, 'var(--gtb-muted)') + '</div>'
+        + '</div>';
+    showPopUpWindow('nine15-detail', body, title + ' 9:15 Breakout', 620, 420);
+    var _cls = 'popup-custom-style-nine15-detail';
+    var _title = '<div style="display:flex;align-items:center;gap:6px;width:100%;">'
+        + '<span style="font-weight:800;font-size:0.7rem;"><i class="bi bi-alarm"></i> ' + title.toUpperCase() + ' 9:15 BREAKOUT</span>'
+        + popupWinControls(_cls)
+        + '</div>';
+    jQ('.' + _cls).find('.popupwindow_titlebar_text').html(_title);
+    hideNativePopupButtons(_cls);
+    jQ('.' + _cls).find('.popupwindow_titlebar').removeClass('popupwindow_titlebar_draggable');
+    jQ('.' + _cls).toggleClass('gtb-light', (localStorage.getItem('GTB_THEME') || 'dark') === 'light');
+}
+jQ(document).on('click', '[data-915-list]', function (e) {
+    e.preventDefault();
+    _gtbShowNineFifteenDetailPopup(jQ(this).attr('data-915-list'));
+});
 
 // Max Pain gravity: +1 when Max Pain is above spot (bullish pull), -1 when below.
 // At pin (distance < 0.3%) returns 0 — no directional pull when already at Max Pain.
@@ -8728,6 +8782,8 @@ function _gtbCfgFieldGroups() {
         { key: 'api_secret', label: 'API Secret', type: 'text' },
         { key: 'api_access_token', label: 'Access Token', type: 'text' },
         { key: 'create_at', label: '', type: 'button', buttonLabel: 'Create AT (login via Kite)' },
+        { key: 'telegram_bot_token', label: 'Telegram Bot Token (Positional Screener)', type: 'text' },
+        { key: 'telegram_chat_id', label: 'Telegram Chat ID', type: 'text' },
     ]});
     groups.push({ id: 'general', title: 'GENERAL', fields: [
         { key: 'previous_day_date', label: 'Previous day (YYYY-MM-DD)', type: 'text' },

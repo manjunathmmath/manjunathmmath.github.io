@@ -77,14 +77,20 @@ function _mcFetchManual(def) {
     });
 }
 
-function _mcFetch(def) {
+function _mcFetch(def, rangeOverride) {
     if (def.manual) return _mcFetchManual(def);
     var sym = def.sym;
+    // rangeOverride: the live Macro card only ever needs '3mo' (its own 20-day sparkline/tabs
+    // is well within that), so it's the default and stays unchanged for that path. The
+    // backtest passes a wider range ('1y') when replaying 6 months, since 3 months of daily
+    // closes (~63 trading days) doesn't have enough history to score 126 trading days back
+    // (each scored day itself needs ~6 more days of lookback before it).
+    var range = rangeOverride || '3mo';
     return new Promise(function (resolve, reject) {
         if (typeof GM_xmlhttpRequest === 'undefined') { reject('GM_xmlhttpRequest unavailable'); return; }
         GM_xmlhttpRequest({
             method: 'GET',
-            url: 'https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(sym) + '?interval=1d&range=3mo',
+            url: 'https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(sym) + '?interval=1d&range=' + range,
             onload: function (res) {
                 try {
                     var r = JSON.parse(res.responseText).chart.result[0];
@@ -242,6 +248,9 @@ function _mcInjectStyle() {
 function _mcHtml(m) {
     var h = '<div class="mc-scope">';
     h += '<div class="mc-bar"><button class="mc-btn" id="mc-refresh"><i class="bi bi-arrow-repeat"></i> Refresh</button>'
+       + '<button class="mc-btn mc-backtest-btn" data-days="22"><i class="bi bi-clock-history"></i> Backtest (1M)</button>'
+       + '<button class="mc-btn mc-backtest-btn" data-days="44"><i class="bi bi-clock-history"></i> Backtest (2M)</button>'
+       + '<button class="mc-btn mc-backtest-btn" data-days="126"><i class="bi bi-clock-history"></i> Backtest (6M)</button>'
        + '<span class="mc-meta">Updated ' + moment(m.ts).format('HH:mm:ss') + (m.rows[0] && m.rows[0].isReplay ? ' · values as of snapshot day ' + _mcEsc(m.rows[0].asOf) : ' · live') + '</span></div>';
     h += '<div class="mc-head"><div class="mc-meta">MACRO BACKDROP FOR INDIAN EQUITIES</div>'
        + '<div class="mc-big t-' + m.tone + '">' + _mcEsc(m.label) + ' <span class="mc-meta" style="font-size:14px;">(' + (m.score >= 0 ? '+' : '') + m.score.toFixed(1) + ')</span></div>'
@@ -287,7 +296,190 @@ async function _gtbRenderMacroPane() {
     $p.html(_mcHtml(m));
     jQ('#mc-refresh').off('click').on('click', async function () { $p.find('#mc-refresh').prop('disabled', true); await _mcRefresh(true); _gtbRenderMacroPane(); });
     jQ('#mc-fed-input').off('change').on('change', function () { try { localStorage.setItem('GTB_MACRO_FED_RATE', this.value); } catch (e) {} _gtbRenderMacroPane(); });
+    jQ('.mc-backtest-btn').off('click').on('click', function () { _gtbShowMacroBacktest(+jQ(this).data('days') || 22); });
     jQ('.gtb-tab[data-tab="macro"]').removeClass('gtb-new-dot');
+}
+
+// ══════════════════════════════════════════════════════════════════════════════════════
+// Macro Backtest (last ~1 month) — replays the SAME composite-score formula _mcAnalyse/
+// _mcVerdict use, at each of the last ~22 trading days, from the same 3-month history each
+// driver's live fetch already pulls (no new endpoint, just re-using the raw daily closes at
+// an earlier index instead of only the latest one). Paired against NIFTY 50's own actual
+// daily move (via Kite) so you can see whether the reasoning actually held up, day by day —
+// this is exactly the honest check the Macro tab itself says hasn't been done ("no number
+// here can honestly claim a historical win rate" applies to the LIVE card; this backtest is
+// what closes that gap, transparently, with real dates and real outcomes, not a claim).
+function _mcScoreAt(def, pts, idx) {
+    if (idx < 6 || idx >= pts.length) return null;
+    var last = pts[idx].c, prev = pts[idx - 1].c, p5 = pts[Math.max(0, idx - 5)].c;
+    function chg(a, b) { return def.mode === 'pct' ? (a - b) / b * 100 : (a - b); }
+    var c1 = chg(last, prev), c5 = chg(last, p5);
+    function clamp(x) { return Math.max(-1, Math.min(1, x)); }
+    var raw = clamp(clamp(c5 / def.t5 / 2) * 0.7 + clamp(c1 / def.t1 / 2) * 0.3) * def.sign;
+    return Math.abs(raw) < 0.15 ? 0 : Math.round(raw * 10) / 10;
+}
+
+async function _mcRunBacktest(daysBack) {
+    daysBack = daysBack || 22;
+    // IN10Y (manual-paste India 10Y yield) IS backtestable — _mcManualLoad() returns a real
+    // dated {d,c} series, the same shape every Yahoo-fetched driver uses, built from whatever
+    // you've pasted into Data Load -> Macro Data. Read directly from storage instead of
+    // _mcFetch (which is Yahoo-only). INGS (the Nifty GS 10Y index proxy, accumulate:true) is
+    // excluded here on purpose: it only has as many days as this app itself has been running
+    // and captured, almost always too few to backtest a month, AND it's redundant with IN10Y
+    // once real yield data exists (same "real yield supersedes the proxy" rule the live Macro
+    // card already applies) — including both would double-count the same India-yield signal.
+    var driverDefs = _MC_DRIVERS.filter(function (d) { return !d.manual && d.key !== 'INGS'; });
+    // Yahoo range must comfortably exceed daysBack + the ~6-day lookback each scored day
+    // itself needs. '3mo' (~63 trading days) covers up to ~2 months; anything longer needs
+    // '1y' so the oldest requested day still has enough history behind IT to be scored.
+    var yahooRange = daysBack >= 55 ? '1y' : '3mo';
+    var fetched = await Promise.all(driverDefs.map(function (d) {
+        return _mcFetch(d, yahooRange).then(function (raw) { return { def: d, pts: raw.pts }; }).catch(function () { return null; });
+    }));
+    try {
+        var in10y = _MC_DRIVERS.filter(function (d) { return d.key === 'IN10Y'; })[0];
+        var manualPts = (typeof _mcManualLoad === 'function') ? _mcManualLoad() : [];
+        if (in10y && manualPts.length >= 6) fetched.push({ def: in10y, pts: manualPts });
+    } catch (e) {}
+    var driverSeries = fetched.filter(Boolean);
+    if (!driverSeries.length) return { rows: [], error: 'Could not load any driver history.' };
+
+    var axis = driverSeries.filter(function (x) { return x.def.key === 'BRENT'; })[0] || driverSeries[0];
+    var dates = axis.pts.map(function (p) { return p.d; }).slice(-(daysBack + 1));
+
+    var niftyByDate = {};
+    try {
+        var token = INSTRUMENT_TOKENS['NIFTY 50'];
+        // Calendar days, not trading days — needs enough margin for weekends + NSE holidays
+        // over the requested trading-day window. A flat "+20" was fine for 1-2 months but left
+        // NIFTY's own history short of the full 6-month axis range once daysBack grew to 126.
+        var from = moment().subtract(Math.ceil(daysBack * 1.6) + 15, 'days').format('YYYY-MM-DD');
+        var to = moment().format('YYYY-MM-DD');
+        var niftyRaw = await getHistoricalDataUsingPromise(token, from, to, 'day');
+        (niftyRaw && niftyRaw.data && niftyRaw.data.candles || []).forEach(function (c) {
+            niftyByDate[String(c[0]).slice(0, 10)] = +c[4];
+        });
+    } catch (e) {}
+    var niftyDates = Object.keys(niftyByDate).sort();
+
+    var rows = [];
+    dates.forEach(function (date) {
+        var driverRows = [];
+        driverSeries.forEach(function (ds) {
+            var idx = -1;
+            for (var k = 0; k < ds.pts.length; k++) { if (ds.pts[k].d <= date) idx = k; else break; }
+            if (idx < 0) return;
+            var score = _mcScoreAt(ds.def, ds.pts, idx);
+            if (score != null) driverRows.push({ def: ds.def, score: score });
+        });
+        if (!driverRows.length) return;
+        var sum = driverRows.reduce(function (a, r) { return a + r.score; }, 0);
+        var oil = driverRows.filter(function (r) { return r.def.group === 'Oil'; });
+        if (oil.length === 2) sum -= (oil[0].score + oil[1].score) / 2;
+        sum = Math.round(sum * 10) / 10;
+        var label = sum >= 1.5 ? 'TAILWIND' : sum >= 0.5 ? 'MILD TAILWIND' : sum <= -1.5 ? 'HEADWIND' : sum <= -0.5 ? 'MILD HEADWIND' : 'NEUTRAL';
+
+        var nIdx = niftyDates.indexOf(date);
+        var sameDayChg = (nIdx > 0) ? (niftyByDate[niftyDates[nIdx]] - niftyByDate[niftyDates[nIdx - 1]]) / niftyByDate[niftyDates[nIdx - 1]] * 100 : null;
+        var nextDayChg = (nIdx >= 0 && nIdx + 1 < niftyDates.length) ? (niftyByDate[niftyDates[nIdx + 1]] - niftyByDate[niftyDates[nIdx]]) / niftyByDate[niftyDates[nIdx]] * 100 : null;
+        // Per-driver scores, keyed by driver key, so the popup can show WHICH driver(s) are
+        // actually moving the composite vs which are just sitting pinned one way all month —
+        // the whole point of adding this: distinguishing "genuine month-long headwind" from
+        // "one driver's threshold/sign is miscalibrated and never lets the sum go positive".
+        var byDriver = {}; driverRows.forEach(function (r) { byDriver[r.def.key] = r.score; });
+        rows.push({ date: date, score: sum, label: label, sameDayChg: sameDayChg, nextDayChg: nextDayChg, byDriver: byDriver });
+    });
+    // driverSeries (not the pre-filter driverDefs) is the actual set that ended up with usable
+    // history — this is what must drive the popup's table columns, or IN10Y's score would be
+    // computed into byDriver above but never get a column to show up in at all.
+    return { rows: rows.slice(-daysBack), driverDefs: driverSeries.map(function (x) { return x.def; }) };
+}
+
+function _mcBacktestHitRate(rows, field) {
+    var hw = rows.filter(function (r) { return r.score <= -0.5 && r[field] != null; });
+    var tw = rows.filter(function (r) { return r.score >= 0.5 && r[field] != null; });
+    var hwHit = hw.filter(function (r) { return r[field] < 0; }).length;
+    var twHit = tw.filter(function (r) { return r[field] > 0; }).length;
+    return {
+        hwPct: hw.length ? Math.round(hwHit / hw.length * 100) : null, hwN: hw.length,
+        twPct: tw.length ? Math.round(twHit / tw.length * 100) : null, twN: tw.length,
+    };
+}
+
+async function _gtbShowMacroBacktest(daysBack) {
+    daysBack = daysBack || 22;
+    var windowLabel = daysBack >= 110 ? 'LAST 6 MONTHS' : daysBack >= 40 ? 'LAST 2 MONTHS' : 'LAST 1 MONTH';
+    var html = '<div class="mc-scope" style="padding:14px;height:100%;overflow-y:auto;box-sizing:border-box;">'
+        + '<p class="mc-meta"><i class="bi bi-hourglass-split"></i> Replaying the macro score across ' + daysBack + ' trading days and fetching NIFTY 50\'s own daily moves…</p></div>';
+    showPopUpWindow('macro-backtest', html, 'Macro Backtest', 640, 560);
+    var _cls = 'popup-custom-style-macro-backtest';
+    var _title = '<div style="display:flex;align-items:center;gap:6px;width:100%;">'
+        + '<span style="font-weight:800;font-size:0.7rem;"><i class="bi bi-clock-history"></i> MACRO BACKTEST — ' + windowLabel + '</span>'
+        + popupWinControls(_cls) + '</div>';
+    jQ('.' + _cls).find('.popupwindow_titlebar_text').html(_title);
+    hideNativePopupButtons(_cls);
+    jQ('.' + _cls).find('.popupwindow_titlebar').removeClass('popupwindow_titlebar_draggable');
+    jQ('.' + _cls).toggleClass('gtb-light', (localStorage.getItem('GTB_THEME') || 'dark') === 'light');
+
+    var result;
+    try { result = await _mcRunBacktest(daysBack); } catch (e) { result = { rows: [], error: e.message || String(e) }; }
+    var rows = result.rows || [];
+    var $body = jQ('#pop-up-window-macro-backtest .mc-scope');
+    if (!rows.length) { $body.html('<p class="t-bad">Backtest failed: ' + _mcEsc(result.error || 'no data') + '</p>'); return; }
+
+    var sameHit = _mcBacktestHitRate(rows, 'sameDayChg');
+    var nextHit = _mcBacktestHitRate(rows, 'nextDayChg');
+    var driverDefs = result.driverDefs || [];
+
+    // Per-driver average across the whole window + how many days it was pinned one-sided
+    // (never crossed zero) — the fastest way to spot "this ONE driver never lets the composite
+    // go positive" (a calibration bug) vs "every driver genuinely agrees this month" (real).
+    var driverStats = driverDefs.map(function (d) {
+        var vals = rows.map(function (r) { return r.byDriver[d.key]; }).filter(function (v) { return v != null; });
+        if (!vals.length) return null;
+        var avg = vals.reduce(function (a, b) { return a + b; }, 0) / vals.length;
+        var allNeg = vals.every(function (v) { return v <= 0; }), allPos = vals.every(function (v) { return v >= 0; });
+        return { def: d, avg: avg, n: vals.length, pinned: allNeg ? 'always ≤ 0' : allPos ? 'always ≥ 0' : null };
+    }).filter(Boolean);
+
+    var h = '<div class="mc-head" style="margin-bottom:10px;">'
+        + '<div class="mc-meta">HIT RATE — ' + rows.length + ' trading days replayed</div>'
+        + '<p style="margin-top:6px;">Same-day: HEADWIND days where NIFTY fell <b>' + (sameHit.hwPct != null ? sameHit.hwPct + '% (n=' + sameHit.hwN + ')' : '—') + '</b>; TAILWIND days where NIFTY rose <b>' + (sameHit.twPct != null ? sameHit.twPct + '% (n=' + sameHit.twN + ')' : '—') + '</b>.</p>'
+        + '<p>Next-day: HEADWIND days followed by a NIFTY fall <b>' + (nextHit.hwPct != null ? nextHit.hwPct + '% (n=' + nextHit.hwN + ')' : '—') + '</b>; TAILWIND days followed by a NIFTY rise <b>' + (nextHit.twPct != null ? nextHit.twPct + '% (n=' + nextHit.twN + ')' : '—') + '</b>.</p>'
+        + '<p class="mc-meta">A coin flip is 50%. This is ' + (daysBack >= 110 ? 'six months' : daysBack >= 40 ? 'two months' : 'one month') + ' of data across 5-6 correlated global drivers' + (daysBack >= 110 ? ' — better, but still one continuous stretch (not multiple independent market regimes), so treat this as a reasonable sanity check, not a validated edge' : ' — nowhere near enough to call this a validated edge either way; read it as a sanity check on the reasoning, not a track record') + '.</p>'
+        + '</div>';
+
+    h += '<div class="mc-head" style="margin-bottom:10px;">'
+        + '<div class="mc-meta">PER-DRIVER AVERAGE OVER THE WINDOW — spot a pinned/miscalibrated driver</div>'
+        + '<div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:6px;">'
+        + driverStats.map(function (s) {
+            var tone = s.avg > 0.1 ? 'good' : s.avg < -0.1 ? 'bad' : 'warn';
+            return '<div style="min-width:120px;"><div class="mc-meta">' + _mcEsc(s.def.label) + '</div>'
+                + '<div class="t-' + tone + '" style="font-weight:800;font-size:14px;">' + (s.avg >= 0 ? '+' : '') + s.avg.toFixed(2) + '</div>'
+                + (s.pinned ? '<div class="t-warn" style="font-size:11px;">⚠ ' + s.pinned + ' all ' + s.n + ' days</div>' : '<div class="mc-meta" style="font-size:11px;">n=' + s.n + '</div>')
+                + '</div>';
+        }).join('')
+        + '</div></div>';
+
+    h += '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;">'
+        + '<thead><tr><th style="text-align:left;padding:4px 6px;">Date</th><th style="text-align:right;padding:4px 6px;">Score</th><th style="text-align:left;padding:4px 6px;">Label</th>'
+        + driverStats.map(function (s) { return '<th style="text-align:right;padding:4px 6px;" title="' + _mcEsc(s.def.label) + '">' + _mcEsc(s.def.key) + '</th>'; }).join('')
+        + '<th style="text-align:right;padding:4px 6px;">NIFTY same-day</th><th style="text-align:right;padding:4px 6px;">NIFTY next-day</th></tr></thead><tbody>'
+        + rows.slice().reverse().map(function (r) {
+            var tone = r.score > 0 ? 'good' : r.score < 0 ? 'bad' : 'warn';
+            function chgCell(v) { if (v == null) return '<td style="text-align:right;padding:4px 6px;color:var(--gtb-muted);">—</td>'; var c = v > 0 ? 'good' : v < 0 ? 'bad' : 'warn'; return '<td class="t-' + c + '" style="text-align:right;padding:4px 6px;">' + (v >= 0 ? '+' : '') + v.toFixed(2) + '%</td>'; }
+            function driverCell(key) { var v = r.byDriver[key]; if (v == null) return '<td style="text-align:right;padding:4px 6px;color:var(--gtb-muted);">—</td>'; var c = v > 0 ? 'good' : v < 0 ? 'bad' : 'warn'; return '<td class="t-' + c + '" style="text-align:right;padding:4px 6px;">' + (v >= 0 ? '+' : '') + v.toFixed(1) + '</td>'; }
+            return '<tr style="border-top:1px solid var(--gtb-border, #333);">'
+                + '<td style="padding:4px 6px;">' + r.date + '</td>'
+                + '<td class="t-' + tone + '" style="text-align:right;padding:4px 6px;">' + (r.score >= 0 ? '+' : '') + r.score.toFixed(1) + '</td>'
+                + '<td class="t-' + tone + '" style="padding:4px 6px;">' + r.label + '</td>'
+                + driverStats.map(function (s) { return driverCell(s.def.key); }).join('')
+                + chgCell(r.sameDayChg) + chgCell(r.nextDayChg)
+                + '</tr>';
+        }).join('')
+        + '</tbody></table></div>';
+    $body.html(h);
 }
 
 // Refresh in the background each dashboard refresh (cheap: 6 small requests, 5-min cache)

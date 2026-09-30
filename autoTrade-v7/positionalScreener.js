@@ -251,6 +251,7 @@ function _psPrimaryRead(candles, niftyCloses) {
 }
 
 var _PS_CACHE = {}; // _PS_CACHE[name] = { candles, futCandles, ...computed fields }
+var _PS_LAST_FILTERED_ROWS = []; // whatever's currently on screen after filter/search/sort — see _psRenderTable
 
 jQ(document).on('click', '#show-positional-screener', function (e) {
     e.preventDefault();
@@ -303,9 +304,15 @@ function _psContentHtml() {
         +   '<span id="ps-summary" class="ps-summary"></span>'
         +   '<select id="ps-filter" class="sv-pill-btn">'
         +     '<option value="all">All</option>'
-        +     '<option value="buy">BUY / STRONG BUY</option>'
-        +     '<option value="sell">SELL / STRONG SELL</option>'
-        +     '<option value="watch">WATCH</option>'
+        +     '<option value="strongbuy">STRONG BUY</option>'
+        +     '<option value="buy">BUY (any)</option>'
+        +     '<option value="strongsell">STRONG SELL</option>'
+        +     '<option value="sell">SELL (any)</option>'
+        +     '<option value="longforming">LONG forming (Stage 2)</option>'
+        +     '<option value="shortforming">SHORT forming (Stage 4)</option>'
+        +     '<option value="basing">Basing (Stage 1)</option>'
+        +     '<option value="topping">Topping (Stage 3)</option>'
+        +     '<option value="watch">WATCH (all forming/no-plan)</option>'
         +   '</select>'
         +   '<select id="ps-sort" class="sv-pill-btn">'
         +     '<option value="score">Sort: Score</option>'
@@ -313,6 +320,7 @@ function _psContentHtml() {
         +     '<option value="rs">Sort: Rel Strength</option>'
         +   '</select>'
         +   '<input type="text" id="ps-search" class="dl-search" style="width:140px;margin:0;" placeholder="Search results…">'
+        +   '<button id="ps-telegram-btn" class="sv-pill-btn" type="button" title="Send the currently filtered rows to Telegram"><i class="bi bi-send"></i> Telegram</button>'
         + '</div>'
         + '<div id="ps-breadth"></div>'
         + '<div id="ps-table-wrap" class="ps-table-wrap">'
@@ -689,13 +697,23 @@ function _psChartLink(name, token) {
 async function _psCurveLean(name, isMcx) {
     var curveMap = isMcx ? (typeof MCX_FUT_CURVE !== 'undefined' ? MCX_FUT_CURVE : {}) : (typeof NSE_FUT_CURVE !== 'undefined' ? NSE_FUT_CURVE : {});
     var exchName = _PS_INDEX_NAMES[name] || name;
-    var curve = curveMap[exchName] || curveMap[name] || [];
+    var refDay = isMcx ? (typeof MCX_CURRENT_DAY !== 'undefined' ? MCX_CURRENT_DAY : null) : (typeof CURRENT_DAY !== 'undefined' ? CURRENT_DAY : null);
+    var rawCurve = curveMap[exchName] || curveMap[name] || [];
+    // Drops any contract whose expiry is already before the snapshot day -- NSE_FUT_CURVE/
+    // MCX_FUT_CURVE only update when Data Load's Kite Instruments sync is re-run, so on/after
+    // an expiry day (e.g. NIFTY26SEPFUT expiring 2026-09-29) a curve cached from before that
+    // sync would still list the now-expired contract as curve[0] and try to fetch candles for
+    // a token that no longer trades -- which is exactly what produced "No candle data" here.
+    // Same fix as _gtbFilterLiveCurve (grootTradeBot.js); reimplemented inline in case this
+    // file's scan runs before that one has finished loading.
+    var curve = (typeof _gtbFilterLiveCurve === 'function') ? _gtbFilterLiveCurve(rawCurve, refDay)
+        : (refDay ? rawCurve.filter(function (c) { return !c.expiry || c.expiry >= refDay; }) : rawCurve);
     if (curve.length < 2) return { ok: false, reason: curve.length ? 'Only 1 contract listed' : 'No contracts listed (run Data Load)' };
     var near = curve[0], far = curve[1];
     try {
         var nearCandles = await _psFetchDaily(near.token, 5);
         var farCandles = await _psFetchDaily(far.token, 5);
-        if (!nearCandles.length || !farCandles.length) return { ok: false, reason: 'No candle data' };
+        if (!nearCandles.length || !farCandles.length) return { ok: false, reason: 'No candle data (' + near.tradingsymbol + '/' + far.tradingsymbol + ' — try re-running Data Load if this contract just rolled over)' };
         var nearLtp = parseFloat(nearCandles[nearCandles.length - 1][4]);
         var farLtp = parseFloat(farCandles[farCandles.length - 1][4]);
         var diffPct = nearLtp ? ((farLtp - nearLtp) / nearLtp * 100) : 0;
@@ -1179,8 +1197,14 @@ function _psRenderTable() {
     // Verdict strings now carry qualifiers ("BUY (awaiting overlay confirmation)", "SELL —
     // overlay disagrees (caution)", etc.) instead of the old fixed 4 values — match by
     // substring so the filter buttons still group them sensibly.
-    if (filter === 'buy') rows = rows.filter(function (r) { return r.verdict.indexOf('BUY') !== -1; });
+    if (filter === 'strongbuy') rows = rows.filter(function (r) { return r.verdict.indexOf('STRONG BUY') !== -1; });
+    else if (filter === 'buy') rows = rows.filter(function (r) { return r.verdict.indexOf('BUY') !== -1; });
+    else if (filter === 'strongsell') rows = rows.filter(function (r) { return r.verdict.indexOf('STRONG SELL') !== -1; });
     else if (filter === 'sell') rows = rows.filter(function (r) { return r.verdict.indexOf('SELL') !== -1; });
+    else if (filter === 'longforming') rows = rows.filter(function (r) { return r.verdict.indexOf('LONG forming') !== -1; });
+    else if (filter === 'shortforming') rows = rows.filter(function (r) { return r.verdict.indexOf('SHORT forming') !== -1; });
+    else if (filter === 'basing') rows = rows.filter(function (r) { return r.verdict.indexOf('basing') !== -1; });
+    else if (filter === 'topping') rows = rows.filter(function (r) { return r.verdict.indexOf('topping') !== -1; });
     else if (filter === 'watch') rows = rows.filter(function (r) { return r.verdict.indexOf('BUY') === -1 && r.verdict.indexOf('SELL') === -1; });
     if (q) rows = rows.filter(function (r) { return r.name.indexOf(q) !== -1; });
 
@@ -1192,6 +1216,11 @@ function _psRenderTable() {
     if (sort === 'name') rows.sort(function (a, b) { return a.name < b.name ? -1 : 1; });
     else if (sort === 'rs') rows.sort(function (a, b) { return b.relStrength - a.relStrength; });
     else rows.sort(function (a, b) { return _psRank(b) - _psRank(a); });
+
+    // Stashed for the "Send to Telegram" button — the exact rows currently on screen (after
+    // filter/search/sort), not the full unfiltered scan, so what gets sent matches what's
+    // actually visible when the button is clicked.
+    _PS_LAST_FILTERED_ROWS = rows;
 
     if (!rows.length) {
         jQ('#ps-table-wrap').html('<div class="sv-empty-state"><i class="bi bi-search"></i><span>No results' + (q ? ' for "' + q + '"' : '') + '.</span></div>');
@@ -1870,4 +1899,109 @@ jQ(document).on('click', '#lvs-pm-btn', async function () {
         return;
     }
     _lvsRenderPmResults(out);
+});
+
+// ── Send to Telegram — same idea as groot-research's Telegram feature (a UI-button trigger,
+// tap-to-copy symbol names via Telegram's monospace formatting), reimplemented here since this
+// is a separate codebase (Tampermonkey userscript vs groot-research's Python/Flask backend) —
+// GM_xmlhttpRequest calls the Telegram Bot API directly, bypassing CORS the same way every
+// other external API call in this app does (Yahoo, CBOE). Sends whatever is CURRENTLY VISIBLE
+// in the table (after filter/search/sort), not the full scan, so what you get in Telegram
+// matches what you were just looking at.
+function _psTelegramEsc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+function _psBuildTelegramMessage(rows) {
+    if (!rows.length) return null;
+    var longs = rows.filter(function (r) { return r.verdict.indexOf('BUY') !== -1 || r.verdict.indexOf('LONG forming') !== -1; });
+    var shorts = rows.filter(function (r) { return r.verdict.indexOf('SELL') !== -1 || r.verdict.indexOf('SHORT forming') !== -1; });
+    var other = rows.filter(function (r) { return longs.indexOf(r) === -1 && shorts.indexOf(r) === -1; });
+
+    function fmtRow(r) {
+        // <code>SYMBOL</code> renders as monospace in Telegram, which is what makes it
+        // tap-to-copy in the mobile app — same trick groot-research's own Telegram feature
+        // used, just Telegram's native formatting instead of a custom copy button.
+        var line = '<code>' + _psTelegramEsc(r.name) + '</code> — ' + _psTelegramEsc(r.verdict);
+        if (r.entry != null) line += '\n  Entry ' + r.entry.toFixed(1) + ' · Target ' + r.target.toFixed(1) + ' · Stop ' + r.stop.toFixed(1)
+            + (r.riskReward != null ? ' · R:R 1:' + r.riskReward.toFixed(1) : '');
+        if (r.convictionPct != null) line += ' · Conviction ' + r.convictionPct + '%';
+        return line;
+    }
+
+    var parts = ['<b>Positional Screener — ' + moment().format('DD-MMM HH:mm') + '</b>', '(' + rows.length + ' shown, as currently filtered)'];
+    if (longs.length) parts.push('\n<b>LONG (' + longs.length + ')</b>\n' + longs.map(fmtRow).join('\n'));
+    if (shorts.length) parts.push('\n<b>SHORT (' + shorts.length + ')</b>\n' + shorts.map(fmtRow).join('\n'));
+    if (other.length) parts.push('\n<b>OTHER / WATCH (' + other.length + ')</b>\n' + other.map(fmtRow).join('\n'));
+    parts.push('\n<i>Rule-based, not a validated probability. Groot Bot Positional Screener.</i>');
+    return parts.join('\n');
+}
+
+// Telegram's own hard limit is 4096 chars/message — split on section boundaries (blank-line-
+// preceded blocks) first, but a single section (e.g. a big OTHER/WATCH list, all joined by
+// single '\n' with no blank lines inside it) can itself exceed maxLen — that block was
+// previously treated as atomic and passed through oversized, which is exactly what caused
+// Telegram's "message is too long" rejection on a large scan. Any block still over maxLen
+// after the section split is now further packed line-by-line (never mid-line, so a symbol
+// name + its entry/target/stop line always stay together as one unbreakable unit).
+function _psChunkTelegramMessage(text, maxLen) {
+    maxLen = maxLen || 3800;
+    if (text.length <= maxLen) return [text];
+    var blocks = text.split('\n\n'), chunks = [], cur = '';
+    function flush() { if (cur) { chunks.push(cur); cur = ''; } }
+    blocks.forEach(function (b) {
+        if (b.length > maxLen) {
+            flush();
+            var lines = b.split('\n'), lcur = '';
+            lines.forEach(function (ln) {
+                if ((lcur + '\n' + ln).length > maxLen && lcur) { chunks.push(lcur); lcur = ln; }
+                else lcur = lcur ? lcur + '\n' + ln : ln;
+            });
+            if (lcur) chunks.push(lcur);
+        } else if ((cur + '\n\n' + b).length > maxLen && cur) {
+            chunks.push(cur); cur = b;
+        } else {
+            cur = cur ? cur + '\n\n' + b : b;
+        }
+    });
+    flush();
+    return chunks;
+}
+
+function _psTelegramSendOne(token, chatId, text) {
+    return new Promise(function (resolve, reject) {
+        if (typeof GM_xmlhttpRequest === 'undefined') { reject('GM_xmlhttpRequest unavailable'); return; }
+        GM_xmlhttpRequest({
+            method: 'POST',
+            url: 'https://api.telegram.org/bot' + token + '/sendMessage',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            data: 'chat_id=' + encodeURIComponent(chatId) + '&parse_mode=HTML&disable_web_page_preview=true&text=' + encodeURIComponent(text),
+            onload: function (res) {
+                try {
+                    var j = JSON.parse(res.responseText);
+                    if (j.ok) resolve(); else reject(j.description || ('HTTP ' + res.status));
+                } catch (e) { reject('Bad response from Telegram (HTTP ' + res.status + ')'); }
+            },
+            onerror: function () { reject('Network error contacting Telegram'); },
+        });
+    });
+}
+
+jQ(document).on('click', '#ps-telegram-btn', async function () {
+    var $btn = jQ(this);
+    var token = (typeof g_config !== 'undefined' ? g_config.get('telegram_bot_token') : '') || '';
+    var chatId = (typeof g_config !== 'undefined' ? g_config.get('telegram_chat_id') : '') || '';
+    if (!token || !chatId) { _gtbToast('Set Telegram Bot Token + Chat ID in Settings → API & Authentication first', 'error'); return; }
+    var rows = _PS_LAST_FILTERED_ROWS;
+    if (!rows || !rows.length) { _gtbToast('Nothing to send — run a scan first', 'error'); return; }
+    var msg = _psBuildTelegramMessage(rows);
+    if (!msg) { _gtbToast('Nothing to send', 'error'); return; }
+    var chunks = _psChunkTelegramMessage(msg);
+    $btn.prop('disabled', true).html('<i class="bi bi-hourglass-split"></i> Sending…');
+    try {
+        for (var i = 0; i < chunks.length; i++) await _psTelegramSendOne(token, chatId, chunks[i]);
+        _gtbToast('Sent ' + rows.length + ' row(s) to Telegram' + (chunks.length > 1 ? ' (' + chunks.length + ' messages)' : ''), 'success');
+    } catch (e) {
+        _gtbToast('Telegram send failed: ' + e, 'error');
+    } finally {
+        $btn.prop('disabled', false).html('<i class="bi bi-send"></i> Telegram');
+    }
 });
