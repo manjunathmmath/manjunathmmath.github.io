@@ -484,13 +484,61 @@ async function _gtbShowMacroBacktest(daysBack) {
 
 // Refresh in the background each dashboard refresh (cheap: 6 small requests, 5-min cache)
 function _gtbMacroOnRefresh() {
-    _mcRefresh(false).then(function () {
+    _mcRefresh(false).then(function (m) {
+        try { _gtbCheckMacroChangeAlert(m); } catch (e) {}
         if (typeof _gtbCurrentActiveTab !== 'undefined' && _gtbCurrentActiveTab === 'macro') _gtbRenderMacroPane();
         // Dashboard's one-line macro strip refreshes every cycle regardless of which tab is
         // active — it's a cheap DOM write (a single line, not the full per-driver tab), and
         // the whole point is it's visible without switching to the Macro tab at all.
         try { _gtbRenderDashMacroStrip(); } catch (e) {}
     }).catch(function () {});
+}
+
+// ── Macro regime-change alert — same Toastify pattern as the NSE holiday alert
+// (_gtbCheckHolidayAlert, grootTradeBot.js), triggered by EITHER a LABEL TRANSITION or a large
+// same-label SCORE MOVE (e.g. +0.7 -> +1.7, or -0.7 -> -1.7 — a real strengthening/weakening of
+// the backdrop that a label-only check would miss, since both ends there can sit inside
+// neighbouring or even the same band). Session-scoped on purpose, same reasoning as the holiday
+// check's once-a-day vs this one's relative-to-what-you-were-already-looking-at: the first
+// refresh after a reload just establishes the baseline silently, it never fires on its own.
+var _GTB_MACRO_LAST_LABEL = null;
+var _GTB_MACRO_ALERT_BASE_SCORE = null; // score at the last alert (or at session baseline)
+var _GTB_MACRO_SCORE_ALERT_DELTA = 1.0; // e.g. 0.7 -> 1.7 or -0.7 -> -1.7
+function _gtbCheckMacroChangeAlert(m) {
+    if (!m || !m.label || typeof m.score !== 'number') return;
+    var prevLabel = _GTB_MACRO_LAST_LABEL;
+    var baseScore = _GTB_MACRO_ALERT_BASE_SCORE;
+    _GTB_MACRO_LAST_LABEL = m.label;
+
+    // No prior reading yet (first refresh this session) — just establish the baseline.
+    if (prevLabel === null) { _GTB_MACRO_ALERT_BASE_SCORE = m.score; return; }
+    // Either side is a transient fetch failure ('NO DATA'), not a genuine reading to compare
+    // against — skip the check, and re-baseline once real data comes back.
+    if (prevLabel === 'NO DATA' || m.label === 'NO DATA') { if (m.label !== 'NO DATA') _GTB_MACRO_ALERT_BASE_SCORE = m.score; return; }
+
+    var labelChanged = prevLabel !== m.label;
+    var scoreDelta = (baseScore == null) ? 0 : (m.score - baseScore);
+    var scoreMoved = Math.abs(scoreDelta) >= _GTB_MACRO_SCORE_ALERT_DELTA;
+    // Nothing alert-worthy — deliberately leave the baseline score untouched (not reset to
+    // today's reading) so a slow multi-refresh drift still accumulates toward the threshold
+    // instead of resetting its clock on every unchanged tick.
+    if (!labelChanged && !scoreMoved) return;
+
+    _GTB_MACRO_ALERT_BASE_SCORE = m.score; // reset baseline at the point an alert actually fires
+    if (typeof Toastify === 'undefined') return;
+    var col = m.tone === 'good' ? '#3fb950' : m.tone === 'bad' ? '#f85149' : '#d29922';
+    var fmt = function (n) { return (n >= 0 ? '+' : '') + n.toFixed(1); };
+    var headline = labelChanged
+        ? 'MACRO SHIFT: ' + _mcEsc(prevLabel) + ' &rarr; ' + _mcEsc(m.label)
+        : 'MACRO MOVE (' + _mcEsc(m.label) + '): ' + fmt(baseScore) + ' &rarr; ' + fmt(m.score);
+    Toastify({
+        text: '<i class="bi bi-globe" style="margin-right:6px;color:' + col + ';font-size:1rem;"></i>'
+            + '<span style="font-size:0.75rem;font-weight:700;color:' + col + ';">' + headline + '</span><br>'
+            + '<span style="font-size:0.65rem;color:#c9d1d9;">' + _mcEsc(m.advice) + '</span>',
+        duration: 10000, gravity: 'top', position: 'center', escapeMarkup: false, close: true,
+        style: { background: '#0a0a0a', border: '2px solid ' + col, 'border-radius': '8px',
+                 padding: '12px 18px', 'min-width': '280px', 'line-height': '1.6' }
+    }).showToast();
 }
 
 // One-line macro backdrop strip on the Dashboard tab, right below Predict — see the dashboard

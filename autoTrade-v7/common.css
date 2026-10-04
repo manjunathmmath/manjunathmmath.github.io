@@ -232,7 +232,7 @@
 .gtb-t915-table { width: 100%; border-collapse: collapse; }
 .gtb-t915-table th {
   text-align: left; font-size: 0.58rem; font-weight: 800; letter-spacing: 0.05em;
-  color: var(--gtb-muted); text-transform: uppercase;
+  color: var(--gtb-muted); text-transform: uppercase; white-space: nowrap;
   padding: 6px 8px; border-bottom: 1px solid var(--gtb-border);
   position: sticky; top: 0; background: var(--gtb-surface2);
 }
@@ -1411,15 +1411,12 @@ code {
 }
 
 /* WebKit (Chrome, Edge) */
-/* ── Thin 2px overlay scrollbars across the whole dashboard ─────────── */
-/* Thin scrollbar everywhere */
-::-webkit-scrollbar { width: 3px; height: 3px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--gtb-border2, #30363d); border-radius: 2px; }
-::-webkit-scrollbar-thumb:hover { background: var(--gtb-muted, #7d8590); }
-/* Firefox */
-* { scrollbar-width: thin; scrollbar-color: var(--gtb-border2, #30363d) transparent; }
-
+/* ── Thin 2px overlay scrollbars, scoped to this app's own surfaces only ──
+   Previously had an UNSCOPED `*`/`::-webkit-scrollbar` block here that applied this app's
+   thin-scrollbar styling to every scrollable element on the whole kite.zerodha.com page —
+   a real, confirmed leak into Zerodha's own UI. Removed: the explicitly-scoped block right
+   below (targeting .popupwindow_container/#main-trade-bot-container/etc.) already covers
+   every surface this app actually renders scrollbars in, so nothing was lost. */
 .popupwindow_container ::-webkit-scrollbar,
 .popupwindow_content::-webkit-scrollbar,
 #main-trade-bot-container ::-webkit-scrollbar,
@@ -1786,7 +1783,15 @@ td.details-control {
 
 /* ── CSS variables ─────────────────────────────────────────── */
 /* ── Institutional dark (Bloomberg-style navy) ──────────────── */
-:root {
+/* Was literal :root (i.e. kite.zerodha.com's own <html>) — defined 20+ custom properties
+   globally on Zerodha's own page root instead of scoping them to this app's own containers.
+   Retargeted to every top-level surface this app actually renders into (the main dashboard,
+   every showPopUpWindow-created popup via .popupwindow_container, and the handful of
+   standalone body-appended overlays) — same list used for the runtime CSS-scoping of the
+   third-party libraries in monkeyStyle.js, kept in sync manually since this file has no
+   preprocessor. */
+#gtb-popup-win, .popupwindow_container, #groot-maximize-overlay, #gtb-chartgrid-overlay,
+#gtb-info-pop, #gtb-daychart-overlay, #gtb-combochart-overlay, #gtb-tools-flyout {
   /* Surfaces */
   --gtb-bg:        #060a12;
   --gtb-surface:   #0b1220;
@@ -2885,7 +2890,8 @@ td.details-control {
    #main-trade-bot-container; both header and row use the same template so
    they stay pixel-aligned automatically.
    INSTRUMENT(sticky) | CHART | 9:15 | FUTURES | OI MATRIX | OI/OBV | WEIGHTAGE | DETAILS */
-:root {
+#gtb-popup-win, .popupwindow_container, #groot-maximize-overlay, #gtb-chartgrid-overlay,
+#gtb-info-pop, #gtb-daychart-overlay, #gtb-combochart-overlay, #gtb-tools-flyout {
   --gtb-col-instr:   140px;
   --gtb-col-chart:   260px;
   --gtb-col-915:      56px;
@@ -4300,7 +4306,8 @@ td.details-control {
 .sv-col-oi      .sv-col-icon { color: var(--gtb-blue); }
 
 /* ── Card header token ─────────────────────────────────────── */
-:root {
+#gtb-popup-win, .popupwindow_container, #groot-maximize-overlay, #gtb-chartgrid-overlay,
+#gtb-info-pop, #gtb-daychart-overlay, #gtb-combochart-overlay, #gtb-tools-flyout {
   --hdr-height: 28px;
   --badge-h:    20px;
   --btn-sz:     22px;
@@ -7261,3 +7268,29 @@ td.details-control {
 .gtb-panel-na {
     flex: 1;
 }
+
+/* ── Dashboard review strip (sticky chips, one per Dashboard section) ───────────────────── */
+#gtb-dash-review-strip {
+  position: sticky; top: 0; z-index: 6;
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 8px; margin: 0 0 6px;
+  background: var(--gtb-bg); border-bottom: 1px solid var(--gtb-border);
+}
+#gtb-dash-review-strip .gtb-rv-label {
+  font-size: 0.52rem; font-weight: 800; letter-spacing: 0.06em; color: var(--gtb-muted); margin-right: 4px;
+}
+#gtb-dash-review-strip .gtb-rv-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px 8px; font-size: 0.54rem; font-weight: 700; line-height: 1.5;
+  color: var(--gtb-text); background: var(--gtb-surface); border: 1px solid var(--gtb-border);
+  cursor: pointer; white-space: nowrap;
+}
+#gtb-dash-review-strip .gtb-rv-chip:hover { border-color: var(--gtb-accent); }
+#gtb-dash-review-strip .gtb-rv-chip.gtb-rv-done { opacity: 0.5; }
+#gtb-dash-review-strip .gtb-rv-chips { display: grid; gap: 5px; overflow-x: auto; flex: 1 1 auto; min-width: 0; }
+#gtb-dash-review-strip .gtb-rv-chip.gtb-rv-reset { color: var(--gtb-muted); font-weight: 600; margin-left: auto; flex-shrink: 0; }
+#gtb-dash-review-strip .gtb-rv-label { flex-shrink: 0; }
+#gtb-dash-review-strip .gtb-rv-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+#gtb-dash-review-strip .gtb-rv-chip .bi-check2 { color: var(--gtb-green); }
+@keyframes gtb-rv-flash-kf { 0% { box-shadow: 0 0 0 2px var(--gtb-accent); } 100% { box-shadow: 0 0 0 2px transparent; } }
+.gtb-rv-flash { animation: gtb-rv-flash-kf 1.6s ease-out; }

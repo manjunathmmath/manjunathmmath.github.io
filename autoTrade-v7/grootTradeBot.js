@@ -110,7 +110,7 @@ function _gtbChartGridSetStatus(msg) {
 }
 
 function _gtbChartGridOpen() {
-    var isLight = jQ('#main-trade-bot-container').hasClass('gtb-light');
+    var isLight = _gtbIsLightTheme();
     jQ('#gtb-chartgrid-overlay').toggleClass('gtb-light', isLight).css('display', 'flex');
     _gtbCGVisible = true;
     _gtbChartGridLoad();
@@ -539,6 +539,8 @@ function _gtbRefreshProbCards() {
         if (el) el.innerHTML = _cmdTrendProb(name, null);
         var lvlEl = document.getElementById(tid + '-lvlprob');
         if (lvlEl) { try { lvlEl.innerHTML = _gtbLevelProbHtml(name); } catch(e) {} }
+        var psEl = document.getElementById(tid + '-psverdict');
+        if (psEl) { try { psEl.innerHTML = _psInstrDetailVerdictHtml(name); } catch(e) {} }
         var brEl = document.getElementById(tid + '-brief');
         if (brEl) { try { brEl.innerHTML = _gtbInstrBriefHtml(name); } catch(e) {} }
     });
@@ -571,6 +573,18 @@ jQ(document).on('click', '.gtb-left-max-btn', function(e) {
     showMaximizeOverlay(titles[panel] || panel, '<div style="padding:12px;overflow:auto;height:100%;">' + body + '</div>');
 });
 
+// Theme for popups/overlays that live on <body>. Several call sites used to read ONLY
+// #main-trade-bot-container's class, but that container doesn't exist until the Groot
+// dashboard has been opened at least once (e.g. a tool launched from the All Tools icon in
+// Kite's nav bar) -- hasClass() on an empty set is false, so those popups always came up dark
+// even with Light theme saved. Falls back to the persisted GTB_THEME when the container
+// isn't built yet.
+function _gtbIsLightTheme() {
+    var $c = jQ('#main-trade-bot-container');
+    if ($c.length) return $c.hasClass('gtb-light');
+    return (localStorage.getItem('GTB_THEME') || 'dark') === 'light';
+}
+
 var _gtbMaxRefreshFn = null;   // callback set by each maximize caller
 
 function showMaximizeOverlay(title, bodyHtml, refreshFn) {
@@ -579,7 +593,7 @@ function showMaximizeOverlay(title, bodyHtml, refreshFn) {
     _gtbMaxRefreshFn = refreshFn || null;
     jQ('#groot-maximize-refresh').css('display', refreshFn ? 'flex' : 'none');
     // Match the current dashboard theme (overlay lives on <body>, not inside the container)
-    var isLight = jQ('#main-trade-bot-container').hasClass('gtb-light');
+    var isLight = _gtbIsLightTheme();
     jQ('#groot-maximize-overlay').toggleClass('gtb-light', isLight).addClass('active');
 }
 
@@ -1132,6 +1146,10 @@ function _buildCardStandalone(item) {
     // Panel: level probability (ASO/AST/VIXU vs BSO/BST/VIXL)
     h += '<div class="gtb-ic-panel" data-col="lvlprob"><div class="gtb-ic-panel-hdr"><span class="gtb-ic-panel-title"><i class="bi bi-signpost-split-fill"></i> LEVEL PROBABILITY' + _ii('dv-lvlprob') + '</span></div>'
        + '<div class="gtb-ic-panel-body" id="' + tid + '-lvlprob"></div></div>';
+
+    // Panel: Positional Screener verdict (positionalScreener.js, read from its own scan cache)
+    h += '<div class="gtb-ic-panel" data-col="psverdict"><div class="gtb-ic-panel-hdr"><span class="gtb-ic-panel-title"><i class="bi bi-graph-up-arrow"></i> POSITIONAL VERDICT</span></div>'
+       + '<div class="gtb-ic-panel-body ps-detail-verdict" data-name="' + name + '" id="' + tid + '-psverdict"></div></div>';
 
     // Panel: plain-English briefing for this instrument (briefingText.js)
     h += '<div class="gtb-ic-panel" data-col="brief"><div class="gtb-ic-panel-hdr"><span class="gtb-ic-panel-title"><i class="bi bi-file-text"></i> BRIEFING</span></div>'
@@ -3391,6 +3409,16 @@ async function commonShowPopupWindow() {
     try { renderComponentPanel(); } catch(e) { console.warn('renderComponentPanel error', e); }
     try { renderScoreHistory(); } catch(e) { console.warn('renderScoreHistory error', e); }
     try { _gtbMacroOnRefresh(); } catch(e) { console.warn('macro error', e); }
+    // Dashboard review strip ticks mean "looked at since the last refresh" -- new data clears them.
+    try { _gtbDashReviewReset(); } catch(e) {}
+    // Positional Screener Verdict dashboard card's background top-up scan — belongs HERE
+    // (the actual refresh cycle), not inside _gtbRenderDashboardPane, which also runs on
+    // every tab activation/popup open and would otherwise fire a scan far more often than
+    // intended. Throttled + scoped to just this card's instrument list internally (see
+    // _psAutoScanDashboardInstruments's own comment). Deliberately NOT awaited — it can take
+    // a while (daily candles per instrument) and shouldn't hold up the rest of this cycle; it
+    // repaints #gtb-dash-ps-verdict itself once done.
+    try { if (typeof _psAutoScanDashboardInstruments === 'function') _psAutoScanDashboardInstruments(); } catch(e) { console.warn('positional auto-scan error', e); }
     // Pre-Squeeze streak tracking must run every cycle regardless of which tab is open — it's
     // watching for a MULTI-scan unreversed run, so a gap in tracking (e.g. user on another tab)
     // would silently reset streaks that were actually still building.
@@ -6692,6 +6720,7 @@ async function _dvFetchAndRender(name, tid, sfx, isMcx) {
         } catch(e) {}
         try { jQ('#' + tid + '-prob' + sfx).html(_cmdTrendProb(name, null)); } catch(e) {}
         try { jQ('#' + tid + '-lvlprob' + sfx).html(_gtbLevelProbHtml(name)); } catch(e) {}
+        try { jQ('#' + tid + '-psverdict' + sfx).html(_psInstrDetailVerdictHtml(name)); } catch(e) {}
         try { jQ('#' + tid + '-brief' + sfx).html(_gtbInstrBriefHtml(name)); } catch(e) {}
         // Prediction panel is built synchronously with the card HTML, before futures/OI/score
         // data for this instrument has finished loading — re-render it now that it has.
@@ -6847,6 +6876,10 @@ async function _gtbLoadInstrDetail(name) {
     h += '<div class="gtb-ic-panel" data-col="lvlprob">';
     h +=   '<div class="gtb-ic-panel-hdr"><span class="gtb-ic-panel-title"><i class="bi bi-signpost-split-fill"></i> LEVEL PROBABILITY' + _ii('dv-lvlprob') + '</span></div>';
     h +=   '<div class="gtb-ic-panel-body" id="' + tid + '-lvlprob' + sfx + '"></div>';
+    h += '</div>';
+    h += '<div class="gtb-ic-panel" data-col="psverdict">';
+    h +=   '<div class="gtb-ic-panel-hdr"><span class="gtb-ic-panel-title"><i class="bi bi-graph-up-arrow"></i> POSITIONAL VERDICT</span></div>';
+    h +=   '<div class="gtb-ic-panel-body ps-detail-verdict" data-name="' + name + '" id="' + tid + '-psverdict' + sfx + '"></div>';
     h += '</div>';
     h += '<div class="gtb-ic-panel" data-col="brief">';
     h +=   '<div class="gtb-ic-panel-hdr"><span class="gtb-ic-panel-title"><i class="bi bi-file-text"></i> BRIEFING</span></div>';
@@ -7083,6 +7116,10 @@ function _gtbLoadInstrDetailPanel(name) {
     h += '<div class="gtb-ic-panel" data-col="lvlprob">';
     h +=   '<div class="gtb-ic-panel-hdr"><span class="gtb-ic-panel-title"><i class="bi bi-signpost-split-fill"></i> LEVEL PROBABILITY' + _ii('dv-lvlprob') + '</span></div>';
     h +=   '<div class="gtb-ic-panel-body" id="' + tid + '-lvlprob' + sfx + '"></div>';
+    h += '</div>';
+    h += '<div class="gtb-ic-panel" data-col="psverdict">';
+    h +=   '<div class="gtb-ic-panel-hdr"><span class="gtb-ic-panel-title"><i class="bi bi-graph-up-arrow"></i> POSITIONAL VERDICT</span></div>';
+    h +=   '<div class="gtb-ic-panel-body ps-detail-verdict" data-name="' + name + '" id="' + tid + '-psverdict' + sfx + '"></div>';
     h += '</div>';
     h += '<div class="gtb-ic-panel" data-col="brief">';
     h +=   '<div class="gtb-ic-panel-hdr"><span class="gtb-ic-panel-title"><i class="bi bi-file-text"></i> BRIEFING</span></div>';
@@ -7349,7 +7386,7 @@ function _gtbCreateInstrDetailPopup(minimal) {
     // axis/candles; left-aligned keeps more of the actual chart visible alongside it.
     showPopUpWindow('gtb-instr-detail', body, 'Instrument Detail View', pw, ph, minimal ? { left: 16, top: 70 } : undefined);
 
-    var isLight = jQ('#main-trade-bot-container').hasClass('gtb-light')
+    var isLight = _gtbIsLightTheme()
                || (localStorage.getItem('GTB_THEME') || 'dark') === 'light';
     jQ('.' + popCls).toggleClass('gtb-light', isLight);
 
@@ -7384,14 +7421,13 @@ jQ(document).on('click', '#show-futures-signal', function (e) {
 // isMcx branch too (see v26.80). The one thing the NSE Dashboard gets for free that MCX
 // doesn't — OI/futures data already sitting in INSTRUMENT_SCORE_MAP from the background
 // refresh cycle — is fetched explicitly here per commodity before populating.
-// Mini contracts (CRUDEOILM/GOLDM/SILVERM/NATGASMINI) first — per explicit request, since
-// those are the ones actually traded most — everything else follows in its original
-// _CFG_MCX_COMMODITIES order. Scoped to this dashboard only (doesn't touch the shared
-// config.js list, which also drives the Settings popup's field ordering).
+// Restricted to just the two actually-traded minis per explicit request — was previously
+// every _CFG_MCX_COMMODITIES entry (mini contracts first, everything else after). Scoped to
+// this dashboard only (doesn't touch the shared config.js list, which still drives the
+// Settings popup's field ordering, the Commodities popup, the Positional Screener's MCX
+// universe, and WebSocket Subscribe's default list — all unaffected by this).
 function _gtbMcxDashNames() {
-    var all = (typeof _CFG_MCX_COMMODITIES !== 'undefined' ? _CFG_MCX_COMMODITIES : []);
-    var isMini = function (n) { return /M$/.test(n) || /MINI/.test(n); };
-    return all.filter(isMini).concat(all.filter(function (n) { return !isMini(n); }));
+    return ['GOLDM', 'SILVERM'];
 }
 
 function _gtbMcxDashInstruments() {
@@ -7584,6 +7620,19 @@ function _gtbMcxDashRefreshAll() {
             .then(function () { done++; _gtbMcxDashProgress(done, total); });
     })).then(function () {
         try { jQ('#gtb-mcxdash-consensus').html(_gtbMasterConsensusMcxRowsHtml()); } catch (e) {}
+        // Positional Screener verdict per commodity — paints whatever's already cached
+        // (_PS_CACHE) immediately, then kicks off a background top-up scan restricted to
+        // just these MCX names (see _psAutoScanMcxDashInstruments's own comment, same
+        // "scan only this card's own instruments, never the full universe" convention as
+        // the NSE Dashboard's equivalent card) so a never-scanned commodity fills in without
+        // requiring a trip to the standalone Positional Screener popup first.
+        try {
+            names.forEach(function (n) {
+                var t = n.replace(/ /g, '-').replace(/&/g, '-');
+                jQ('#' + t + '-ps-verdict-dash').html(_psMcxDashVerdictHtml(n));
+            });
+            if (typeof _psAutoScanMcxDashInstruments === 'function') _psAutoScanMcxDashInstruments(names);
+        } catch (e) {}
     });
 }
 
@@ -7668,6 +7717,7 @@ function _gtbShowMcxDashboard() {
                     +   '<div class="gtb-mcxdash-card-sec gtb-mcxdash-card-predict" id="' + tid + '-predict-dash"><span class="gtb-row-na" style="margin:auto">—</span></div>'
                     +   '<div class="gtb-mcxdash-card-sec gtb-mcxdash-card-futacc" id="' + tid + '-futacc-dash"><span class="gtb-row-na" style="margin:auto">—</span></div>'
                     +   '<div class="gtb-mcxdash-card-sec gtb-mcxdash-card-lvlprob" id="' + tid + '-lvlprob-dash"><span class="gtb-row-na" style="margin:auto">—</span></div>'
+                    +   '<div class="gtb-mcxdash-card-sec" id="' + tid + '-ps-verdict-dash"><span class="gtb-row-na" style="margin:auto">—</span></div>'
                     +   '<div class="gtb-mcxdash-card-sec" id="' + tid + '-shortcov-dash"><span class="gtb-row-na" style="margin:auto">—</span></div>'
                     + '</div>';
             }).join('')
@@ -8792,6 +8842,8 @@ function _gtbCfgFieldGroups() {
         { key: 'refresh_time', label: 'Refresh time', type: 'text' },
         { key: 'historical_data_interval', label: 'Historical data interval', type: 'text' },
         { key: 'use_ltp_for_strike', label: 'Use LTP for strike', type: 'checkbox' },
+        { key: 'squeeze_auto_scan', label: '5-min squeeze alert scan (NIFTY, BANK, RELIANCE, HDFCBANK, ICICIBANK)', type: 'checkbox' },
+        { key: 'squeeze_auto_scan_mcx', label: '5-min squeeze alert scan — MCX (SILVERM, GOLDM)', type: 'checkbox' },
     ]});
     groups.push({ id: 'nse', title: 'NSE / INDEX EXPIRY', fields: [
         Object.assign({ key: 'nifty_expiry_date', label: 'NIFTY options expiry date', type: 'select' }, nseExpiryChoices('NIFTY')),
@@ -9173,7 +9225,7 @@ function _gtbApplyTheme(theme) {
 
 // Theme-aware LightweightCharts colours
 function _gtbChartColors() {
-    var light = jQ('#main-trade-bot-container').hasClass('gtb-light')
+    var light = _gtbIsLightTheme()
              || (localStorage.getItem('GTB_THEME') || 'dark') === 'light';
     return light
         ? { bg: '#ffffff', grid: '#e7edf4', bdr: '#c5d0de', text: '#5a6678' }
@@ -10342,7 +10394,7 @@ jQ(document).on('click', '.gtb-info-i', function(e) {
     if (!info) return;
     var pop = _gtbInfoPop();
     // Theme match (overlay-style elements live on <body>)
-    jQ(pop).toggleClass('gtb-light', jQ('#main-trade-bot-container').hasClass('gtb-light'));
+    jQ(pop).toggleClass('gtb-light', _gtbIsLightTheme());
     pop.querySelector('.gtb-info-pop-title').innerHTML = '<i class="bi ' + info.icon + '"></i> ' + info.title;
     pop.querySelector('.gtb-info-pop-body').innerHTML = info.body;
     pop.style.display = 'block';
@@ -11077,7 +11129,7 @@ function _gtbDayChartPopup() {
             + '<div id="gtb-daychart-body"></div></div>';
         document.body.appendChild(el);
     }
-    jQ(el).toggleClass('gtb-light', jQ('#main-trade-bot-container').hasClass('gtb-light'));
+    jQ(el).toggleClass('gtb-light', _gtbIsLightTheme());
     return jQ(el);
 }
 jQ(document).on('click', '.gtb-daychart-close, #gtb-daychart-overlay', function (e) {
@@ -11155,7 +11207,7 @@ function _gtbComboChartPopup() {
             + '<div id="gtb-combochart-body"></div></div>';
         document.body.appendChild(el);
     }
-    jQ(el).toggleClass('gtb-light', jQ('#main-trade-bot-container').hasClass('gtb-light'));
+    jQ(el).toggleClass('gtb-light', _gtbIsLightTheme());
     return jQ(el);
 }
 jQ(document).on('click', '.gtb-combochart-close, #gtb-combochart-overlay', function (e) {
@@ -11499,6 +11551,167 @@ function _gtbCheckShortCoveringAlerts(rows) {
     // Clear alerts for remarks that are no longer active, so a later re-entry alerts again.
     Object.keys(_GTB_ACTIVE_SC_ALERTS).forEach(function (key) { if (!seenKeys[key]) delete _GTB_ACTIVE_SC_ALERTS[key]; });
 }
+
+// ── 5-minute futures squeeze auto-scan (short covering / long unwinding alerts) ─────────────
+// Independent of the dashboard refresh cycle and of which tab is open: every 5-minute mark
+// after 9:15 (9:20, 9:25 … 15:30) it re-reads the futures REMARK for NIFTY 50, NIFTY BANK,
+// RELIANCE, HDFCBANK and ICICIBANK and toasts + beeps when one newly turns SHOT_COVERING
+// (price up, OI down) or LONG_UNWINDING (price down, OI down). Uses showFutureDetails() — the
+// exact function the refresh cycle uses, which already drops the still-forming candle — so
+// this scan's remark can never disagree with the dashboard's definition of it.
+// Switch: Settings → General → "5-min squeeze alert scan" (config key squeeze_auto_scan,
+// default ON); re-read at every tick, so toggling it needs no reload. A second, independent
+// MCX group (SILVERM + GOLDM, 9:05–23:55, switch squeeze_auto_scan_mcx) runs alongside it, so the
+// NSE group still stops at 15:30 while MCX continues into the evening. Alerts once on the
+// transition into the state and clears when the remark moves away, so a later re-entry alerts
+// again (same dedup idea as _gtbCheckShortCoveringAlerts above, but its own key set so the two
+// don't clear each other's entries).
+// Caveat: a browser throttles timers in a background tab (Chrome can delay them up to ~1
+// minute after the tab has been hidden a while) — the scan then runs late, but still reads
+// fresh candles, so the alert is late rather than wrong.
+var _GTB_SQUEEZE_SCAN_DELAY_MS = 10000; // let Kite finalize the candle that just closed
+var _GTB_SQUEEZE_SCAN_ACTIVE = {};      // 'name|REMARK' -> true while that remark is firing
+var _GTB_SQUEEZE_SCAN_RUNNING = {};     // group key -> a tick for that group is in flight
+var _GTB_SQUEEZE_SCAN_HOLIDAY_DAY = null; // day we last refreshed the NSE holiday list (at most once a day)
+
+// MCX bullion remark, read the same way showFutureDetailsMCX() builds it EXCEPT that the
+// still-forming candle is dropped first: showFutureDetailsMCX keeps it (the scan fires 10 s
+// after a boundary, when the newest candle has barely started and its volume/OI are tiny),
+// which would make the remark flip on a near-empty candle. NSE's showFutureDetails already
+// drops it, so only MCX needs this.
+async function _gtbSqueezeMcxRemark(name) {
+    var fut = (typeof COMMODITIES_FUTURE_INSTRUMENT_LIST !== 'undefined')
+        ? COMMODITIES_FUTURE_INSTRUMENT_LIST.find(function (f) { return f.name === name; }) : null;
+    if (!fut) return null;
+    var pair = await Promise.all([
+        getHistoricalDataUsingPromise(fut.instrument_token, _gtbMcxPrevDay(), _gtbMcxPrevDay(), 'day'),
+        getHistoricalDataUsingPromise(fut.instrument_token, _gtbMcxCurrDay(), _gtbMcxCurrDayTo(), '5minute'),
+    ]);
+    var pres = pair[0], cres = pair[1];
+    var raw = (cres && cres.data && cres.data.candles) ? cres.data.candles : [];
+    var kept = _gtbDropFormingCandle(_gtbTrimCandles(raw, MCX_CURRENT_DAY), '5minute');
+    var pc = (pres && pres.data && pres.data.candles) ? pres.data.candles : [];
+    // One finished candle is enough (the 9:05 tick has only the 9:00 candle) — same as
+    // showFutureDetailsMCX, which passes no intraday series when there's just one.
+    if (!kept.length || !pc.length) return null;
+    var map = function (c) { return { date: moment(c[0]).format('HH:mm'), open: c[1], high: c[2], low: c[3], close: c[4], volume: c[5], oi: c[6] }; };
+    var intr = kept.map(map), prevDay = map(pc[pc.length - 1]);
+    var daily = {
+        date: intr[intr.length - 1].date, open: intr[0].open,
+        high: Math.max.apply(null, intr.map(function (c) { return c.high; })),
+        low: Math.min.apply(null, intr.map(function (c) { return c.low; })),
+        close: intr[intr.length - 1].close,
+        volume: intr.reduce(function (s, c) { return s + c.volume; }, 0), oi: intr[intr.length - 1].oi
+    };
+    var resp = showTableAiNiftyPrediction(daily, prevDay, fut.lot_size, intr.length > 1 ? intr : null, { name: name });
+    return resp ? resp['REMARK'] : null;
+}
+
+// Two independent groups, each with its own session window and its own config switch, so NSE
+// stops at 15:30 while MCX keeps scanning into the evening. MCX is NOT holiday-skipped with
+// the NSE holiday list (MCX often trades its evening session on NSE holidays) — if MCX has no
+// data the read just returns null and nothing alerts. MCX end is 23:55 (bullion closes 23:30
+// in winter, 23:55 during US daylight saving); a few empty reads before close are harmless.
+var _GTB_SQUEEZE_SCAN_GROUPS = [
+    { key: 'nse', label: 'NSE', cfg: 'squeeze_auto_scan', names: ['NIFTY 50', 'NIFTY BANK', 'RELIANCE', 'HDFCBANK', 'ICICIBANK'],
+      startMin: 9 * 60 + 20, endMin: 15 * 60 + 30, holidayAware: true,
+      read: function (name) { return showFutureDetails(name).then(function (res) { return res ? res['REMARK'] : null; }); } },
+    { key: 'mcx', label: 'MCX', cfg: 'squeeze_auto_scan_mcx', names: ['SILVERM', 'GOLDM'],
+      startMin: 9 * 60 + 5, endMin: 23 * 60 + 55, holidayAware: false,
+      read: function (name) { return _gtbSqueezeMcxRemark(name); } },
+];
+
+function _gtbSqueezeScanEnabled(group) {
+    try { return g_config.get(group.cfg) !== false; } catch (e) { return true; }
+}
+
+// Next 5-minute slot whose scan (slot + delay) has not happened yet, and when to fire it.
+function _gtbSqueezeNextSlot(now) {
+    var prev = now.clone().minutes(Math.floor(now.minutes() / 5) * 5).seconds(0).milliseconds(0);
+    var slot = prev;
+    var fireAt = slot.valueOf() + _GTB_SQUEEZE_SCAN_DELAY_MS;
+    if (fireAt <= now.valueOf()) { slot = prev.clone().add(5, 'minutes'); fireAt = slot.valueOf() + _GTB_SQUEEZE_SCAN_DELAY_MS; }
+    return { slot: slot, delayMs: fireAt - now.valueOf() };
+}
+
+// Weekday, and the slot sits inside the group's own session window (first 5-min candle of
+// the session closes at startMin).
+function _gtbSqueezeSlotInWindow(slot, group) {
+    if (slot.isoWeekday() > 5) return false;
+    var mins = slot.hours() * 60 + slot.minutes();
+    return mins >= group.startMin && mins <= group.endMin;
+}
+
+// Pure: given [{name, remark}] returns the alerts to raise now and updates the dedup set.
+// A name whose fetch failed (remark null) keeps its existing keys, so a flaky call can't
+// cause a false clear followed by a duplicate alert.
+function _gtbSqueezeProcessResults(results) {
+    var fresh = [], seen = {};
+    results.forEach(function (r) {
+        if (r.remark === 'SHOT_COVERING' || r.remark === 'LONG_UNWINDING') {
+            var key = r.name + '|' + r.remark;
+            seen[key] = true;
+            if (!_GTB_SQUEEZE_SCAN_ACTIVE[key]) { _GTB_SQUEEZE_SCAN_ACTIVE[key] = true; fresh.push(r); }
+        }
+    });
+    results.forEach(function (r) {
+        if (r.remark == null) return;
+        Object.keys(_GTB_SQUEEZE_SCAN_ACTIVE).forEach(function (key) {
+            if (key.indexOf(r.name + '|') === 0 && !seen[key]) delete _GTB_SQUEEZE_SCAN_ACTIVE[key];
+        });
+    });
+    return fresh;
+}
+
+async function _gtbSqueezeScanGroup(slot, group) {
+    if (_GTB_SQUEEZE_SCAN_RUNNING[group.key]) return;
+    if (!_gtbSqueezeScanEnabled(group) || !_gtbSqueezeSlotInWindow(slot, group)) return;
+    _GTB_SQUEEZE_SCAN_RUNNING[group.key] = true;
+    try {
+        if (group.holidayAware) {
+            var today = slot.format('YYYY-MM-DD');
+            if (_GTB_SQUEEZE_SCAN_HOLIDAY_DAY !== today) {
+                _GTB_SQUEEZE_SCAN_HOLIDAY_DAY = today;
+                try { if (typeof _gtbFetchHolidays === 'function') await _gtbFetchHolidays(); } catch (e) {}
+            }
+            try { if (typeof _gtbTodayHoliday === 'function' && _gtbTodayHoliday()) return; } catch (e) {}
+        }
+
+        var results = await Promise.all(group.names.map(function (name) {
+            return Promise.resolve().then(function () { return group.read(name); })
+                .then(function (remark) { return { name: name, remark: remark }; })
+                .catch(function (e) { console.log('[squeeze-scan]', name, e); return { name: name, remark: null }; });
+        }));
+        console.log('[squeeze-scan ' + group.label + ']', slot.format('HH:mm'), results.map(function (r) { return r.name + ':' + (r.remark || 'n/a'); }).join(', '));
+
+        _gtbSqueezeProcessResults(results).forEach(function (r) {
+            var isCover = r.remark === 'SHOT_COVERING';
+            var msg = r.name + ' — ' + (isCover ? 'SHORT COVERING (price ↑, OI ↓)' : 'LONG UNWINDING (price ↓, OI ↓)') + ' · 5-min ' + group.label + ' futures scan ' + slot.format('HH:mm');
+            try { _gtbToast(msg, isCover ? 'success' : 'error'); } catch (e) {}
+            try { _svBeep(); } catch (e) {}
+            try { if (typeof _gtbLogWrite === 'function') _gtbLogWrite('info', [msg]); } catch (e) {}
+        });
+    } catch (e) {
+        console.log('[squeeze-scan] ' + group.label + ' tick failed', e);
+    } finally {
+        _GTB_SQUEEZE_SCAN_RUNNING[group.key] = false;
+    }
+}
+
+function _gtbSqueezeScanTick(slot) {
+    return Promise.all(_GTB_SQUEEZE_SCAN_GROUPS.map(function (g) { return _gtbSqueezeScanGroup(slot, g); }));
+}
+
+function _gtbSqueezeScanSchedule() {
+    var n = _gtbSqueezeNextSlot(moment());
+    setTimeout(function () {
+        _gtbSqueezeScanTick(n.slot);
+        _gtbSqueezeScanSchedule();
+    }, n.delayMs);
+}
+// Runs from page load, no dashboard needed. Console helper for testing: _gtbSqueezeScanNow()
+function _gtbSqueezeScanNow() { return _gtbSqueezeScanTick(moment().minutes(Math.floor(moment().minutes() / 5) * 5).seconds(0).milliseconds(0)); }
+setTimeout(_gtbSqueezeScanSchedule, 3000);
 
 // Market-wide scan across a name list — used by the NSE Dashboard's own
 // SHORT COVERING / LONG UNWINDING card, same idea as _gtbLevelProbLiveRowsHtml: every
@@ -13528,11 +13741,17 @@ function _gtbLevelProbRowsHtmlFor(lvlNames) {
         + downGroup.map(function(r) { return rowHtml(r.name, r.p); }).join('');
 }
 
-function _gtbLevelProbLiveRowsHtml() {
-    var lvlNames = ['NIFTY 50', 'NIFTY BANK']
+// Shared instrument list for every Dashboard card scoped to "Level Probability's universe"
+// (NIFTY 50 + NIFTY BANK + both indices' top-10 weighted constituents) — factored out so the
+// Positional Screener Verdict column (added alongside Futures Accuracy + Level Probability)
+// can't silently drift onto a different instrument set than Level Probability itself.
+function _gtbLvlProbInstrumentNames() {
+    return ['NIFTY 50', 'NIFTY BANK']
         .concat(Object.keys(NIFTY_50_WEIGHTED_STOCKS || {}))
         .concat(Object.keys(NIFTY_BANK_WEIGHTED_STOCKS || {}));
-    return _gtbLevelProbRowsHtmlFor(lvlNames);
+}
+function _gtbLevelProbLiveRowsHtml() {
+    return _gtbLevelProbRowsHtmlFor(_gtbLvlProbInstrumentNames());
 }
 
 function _gtbLevelProbHtml(name) {
@@ -14035,7 +14254,7 @@ function _cmdChartLink(name) {
 jQ(document).on('click', '#show-commodities', function (e) {
     e.preventDefault();
     var _cmdDivId = 'popup-custom-style-commodities-panel';
-    var _cmdName = 'CRUDEOILM'; // active right-column commodity, switchable via #cmd-instr-select
+    var _cmdName = 'SILVERM'; // active right-column commodity, switchable via #cmd-instr-select — default per explicit request (was CRUDEOILM)
     _CMD.activeName = _cmdName; // shared with _gtbRefreshAllPredictCards so it knows which commodity's fixed-id panel to sync
 
     var body = '<div class="cmd-wrap">'
@@ -14056,7 +14275,7 @@ jQ(document).on('click', '#show-commodities', function (e) {
         // ── Instrument header — icon + picker + meta chips (OVX regime, expiry) in one
         // compact strip, replacing the old plain "column header" convention. ──────────
         + '<div class="cmd-instr-hdr">'
-        +   '<i id="cmd-instr-icon" class="bi bi-droplet-fill cmd-instr-hdr-icon"></i>'
+        +   '<i id="cmd-instr-icon" class="bi ' + _cmdMeta(_cmdName).icon + ' cmd-instr-hdr-icon"></i>'
         +   '<select id="cmd-instr-select" class="cmd-instr-hdr-select">'
         +     _cmdAvailableInstruments().map(function (i) { return '<option value="' + i.name + '"' + (i.name === _cmdName ? ' selected' : '') + '>' + i.label + '</option>'; }).join('')
         +   '</select>'
@@ -21299,6 +21518,8 @@ function _gtbRenderDashboardPane() {
       try {
         var h = '<div style="padding:8px 0;">';
 
+        h += '<div id="gtb-dash-review-strip"></div>';
+
         h += _gtbDashboardOverviewHtml();
 
         // Price Action grid — the same 8 instruments/order as the Overview tab's own
@@ -21355,7 +21576,7 @@ function _gtbRenderDashboardPane() {
         h += '<div class="gtb-card gtb-widget" style="margin:0 8px 8px;">'
         +      '<div class="gtb-card-header"><span class="gtb-card-title">' + _gtbDashNum(7) + '<i class="bi bi-shield-check"></i> LEVEL CONFIRMATION</span></div>'
         +      '<div class="gtb-card-body" id="gtb-dash-lvlconfirm" style="padding:6px 8px;"></div>'
-        +    '</div>';
+        +    '</div>';
 
         // Per-instrument OI/OBV + Prediction matrix — one row per instrument, reusing Stock
         // Viewer's own row classes/CSS (.gtb-row/.gtb-row-id/.gtb-row-predict/.gtb-row-oiobv;
@@ -21382,10 +21603,10 @@ function _gtbRenderDashboardPane() {
         +      '</div>';
         h += '</div>'; // end .gtb-dash-sig-cols
 
-        // Futures Accuracy + Level Probability — side by side (2-column), matching the
-        // INDEX/STOCK OI | WEIGHTED CONSTITUENTS OI row's width instead of stacking as two
-        // separate full-width rows with empty space either side, per explicit request.
-        h += '<div class="gtb-dash-2col" style="padding:0 8px 8px;">';
+        // Futures Accuracy + Level Probability + Positional Screener Verdict — side by side
+        // (3-column), matching the INDEX/STOCK OI | WEIGHTED CONSTITUENTS OI row's width
+        // instead of stacking as separate full-width rows with empty space either side.
+        h += '<div class="gtb-dash-3col" style="padding:0 8px 8px;">';
         h +=   '<div class="gtb-card gtb-widget" style="margin:0;">'
         +        '<div class="gtb-card-header"><span class="gtb-card-title">' + _gtbDashNum(9) + '<i class="bi bi-bullseye"></i> FUTURES ACCURACY</span></div>'
         +        '<div class="gtb-card-body" id="gtb-dash-sig-fut-body" style="padding:0;overflow:auto;max-height:320px;">'
@@ -21399,7 +21620,16 @@ function _gtbRenderDashboardPane() {
         +        '<div class="gtb-card-header"><span class="gtb-card-title">' + _gtbDashNum(10) + '<i class="bi bi-signpost-split-fill"></i> LEVEL PROBABILITY (LIVE SIGNALS)</span></div>'
         +        '<div class="gtb-card-body" id="gtb-dash-lvlprob" style="padding:6px 8px;overflow:auto;max-height:320px;"></div>'
         +      '</div>';
-        h += '</div>'; // end .gtb-dash-2col
+        // Positional Screener Verdict — same instrument universe as Level Probability
+        // (_gtbLvlProbInstrumentNames, shared), reading whatever the Positional Screener's
+        // last scan already computed (_PS_CACHE, positionalScreener.js) — a pure read of
+        // already-scanned results, never triggers a scan itself (that's a 210+ day daily
+        // candle fetch per stock, far too heavy to run on every 5-min dashboard refresh).
+        h +=   '<div class="gtb-card gtb-widget" style="margin:0;">'
+        +        '<div class="gtb-card-header"><span class="gtb-card-title"><i class="bi bi-graph-up-arrow"></i> POSITIONAL SCREENER VERDICT</span></div>'
+        +        '<div class="gtb-card-body" id="gtb-dash-ps-verdict" style="padding:6px 8px;overflow:auto;max-height:320px;"></div>'
+        +      '</div>';
+        h += '</div>'; // end .gtb-dash-3col
 
         // Market Fear & Greed / Master Consensus / Trend Probability — three market-wide
         // context cards, grouped into one 3-column row per explicit request. Fear & Greed
@@ -21521,6 +21751,12 @@ function _gtbRenderDashboardPane() {
     _gtbLoadFutAccInPane(['gtb-dash-sig-fut-body']);
 
     try { jQ('#gtb-dash-lvlprob').html(_gtbLevelProbLiveRowsHtml()); } catch (e) {}
+    // Pure read of whatever's already cached (_PS_CACHE) — safe to repaint on every tab
+    // view/popup open. The actual SCAN that populates it only runs from the real refresh
+    // cycle (commonShowPopupWindow, near _gtbMacroOnRefresh), not from here — this function
+    // also runs on tab activation and popup open, and a scan firing on every one of those
+    // (not just an actual 5-min refresh) was the reported bug.
+    try { jQ('#gtb-dash-ps-verdict').html(_psVerdictDashRowsHtml()); } catch (e) {}
     try { jQ('#gtb-dash-consensus').html(_gtbMasterConsensusAllRowsHtml()); } catch (e) {}
     // Trend Probability — gauge-only view of the SAME engine the Analysis tab's full panel
     // uses (_btComputeTrendProb/_btTrendProbLeftHtml, bloombergAnalysis.js), so this card can
@@ -21535,8 +21771,170 @@ function _gtbRenderDashboardPane() {
     try { jQ('#gtb-dash-feargreed').html(_gtbFearGreedHtml()); } catch (e) {}
     _gtbFetchNiftyMomentum().then(function () {
         try { jQ('#gtb-dash-feargreed').html(_gtbFearGreedHtml()); } catch (e) {}
+        try { _gtbRenderDashReviewStrip(); } catch (e) {}
     });
+    try { _gtbRenderDashReviewStrip(); } catch (e) {}
 }
+
+// ── Dashboard review strip ───────────────────────────────────────────────────────────────
+// A sticky row of chips at the top of the Dashboard tab, one per section, so no section gets
+// forgotten: each chip shows a status dot (green/amber/red, or grey when the section has no
+// single numeric read), clicking it scrolls to that section and ticks it as reviewed, and the
+// ticks reset on every real refresh (_gtbDashReviewReset, called from the refresh cycle).
+// The dot colours are simple heuristics built only from already-cached data (sign / lean of
+// each section's own headline number) — they say "worth a look", not "act on this", and
+// none of the thresholds are backtested. Sections with no clean one-number read are grey.
+var _GTB_DASH_REVIEWED = {};
+
+function _gtbDashScoreOf(name) { try { return computeInstrumentScore(name); } catch (e) { return null; } }
+
+// tone: 'good' | 'warn' | 'bad' | 'none'
+function _gtbDashSignTone(v, eps) {
+    if (v == null || !isFinite(v)) return 'none';
+    eps = eps || 0;
+    return v > eps ? 'good' : v < -eps ? 'bad' : 'warn';
+}
+
+var _GTB_DASH_REVIEW_SECTIONS = [
+    { key: 'overview', label: 'Overview', target: '#gtb-overview-dash', status: function () {
+        var score = parseFloat(jQ('#gtb-ov-score-dash').text());
+        if (!isFinite(score)) return { tone: 'none', tip: 'No score yet — run a refresh.' };
+        var t = score >= 4 ? 'good' : score <= -4 ? 'bad' : 'warn';
+        return { tone: t, tip: (jQ('#gtb-ov-verdict-dash').text() || 'Market verdict') + ' (score ' + score + ')' };
+    } },
+    { key: 'price', label: 'Price Action', target: '#gtb-dash-pa-grid', status: function () {
+        var cs = _gtbDashScoreOf('NIFTY 50');
+        return cs ? { tone: _gtbDashSignTone(cs.current_trend), tip: 'NIFTY 50 trend vs its 9:15 levels' } : { tone: 'none', tip: 'No data yet' };
+    } },
+    { key: 'predict', label: 'Predict', target: '#gtb-dash-predict', status: function () { return { tone: 'none', tip: '9:15 combo prediction — read it directly' }; } },
+    { key: 'macro', label: 'Macro', target: '#gtb-dash-macro', status: function () {
+        var m = (typeof _GTB_MACRO !== 'undefined') ? _GTB_MACRO : null;
+        if (!m) return { tone: 'none', tip: 'Macro not loaded yet' };
+        return { tone: m.tone === 'good' ? 'good' : m.tone === 'bad' ? 'bad' : 'warn', tip: m.label + ' (' + m.score + ')' };
+    } },
+    { key: 'lvlconfirm', label: 'Level Confirm', target: '#gtb-dash-lvlconfirm', status: function () { return { tone: 'none', tip: 'Pre-trade level checks — read directly' }; } },
+    { key: 'matrix', label: 'OI/OBV Matrix', target: '#gtb-dash-matrix-index', status: function () {
+        var names = []; try { names = _gtbDashCoreNames(); } catch (e) {}
+        var bulls = 0, bears = 0, n = 0;
+        names.forEach(function (nm) { var cs = _gtbDashScoreOf(nm); if (!cs || cs.total == null) return; n++; if (cs.total > 0) bulls++; else if (cs.total < 0) bears++; });
+        if (!n) return { tone: 'none', tip: 'No data yet' };
+        return { tone: bulls > bears ? 'good' : bears > bulls ? 'bad' : 'warn', tip: bulls + ' bullish / ' + bears + ' bearish of ' + n + ' core instruments (total score)' };
+    } },
+    { key: 'oiindex', label: 'Index OI', target: '#gtb-dash-sig-oi-index', status: function () {
+        var a = _gtbDashScoreOf('NIFTY 50'), b = _gtbDashScoreOf('NIFTY BANK');
+        if (!a && !b) return { tone: 'none', tip: 'No data yet' };
+        var v = (a ? a.oi_obv || 0 : 0) + (b ? b.oi_obv || 0 : 0);
+        return { tone: _gtbDashSignTone(v, 0.5), tip: 'NIFTY 50 + BANK NIFTY OI/OBV score ' + v.toFixed(1) };
+    } },
+    { key: 'oiwtd', label: 'Weighted OI', target: '#gtb-dash-sig-oi-wtd', status: function () {
+        var wMap = (typeof NIFTY_50_WEIGHTED_STOCKS !== 'undefined') ? NIFTY_50_WEIGHTED_STOCKS : {};
+        var sw = 0, sv = 0;
+        Object.keys(wMap).forEach(function (nm) { var cs = _gtbDashScoreOf(nm), w = parseFloat(wMap[nm]) || 0; if (cs && w) { sw += w; sv += w * (cs.oi_obv || 0); } });
+        if (!sw) return { tone: 'none', tip: 'No data yet' };
+        var v = sv / sw;
+        return { tone: _gtbDashSignTone(v, 0.3), tip: 'Weighted OI/OBV score of NIFTY 50 top constituents ' + v.toFixed(2) };
+    } },
+    { key: 'futacc', label: 'Futures Accuracy', target: '#gtb-dash-sig-fut-body', status: function () { return { tone: 'none', tip: 'Reference table — check the win-rates for today\'s remarks' }; } },
+    { key: 'lvlprob', label: 'Level Prob', target: '#gtb-dash-lvlprob', status: function () {
+        var p; try { p = _gtbLevelProb('NIFTY 50'); } catch (e) { p = null; }
+        if (!p || !p.ok) return { tone: 'none', tip: 'No data yet' };
+        var up = Math.max(p.pASO, p.pAST, p.pVIXU), dn = Math.max(p.pBSO, p.pBST, p.pVIXL), d = up - dn;
+        return { tone: d >= 10 ? 'good' : d <= -10 ? 'bad' : 'warn', tip: 'NIFTY 50: upside ' + up + '% vs downside ' + dn + '%' };
+    } },
+    { key: 'psverdict', label: 'Positional', target: '#gtb-dash-ps-verdict', status: function () {
+        var names = []; try { names = _gtbLvlProbInstrumentNames(); } catch (e) {}
+        var bulls = 0, bears = 0, n = 0;
+        names.forEach(function (nm) {
+            var r = _PS_CACHE[nm.toUpperCase()] || _PS_CACHE[nm]; if (!r) return; n++;
+            if (r.verdict.indexOf('BUY') !== -1 || r.verdict.indexOf('LONG forming') !== -1) bulls++;
+            else if (r.verdict.indexOf('SELL') !== -1 || r.verdict.indexOf('SHORT forming') !== -1) bears++;
+        });
+        if (!n) return { tone: 'none', tip: 'Positional Screener not scanned yet' };
+        return { tone: bulls > bears ? 'good' : bears > bulls ? 'bad' : 'warn', tip: bulls + ' bulls / ' + bears + ' bears of ' + n + ' scanned' };
+    } },
+    { key: 'feargreed', label: 'Fear & Greed', target: '#gtb-dash-feargreed', status: function () {
+        var fg; try { fg = _gtbFearGreedComponents(); } catch (e) { fg = null; }
+        if (!fg || fg.composite == null) return { tone: 'none', tip: 'Pending' };
+        var lbl = _gtbFearGreedLabel(fg.composite).label;
+        // Contrarian reading, same as the card itself: extreme fear = potential buy-the-dip.
+        var t = lbl === 'EXTREME FEAR' ? 'good' : lbl === 'EXTREME GREED' ? 'bad' : 'warn';
+        return { tone: t, tip: lbl + ' (' + Math.round(fg.composite) + ')' };
+    } },
+    { key: 'consensus', label: 'Consensus', target: '#gtb-dash-consensus', status: function () {
+        var mc; try { mc = _gtbMasterConsensus('NIFTY 50'); } catch (e) { mc = null; }
+        if (!mc || !mc.voting) return { tone: 'none', tip: 'No data yet' };
+        return { tone: mc.net > 0.2 ? 'good' : mc.net < -0.2 ? 'bad' : 'warn', tip: 'NIFTY 50: ' + mc.outcome };
+    } },
+    { key: 'trendprob', label: 'Trend Prob', target: '#gtb-dash-trendprob', status: function () {
+        var tp; try { tp = _btComputeTrendProb(); } catch (e) { tp = null; }
+        if (!tp || tp.bullPct == null) return { tone: 'none', tip: 'No data yet' };
+        return { tone: tp.bullPct >= 0.6 ? 'good' : tp.bullPct <= 0.4 ? 'bad' : 'warn', tip: 'Bull ' + Math.round(tp.bullPct * 100) + '% — ' + tp.verdict };
+    } },
+    { key: 'shortcov', label: 'Short Cover', target: '#gtb-dash-shortcov', status: function () {
+        var names = ['NIFTY 50', 'NIFTY BANK'].concat(Object.keys(typeof NIFTY_50_WEIGHTED_STOCKS !== 'undefined' ? NIFTY_50_WEIGHTED_STOCKS : {}))
+            .concat(Object.keys(typeof NIFTY_BANK_WEIGHTED_STOCKS !== 'undefined' ? NIFTY_BANK_WEIGHTED_STOCKS : {}));
+        var seen = {}, active = 0;
+        names.forEach(function (nm) { if (seen[nm]) return; seen[nm] = 1; try { var s = _gtbShortCoveringSignal(nm); if (s && s.ok && s.active) active++; } catch (e) {} });
+        return active ? { tone: 'warn', tip: active + ' instrument(s) with an active covering/unwinding remark' } : { tone: 'none', tip: 'None firing right now' };
+    } },
+    { key: 'wtcn50', label: 'WTC N50', target: '#gtb-dash-wtc-n50', status: function () {
+        var w; try { w = _gtbWeightedTrendConfirmation('NIFTY 50'); } catch (e) { w = null; }
+        return w ? { tone: _gtbDashSignTone(w.netScore, 1), tip: 'Weighted constituent score ' + w.netScore.toFixed(2) } : { tone: 'none', tip: 'No data yet' };
+    } },
+    { key: 'wtcbn', label: 'WTC Bank', target: '#gtb-dash-wtc-bn', status: function () {
+        var w; try { w = _gtbWeightedTrendConfirmation('NIFTY BANK'); } catch (e) { w = null; }
+        return w ? { tone: _gtbDashSignTone(w.netScore, 1), tip: 'Weighted constituent score ' + w.netScore.toFixed(2) } : { tone: 'none', tip: 'No data yet' };
+    } },
+];
+
+function _gtbDashToneColor(t) {
+    return t === 'good' ? 'var(--gtb-green)' : t === 'bad' ? 'var(--gtb-red)' : t === 'warn' ? 'var(--gtb-amber)' : 'var(--gtb-muted)';
+}
+
+function _gtbRenderDashReviewStrip() {
+    var $el = jQ('#gtb-dash-review-strip');
+    if (!$el.length) return;
+    var done = 0;
+    var chips = _GTB_DASH_REVIEW_SECTIONS.map(function (s) {
+        var st; try { st = s.status(); } catch (e) { st = { tone: 'none', tip: '' }; }
+        var rv = !!_GTB_DASH_REVIEWED[s.key];
+        if (rv) done++;
+        return '<button type="button" class="gtb-rv-chip' + (rv ? ' gtb-rv-done' : '') + '" data-key="' + s.key + '" title="' + String(st.tip || '').replace(/"/g, '&quot;') + '">'
+            + '<span class="gtb-rv-dot" style="background:' + _gtbDashToneColor(st.tone) + ';"></span>'
+            + s.label + (rv ? ' <i class="bi bi-check2"></i>' : '') + '</button>';
+    }).join('');
+    // Chips sit in a 2-row grid (ceil(n/2) columns, reading left-to-right then down) so the
+    // strip is always exactly two even lines instead of wrapping unevenly.
+    var cols = Math.ceil(_GTB_DASH_REVIEW_SECTIONS.length / 2);
+    $el.html('<span class="gtb-rv-label"><i class="bi bi-list-check"></i> REVIEW ' + done + '/' + _GTB_DASH_REVIEW_SECTIONS.length + '</span>'
+        + '<div class="gtb-rv-chips" style="grid-template-columns:repeat(' + cols + ', max-content);">' + chips + '</div>'
+        + '<button type="button" class="gtb-rv-chip gtb-rv-reset" id="gtb-rv-reset" title="Clear all ticks">Reset</button>');
+}
+
+// Called once per real refresh (the refresh orchestrator), not on tab activation — a tick
+// means "I looked at this section since the last refresh", so new data un-ticks everything.
+function _gtbDashReviewReset() {
+    _GTB_DASH_REVIEWED = {};
+    try { _gtbRenderDashReviewStrip(); } catch (e) {}
+}
+
+jQ(document).on('click', '.gtb-rv-chip[data-key]', function () {
+    var key = jQ(this).attr('data-key');
+    var sec = _GTB_DASH_REVIEW_SECTIONS.filter(function (s) { return s.key === key; })[0];
+    if (!sec) return;
+    _GTB_DASH_REVIEWED[key] = true;
+    var $t = jQ(sec.target);
+    var $card = $t.closest('.gtb-card, .gtb-ov-block, .gtb-dash-sig-col');
+    var el = ($card.length ? $card : $t)[0];
+    if (el) {
+        el.style.scrollMarginTop = '48px';
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        jQ(el).addClass('gtb-rv-flash');
+        setTimeout(function () { jQ(el).removeClass('gtb-rv-flash'); }, 1600);
+    }
+    _gtbRenderDashReviewStrip();
+});
+jQ(document).on('click', '#gtb-rv-reset', function () { _gtbDashReviewReset(); });
 
 function _gtbRenderMetricsPane() {
     var $pane = jQ('#gtb-pane-metrics');
@@ -27696,7 +28094,7 @@ function _gtbCreateFloatingBar() {
 
     function closeFlyout() {
         flyout.classList.remove('gtb-tf-open');
-        jQ('#gtb-tools-launcher').removeClass('gtb-ctrl-link-active');
+        jQ('#gtb-tools-launcher, #gtb-nav-tools-launcher').removeClass('gtb-ctrl-link-active');
     }
 
     _tools.forEach(function (t) {
@@ -27778,8 +28176,13 @@ function _gtbCreateFloatingBar() {
         if (first) first.click();
     });
 
-    // Trigger: the topbar icon added alongside the other gtb-ctrl-link icons.
-    jQ(document).on('click', '#gtb-tools-launcher', function (e) {
+    // Trigger: the topbar icon added alongside the other gtb-ctrl-link icons, AND the
+    // #gtb-nav-tools-launcher icon injected directly into Kite's own nav bar (utils.js,
+    // makeUIChanges) -- same flyout, same toggle/position logic, either entry point.
+    jQ(document).on('click', '#gtb-tools-launcher, #gtb-nav-tools-launcher', function (e) {
+        e.preventDefault(); // #gtb-nav-tools-launcher is a real <a href="#"> in Kite's own nav
+        // bar (utils.js) -- without this, the browser followed the "#" href, which Kite's own
+        // SPA router treated as a real navigation and remounted/refreshed the page.
         e.stopPropagation();
         var open = flyout.classList.contains('gtb-tf-open');
         if (open) { closeFlyout(); return; }
@@ -27805,7 +28208,7 @@ function _gtbCreateFloatingBar() {
         // sliver of the <a> not covered by the icon counted as "the launcher"), so this
         // listener closed the flyout in the SAME click that had just opened it via the
         // delegated handler below, every time the click actually landed on the icon glyph.
-        if (e.target.closest && e.target.closest('#gtb-tools-launcher')) return;
+        if (e.target.closest && e.target.closest('#gtb-tools-launcher, #gtb-nav-tools-launcher')) return;
         closeFlyout();
     });
     document.addEventListener('keydown', function (e) {

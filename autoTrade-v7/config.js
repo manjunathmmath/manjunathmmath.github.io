@@ -139,6 +139,19 @@ const g_config = new MonkeyConfig({
             type: 'checkbox',
             default: true
         },
+        // 5-minute futures auto-scan that alerts on short covering / long unwinding for NIFTY 50,
+        // NIFTY BANK, RELIANCE, HDFCBANK and ICICIBANK (see _gtbSqueezeScanTick). Default ON.
+        squeeze_auto_scan: {
+            'label': '5-min squeeze alert scan (short covering / long unwinding)',
+            type: 'checkbox',
+            default: true
+        },
+        // Same scan for MCX SILVERM + GOLDM (own session window, runs into the evening). Default ON.
+        squeeze_auto_scan_mcx: {
+            'label': '5-min squeeze alert scan — MCX (SILVERM, GOLDM)',
+            type: 'checkbox',
+            default: true
+        },
         api_key: {
             'label': 'API Key',
             'type': 'text',
