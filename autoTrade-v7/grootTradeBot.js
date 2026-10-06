@@ -11613,7 +11613,7 @@ async function _gtbSqueezeMcxRemark(name) {
 // data the read just returns null and nothing alerts. MCX end is 23:55 (bullion closes 23:30
 // in winter, 23:55 during US daylight saving); a few empty reads before close are harmless.
 var _GTB_SQUEEZE_SCAN_GROUPS = [
-    { key: 'nse', label: 'NSE', cfg: 'squeeze_auto_scan', names: ['NIFTY 50', 'NIFTY BANK', 'RELIANCE', 'HDFCBANK', 'ICICIBANK'],
+    { key: 'nse', label: 'NSE', cfg: 'squeeze_auto_scan', names: ['NIFTY 50', 'NIFTY BANK', 'SENSEX', 'RELIANCE', 'HDFCBANK', 'ICICIBANK'],
       startMin: 9 * 60 + 20, endMin: 15 * 60 + 30, holidayAware: true,
       read: function (name) { return showFutureDetails(name).then(function (res) { return res ? res['REMARK'] : null; }); } },
     { key: 'mcx', label: 'MCX', cfg: 'squeeze_auto_scan_mcx', names: ['SILVERM', 'GOLDM'],
@@ -11755,7 +11755,9 @@ function _gtbShortCoveringRowsHtmlFor(names) {
 }
 
 function _gtbShortCoveringLiveRowsHtml() {
-    var names = ['NIFTY 50', 'NIFTY BANK']
+    // SENSEX was missing here, so its SHOT_COVERING remark showed in its Futures panel but
+    // never on this card.
+    var names = ['NIFTY 50', 'NIFTY BANK', 'SENSEX']
         .concat(Object.keys(NIFTY_50_WEIGHTED_STOCKS || {}))
         .concat(Object.keys(NIFTY_BANK_WEIGHTED_STOCKS || {}));
     return _gtbShortCoveringRowsHtmlFor(names) + _gtbPreSqueezeWatchHtml(names);
@@ -21576,7 +21578,7 @@ function _gtbRenderDashboardPane() {
         h += '<div class="gtb-card gtb-widget" style="margin:0 8px 8px;">'
         +      '<div class="gtb-card-header"><span class="gtb-card-title">' + _gtbDashNum(7) + '<i class="bi bi-shield-check"></i> LEVEL CONFIRMATION</span></div>'
         +      '<div class="gtb-card-body" id="gtb-dash-lvlconfirm" style="padding:6px 8px;"></div>'
-        +    '</div>';
+        +    '</div>';
 
         // Per-instrument OI/OBV + Prediction matrix — one row per instrument, reusing Stock
         // Viewer's own row classes/CSS (.gtb-row/.gtb-row-id/.gtb-row-predict/.gtb-row-oiobv;

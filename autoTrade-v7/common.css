@@ -1846,6 +1846,34 @@ td.details-control {
   --gtb-accent-dim:#d6eff6;
 }
 
+/* The dark var block above is keyed by ID (specificity 1,0,0) on the body-appended
+   containers, so a bare `.gtb-light` (0,1,0) set on that same element lost and the overlay
+   stayed dark in Light theme (e.g. maximized price-action chart). Re-state the light palette
+   with matching ID specificity. Keep this list in sync with the dark one. */
+#gtb-popup-win.gtb-light, .popupwindow_container.gtb-light, #groot-maximize-overlay.gtb-light,
+#gtb-chartgrid-overlay.gtb-light, #gtb-info-pop.gtb-light, #gtb-daychart-overlay.gtb-light,
+#gtb-combochart-overlay.gtb-light, #gtb-tools-flyout.gtb-light {
+  --gtb-bg:        #ffffff;
+  --gtb-surface:   #f3f6fa;
+  --gtb-surface2:  #e7edf4;
+  --gtb-border:    #c5d0de;
+  --gtb-border2:   #dde4ee;
+  --gtb-text:      #16202e;
+  --gtb-muted:     #5a6678;
+  --gtb-green:     #0a8f5f;
+  --gtb-green-dim: #d8f6ea;
+  --gtb-red:       #d61f44;
+  --gtb-red-dim:   #ffe1e8;
+  --gtb-amber:     #a9760a;
+  --gtb-amber-dim: #fbeecb;
+  --gtb-blue:      #1f6fd6;
+  --gtb-blue-dim:  #dcebff;
+  --gtb-gold:      #b07d00;
+  --gtb-gold-dim:  #f6ecc9;
+  --gtb-accent:    #0a8aa8;
+  --gtb-accent-dim:#d6eff6;
+}
+
 /* Force chart background in light mode */
 .gtb-light .gtb-chart-mini,
 .gtb-light .gtb-chart-oi,
