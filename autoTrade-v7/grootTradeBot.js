@@ -8836,8 +8836,8 @@ function _gtbCfgFieldGroups() {
         { key: 'telegram_chat_id', label: 'Telegram Chat ID', type: 'text' },
     ]});
     groups.push({ id: 'general', title: 'GENERAL', fields: [
-        { key: 'previous_day_date', label: 'Previous day (YYYY-MM-DD)', type: 'text' },
-        { key: 'current_day_date', label: 'Current day (YYYY-MM-DD)', type: 'text' },
+        { key: 'previous_day_date', label: 'Previous day (YYYY-MM-DD)', type: 'text', date: true },
+        { key: 'current_day_date', label: 'Current day (YYYY-MM-DD)', type: 'text', date: true },
         { key: 'margin', label: 'Margin', type: 'text' },
         { key: 'refresh_time', label: 'Refresh time', type: 'text' },
         { key: 'historical_data_interval', label: 'Historical data interval', type: 'text' },
@@ -8861,8 +8861,8 @@ function _gtbCfgFieldGroups() {
         { key: 'hedge_diff_stocks', label: 'Stocks (points)', type: 'text' },
     ]});
     groups.push({ id: 'mcxgeneral', title: 'MCX DATES', fields: [
-        { key: 'mcx_previous_day_date', label: 'MCX previous day (YYYY-MM-DD)', type: 'text' },
-        { key: 'mcx_current_day_date', label: 'MCX current day (YYYY-MM-DD)', type: 'text' },
+        { key: 'mcx_previous_day_date', label: 'MCX previous day (YYYY-MM-DD)', type: 'text', date: true },
+        { key: 'mcx_current_day_date', label: 'MCX current day (YYYY-MM-DD)', type: 'text', date: true },
     ]});
     groups.push({ id: 'vol', title: 'VOLATILITY INDICES (CBOE)', fields: [
         { key: 'OVX', label: 'OVX (CBOE Crude Oil Volatility)', type: 'text', link: 'https://www.cboe.com/index/dashboard/OVX/', fetchSymbol: '_OVX' },
@@ -8930,8 +8930,12 @@ function _gtbShowMarketTrendSettings() {
         var fetchBtn = f.fetchSymbol
             ? '<button type="button" class="gtb-cfg-fetch-btn" data-symbol="' + f.fetchSymbol + '" data-target="' + id + '" title="Fetch previous close from CBOE"><i class="bi bi-cloud-download"></i></button>'
             : '';
+        var dateBtn = f.date
+            ? '<span class="gtb-cfg-datepick" title="Pick a date"><i class="bi bi-calendar3"></i>'
+                + '<input type="date" data-date-for="' + id + '" value="' + (/^\d{4}-\d{2}-\d{2}$/.test(safeVal) ? safeVal : '') + '"></span>'
+            : '';
         return '<div class="gtb-cfg-field"><label>' + labelHtml + '</label>'
-            + '<div class="gtb-cfg-field-row"><input type="text" id="' + id + '" data-key="' + f.key + '" value="' + safeVal + '">' + fetchBtn + '</div></div>';
+            + '<div class="gtb-cfg-field-row"><input type="text" id="' + id + '" data-key="' + f.key + '" value="' + safeVal + '">' + dateBtn + fetchBtn + '</div></div>';
     }
 
     // Quick-jump nav — with 8 sections/40+ fields on one scroll, per explicit feedback that
@@ -9020,6 +9024,18 @@ jQ(document).on('click', '.gtb-cfg-fetch-btn', function () {
             callSackBarInfo('CBOE fetch timed out');
         },
     });
+});
+
+// Calendar button on the day-date fields: write the picked date into the visible text field
+// (the one that's actually saved) and fire 'input' so the NSE → MCX mirroring above runs.
+jQ(document).on('change', '.gtb-cfg-datepick input[type="date"]', function () {
+    var v = jQ(this).val();
+    if (v) jQ('#' + jQ(this).attr('data-date-for')).val(v).trigger('input');
+});
+// Keep the picker's own value in step when the text field is typed into or mirrored.
+jQ(document).on('input', '.gtb-cfg-wrap input[type="text"][data-key$="_day_date"]', function () {
+    var v = jQ(this).val();
+    jQ('.gtb-cfg-datepick input[data-date-for="' + this.id + '"]').val(/^\d{4}-\d{2}-\d{2}$/.test(v) ? v : '');
 });
 
 jQ(document).on('click', '.gtb-cfg-jump-link', function (e) {
@@ -10729,11 +10745,44 @@ var GTB_LAST_FUT_REMARK = {};   // name → {remark, dir, ts} — futures-trend 
 var _GTB_915_ROWS = [];   // last-built day rows, for the combo-charts popup
 var _GTB_OIC_LIST = [];   // last OI-compare instrument list, for the detailed/compact toggle
 
+// Zone filter for the backtest: pick a 9:15 zone (AST/ASO/B-W/BSO/BST) per instrument and every
+// table below recomputes from just the matching days. '' = any. Exact raw zones, not the
+// normalised AST→ASO buckets, so "AST" and "ASO" can be told apart.
+var _GTB_915_FILTER = { g: '', n: '', s: '', b: '' };
+var _GTB_915_ZONES = ['AST', 'ASO', 'B/W', 'BSO', 'BST'];
+
 function _render915Trend(rows) {
     if (!rows || !rows.length) {
         return '<div style="padding:24px;text-align:center;color:var(--gtb-muted);"><i class="bi bi-exclamation-triangle"></i> No data</div>';
     }
-    _GTB_915_ROWS = rows;
+    var _all915 = rows;
+    _GTB_915_ROWS = _all915;                 // the chart popups below always work from the FULL set
+    var _F = _GTB_915_FILTER;
+    var _filtActive = !!(_F.g || _F.n || _F.s || _F.b);
+    rows = _all915.filter(function (r) {
+        return (!_F.g || r.g === _F.g) && (!_F.n || r.n === _F.n) && (!_F.s || r.s === _F.s) && (!_F.b || r.b === _F.b);
+    });
+    var _filterBar = (function () {
+        var sel = function (k, label) {
+            return '<label style="display:flex;align-items:center;gap:4px;font-size:0.6rem;font-weight:700;">' + label
+                + '<select class="gtb-t915-filter-sel oic-mode-btn" data-k="' + k + '" style="min-width:68px;">'
+                + '<option value="">Any</option>'
+                + _GTB_915_ZONES.map(function (z) { return '<option value="' + z + '"' + (_F[k] === z ? ' selected' : '') + '>' + z + '</option>'; }).join('')
+                + '</select></label>';
+        };
+        return '<div id="gtb-t915-filterbar" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:6px 8px;margin-bottom:6px;border:1px solid var(--gtb-border);background:var(--gtb-surface);">'
+            + '<span style="font-size:0.6rem;font-weight:800;letter-spacing:0.05em;"><i class="bi bi-funnel"></i> 9:15 ZONE FILTER</span>'
+            + sel('g', 'GIFT') + sel('n', 'NIFTY') + sel('s', 'SENSEX') + sel('b', 'BANK')
+            + '<button type="button" id="gtb-915-filter-today" class="oic-mode-btn" title="Set the four filters to today\'s live 9:15 zones">Match today</button>'
+            + '<button type="button" id="gtb-915-filter-reset" class="oic-mode-btn">Reset</button>'
+            + '<span style="font-size:0.58rem;color:' + (_filtActive ? 'var(--gtb-accent)' : 'var(--gtb-muted)') + ';margin-left:auto;">'
+            + (_filtActive ? rows.length + ' of ' + _all915.length + ' days match — all tables below use only these days' : 'all ' + _all915.length + ' days (no filter)') + '</span>'
+            + '</div>';
+    })();
+    if (!rows.length) {
+        return '<div class="gtb-t915-wrap">' + _filterBar
+            + '<div style="padding:24px;text-align:center;color:var(--gtb-muted);"><i class="bi bi-funnel"></i> No days in the last ' + _all915.length + ' trading days had that combination. Loosen a filter.</div></div>';
+    }
     // Todays 9:15 combo (same classification the live dashboard uses) — for highlighting.
     var _tb915 = JSON.parse(localStorage.getItem('VALID_BREAKOUT_NINE_FIFTEEN') || '{}');
     var _t915n = (_tb915['NIFTY 50']   || {}).CLOSE_9_15;
@@ -10839,6 +10888,7 @@ function _render915Trend(rows) {
     }
 
     var html = '<div class="gtb-t915-wrap">';
+    html += _filterBar;
     html += '<div style="display:flex;justify-content:flex-end;margin-bottom:6px;">'
          +  '<button id="gtb-915-clear" class="oic-mode-btn" title="Clear the cached backtest data and rebuild from fresh candles"><i class="bi bi-arrow-clockwise"></i> Clear cache &amp; rebuild</button>'
          +  '</div>';
@@ -11085,6 +11135,23 @@ async function _gtbShow915Backtest() {
     }
 }
 jQ(document).on('click', '#show-915-backtest', function (e) { e.preventDefault(); _gtbShow915Backtest(); });
+// Zone filter controls — re-render from the full row set; the render applies the filter.
+jQ(document).on('change', '.gtb-t915-filter-sel', function () {
+    _GTB_915_FILTER[jQ(this).attr('data-k')] = jQ(this).val();
+    jQ('#groot-maximize-body').html(_render915Trend(_GTB_915_ROWS));
+});
+jQ(document).on('click', '#gtb-915-filter-reset', function (e) {
+    e.preventDefault();
+    _GTB_915_FILTER = { g: '', n: '', s: '', b: '' };
+    jQ('#groot-maximize-body').html(_render915Trend(_GTB_915_ROWS));
+});
+jQ(document).on('click', '#gtb-915-filter-today', function (e) {
+    e.preventDefault();
+    var tb = {}; try { tb = JSON.parse(localStorage.getItem('VALID_BREAKOUT_NINE_FIFTEEN') || '{}'); } catch (e0) {}
+    var z = function (name) { var v = (tb[name] || {}).CLOSE_9_15; return _GTB_915_ZONES.indexOf(v) !== -1 ? v : ''; };
+    _GTB_915_FILTER = { g: z('GIFT NIFTY'), n: z('NIFTY 50'), s: z('SENSEX'), b: z('NIFTY BANK') };
+    jQ('#groot-maximize-body').html(_render915Trend(_GTB_915_ROWS));
+});
 // 9:15 Combo block in the Predict card (Dashboard/Metrics) — clicking it opens the same
 // full backtest popup as the floating-toolbar icon, since the block already summarizes
 // exactly what that popup breaks down in detail.

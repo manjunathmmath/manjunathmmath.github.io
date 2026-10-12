@@ -51,6 +51,19 @@
 }
 .gtb-cfg-fetch-btn:hover { border-color: var(--gtb-accent); }
 .gtb-cfg-fetch-btn:disabled { opacity: 0.5; cursor: default; }
+/* Calendar button for the YYYY-MM-DD day fields: a transparent native <input type="date">
+   sits over the icon, so a click opens the browser's own picker while the visible text field
+   keeps the ISO format (a native date input can't be forced out of the locale's order). */
+.gtb-cfg-datepick {
+  position: relative; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  width: 28px; background: var(--gtb-surface); color: var(--gtb-accent);
+  border: 1px solid var(--gtb-border); font-size: 0.7rem; cursor: pointer;
+}
+.gtb-cfg-datepick:hover { border-color: var(--gtb-accent); }
+.gtb-cfg-datepick input[type="date"] {
+  position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;
+  border: 0; padding: 0; margin: 0;
+}
 .gtb-cfg-field-checkbox {
   flex-direction: row; align-items: center; gap: 5px; font-size: 0.58rem; color: var(--gtb-text);
   grid-column: span 3;
