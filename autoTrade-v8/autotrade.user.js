@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Groot Bot
 // @namespace    Groot Bot
-// @version      29.446
+// @version      29.493
 // @description  Groot Bot
 // @author       Manjunath
 // @match        https://kite.zerodha.com/*
@@ -21,6 +21,7 @@
 // @connect      cdn.cboe.com
 // @connect      cdn-api.cboe.com
 // @connect      api.telegram.org
+// @connect      liveindexsa.niftyindices.com
 // @resource     BOOTSTRAP_CSS https://manjunathmmath.github.io/autoTrade-v8/dist/css/bootstrap.css
 // @resource     DATATABLE_CSS https://manjunathmmath.github.io/autoTrade-v8/global/vendor/datatables/datatables.min.css
 // @resource     BOOTSTRAP_ICON_CSS https://manjunathmmath.github.io/autoTrade-v8/dist/font/bootstrap-icons.css
@@ -110,6 +111,8 @@
 // @require      https://manjunathmmath.github.io/autoTrade-v8/tradeFocusLog.js
 // @require      https://manjunathmmath.github.io/autoTrade-v8/liveContext.js
 // @require      https://manjunathmmath.github.io/autoTrade-v8/stockWatch.js
+// @require      https://manjunathmmath.github.io/autoTrade-v8/indexWeights.js
+// @require      https://manjunathmmath.github.io/autoTrade-v8/obvBreakout.js
 // @require      https://manjunathmmath.github.io/autoTrade-v8/autoPilot.js
 // @require      https://manjunathmmath.github.io/autoTrade-v8/macro.js
 // @require      https://manjunathmmath.github.io/autoTrade-v8/briefingCore.js
