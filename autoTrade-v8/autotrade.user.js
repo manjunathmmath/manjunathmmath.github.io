@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Groot Bot
 // @namespace    Groot Bot
-// @version      29.493
+// @version      29.537
 // @description  Groot Bot
 // @author       Manjunath
 // @match        https://kite.zerodha.com/*
@@ -22,6 +22,17 @@
 // @connect      cdn-api.cboe.com
 // @connect      api.telegram.org
 // @connect      liveindexsa.niftyindices.com
+// @connect      news.google.com
+// @connect      nfs.faireconomy.media
+// @connect      localhost
+// @connect      127.0.0.1
+// @connect      economictimes.indiatimes.com
+// @connect      www.moneycontrol.com
+// @connect      www.livemint.com
+// @connect      www.cnbc.com
+// @connect      feeds.finance.yahoo.com
+// @connect      feeds.content.dowjones.io
+// @connect      feeds.bbci.co.uk
 // @resource     BOOTSTRAP_CSS https://manjunathmmath.github.io/autoTrade-v8/dist/css/bootstrap.css
 // @resource     DATATABLE_CSS https://manjunathmmath.github.io/autoTrade-v8/global/vendor/datatables/datatables.min.css
 // @resource     BOOTSTRAP_ICON_CSS https://manjunathmmath.github.io/autoTrade-v8/dist/font/bootstrap-icons.css
@@ -113,6 +124,11 @@
 // @require      https://manjunathmmath.github.io/autoTrade-v8/stockWatch.js
 // @require      https://manjunathmmath.github.io/autoTrade-v8/indexWeights.js
 // @require      https://manjunathmmath.github.io/autoTrade-v8/obvBreakout.js
+// @require      https://manjunathmmath.github.io/autoTrade-v8/newsFeed.js
+// @require      https://manjunathmmath.github.io/autoTrade-v8/outlookWatch.js
+// @require      https://manjunathmmath.github.io/autoTrade-v8/focusBrief.js
+// @require      https://manjunathmmath.github.io/autoTrade-v8/dataRecorder.js
+// @require      https://manjunathmmath.github.io/autoTrade-v8/replayRecorder.js
 // @require      https://manjunathmmath.github.io/autoTrade-v8/autoPilot.js
 // @require      https://manjunathmmath.github.io/autoTrade-v8/macro.js
 // @require      https://manjunathmmath.github.io/autoTrade-v8/briefingCore.js
