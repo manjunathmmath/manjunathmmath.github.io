@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Groot Bot
 // @namespace    Groot Bot
-// @version      29.580
+// @version      29.609
 // @description  Groot Bot
 // @author       Manjunath
 // @match        https://kite.zerodha.com/*
@@ -22,7 +22,6 @@
 // @connect      cdn-api.cboe.com
 // @connect      api.telegram.org
 // @connect      liveindexsa.niftyindices.com
-// @connect      news.google.com
 // @connect      nfs.faireconomy.media
 // @connect      localhost
 // @connect      127.0.0.1
@@ -33,6 +32,16 @@
 // @connect      feeds.finance.yahoo.com
 // @connect      feeds.content.dowjones.io
 // @connect      feeds.bbci.co.uk
+// @connect      zerodha.com
+// @connect      freefincal.com
+// @connect      premium.capitalmind.in
+// @connect      aswathdamodaran.blogspot.com
+// @connect      awealthofcommonsense.com
+// @connect      ofdollarsanddata.com
+// @connect      thereformedbroker.com
+// @connect      fs.blog
+// @connect      mebfaber.com
+// @connect      alphaarchitect.com
 // @resource     BOOTSTRAP_CSS https://manjunathmmath.github.io/autoTrade-v9/dist/css/bootstrap.css
 // @resource     DATATABLE_CSS https://manjunathmmath.github.io/autoTrade-v9/global/vendor/datatables/datatables.min.css
 // @resource     BOOTSTRAP_ICON_CSS https://manjunathmmath.github.io/autoTrade-v9/dist/font/bootstrap-icons.css
@@ -125,6 +134,7 @@
 // @require      https://manjunathmmath.github.io/autoTrade-v9/indexWeights.js
 // @require      https://manjunathmmath.github.io/autoTrade-v9/obvBreakout.js
 // @require      https://manjunathmmath.github.io/autoTrade-v9/newsFeed.js
+// @require      https://manjunathmmath.github.io/autoTrade-v9/learnFeed.js
 // @require      https://manjunathmmath.github.io/autoTrade-v9/outlookWatch.js
 // @require      https://manjunathmmath.github.io/autoTrade-v9/focusBrief.js
 // @require      https://manjunathmmath.github.io/autoTrade-v9/chartView.js

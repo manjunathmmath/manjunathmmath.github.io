@@ -128,7 +128,7 @@ var _RP_EXP_BASE = 1900000000;
         if (typeof _dlConfiguredExpiryForName === 'function') {
             var oc = _dlConfiguredExpiryForName;
             _dlConfiguredExpiryForName = function (name, kind) {
-                try { var j = _RP.job; if (j && j.status === 'running' && j.exp && j.exp[name] && j.exp[name].expiry) return j.exp[name].expiry; } catch (e) {}
+                try { var j = _RP.job; if (_RP.expInjected && j && j.status === 'running' && j.exp && j.exp[name] && j.exp[name].expiry) return j.exp[name].expiry; } catch (e) {}
                 return oc.apply(this, arguments);
             };
         }
@@ -161,6 +161,7 @@ function _rpInjectExpired(j) {
     var before = (_DL_INSTRUMENTS || []).length;
     _DL_INSTRUMENTS = (_DL_INSTRUMENTS || []).filter(function (r) { return !(r.token >= _RP_EXP_BASE) && !((r.instrument_type === 'CE' || r.instrument_type === 'PE') && drop[r.name + '|' + String(r.expiry).slice(0, 10)]); }).concat(rows);
     _RP.expDropped = before - (_DL_INSTRUMENTS.length - rows.length);
+    _RP.expInjected = true;   // the expiry override above applies only in the tab that injected the rows (a mirror tab or a stale job must not change the live expiry)
     try { _dlRecomputeDerivedGlobals(); } catch (e) { j.errors.push('expired contracts: ' + (e && e.message || e)); }
     _RP.expDone = j.id; _RP.expN = rows.length;
     return rows.length;
